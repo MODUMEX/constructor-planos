@@ -49,3 +49,17 @@ jobs:
             avisa cuando hay una version nueva y la instala si aceptas.
           releaseDraft: false
           prerelease: false
+
+      # Sube una copia del instalador con un nombre FIJO, para poder repartir
+      # siempre el mismo enlace (en la web o por WhatsApp) sin cambiarlo en
+      # cada version:
+      #   .../releases/latest/download/Constructor-de-Planos-Instalador.exe
+      - name: Copia con nombre fijo para el enlace de descarga
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $exe = Get-ChildItem src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1
+          if (-not $exe) { throw "no se genero el instalador NSIS" }
+          Copy-Item $exe.FullName "Constructor-de-Planos-Instalador.exe"
+          gh release upload $env:GITHUB_REF_NAME "Constructor-de-Planos-Instalador.exe" --clobber
