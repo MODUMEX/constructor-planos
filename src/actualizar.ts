@@ -18,10 +18,18 @@ export type FaseActualizacion =
   | { fase: 'descargando'; version: string; porcentaje: number | null }
   | { fase: 'instalando'; version: string }
 
+/** qué pasó al consultar; lo usa el botón "Buscar actualizaciones" para poder decirlo */
+export type ResultadoBusqueda =
+  | { tipo: 'al-dia' }
+  | { tipo: 'rechazada'; version: string }
+  | { tipo: 'instalando' }
+  | { tipo: 'solo-escritorio' }
+  | { tipo: 'error'; mensaje: string }
+
 export async function buscarActualizacion(
   alCambiar: (estado: FaseActualizacion | null) => void,
-): Promise<void> {
-  if (!enEscritorio()) return
+): Promise<ResultadoBusqueda> {
+  if (!enEscritorio()) return { tipo: 'solo-escritorio' }
 
   try {
     const [{ check }, { ask }, { relaunch }] = await Promise.all([
@@ -31,7 +39,7 @@ export async function buscarActualizacion(
     ])
 
     const nueva = await check()
-    if (!nueva) return
+    if (!nueva) return { tipo: 'al-dia' }
 
     const instalar = await ask(
       `Hay una versión nueva del Constructor de Planos (${nueva.version}).\n\n` +
@@ -43,7 +51,7 @@ export async function buscarActualizacion(
         cancelLabel: 'Ahora no',
       },
     )
-    if (!instalar) return
+    if (!instalar) return { tipo: 'rechazada', version: nueva.version }
 
     // A partir de aquí la app queda tapada hasta que se reinicie sola.
     alCambiar({ fase: 'descargando', version: nueva.version, porcentaje: null })
@@ -64,10 +72,13 @@ export async function buscarActualizacion(
     })
 
     await relaunch()
+    return { tipo: 'instalando' }
   } catch (e) {
     // Sin internet, o si la descarga se cae a medias, se destapa la app y se
     // sigue usando la versión ya instalada en vez de dejarla trabada.
     alCambiar(null)
+    const mensaje = e instanceof Error ? e.message : String(e)
     console.warn('No se pudo comprobar o instalar la actualización:', e)
+    return { tipo: 'error', mensaje }
   }
 }

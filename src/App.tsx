@@ -141,12 +141,27 @@ export default function App() {
   const [verProyectos, setVerProyectos] = useState(false)
   const [version, setVersion] = useState(VERSION_COMPILADA)
   const [actualizando, setActualizando] = useState<FaseActualizacion | null>(null)
+  const [buscandoActualizacion, setBuscandoActualizacion] = useState(false)
+  const [avisoActualizacion, setAvisoActualizacion] = useState<string | null>(null)
 
   // al abrir: se muestra la versión en uso y se busca si hay una nueva publicada
   useEffect(() => {
     versionActual().then(setVersion)
     buscarActualizacion(setActualizando)
   }, [])
+
+  // el botón del encabezado: igual que la consulta de arranque, pero diciendo
+  // en qué acabó. Sin esto, un fallo de red se traga el aviso sin dejar rastro.
+  async function buscarActualizacionAhora() {
+    setBuscandoActualizacion(true)
+    setAvisoActualizacion(null)
+    const r = await buscarActualizacion(setActualizando)
+    setBuscandoActualizacion(false)
+    if (r.tipo === 'al-dia') setAvisoActualizacion(`Ya tienes la última versión (${version}).`)
+    else if (r.tipo === 'rechazada') setAvisoActualizacion(`La versión ${r.version} quedó sin instalar.`)
+    else if (r.tipo === 'solo-escritorio') setAvisoActualizacion('En el navegador no hay nada que instalar.')
+    else if (r.tipo === 'error') setAvisoActualizacion(`No se pudo consultar: ${r.mensaje}`)
+  }
 
   // al entrar, las tarifas por m² se traen de la tabla tarifa_m2
   useEffect(() => {
@@ -389,7 +404,16 @@ export default function App() {
         <span className="chip">Plano N° {proyecto.numero}</span>
         <span className="chip">{proyecto.areas.length === 1 ? area.nombre : `${proyecto.areas.length} áreas`}</span>
         <div className="sep" />
+        {avisoActualizacion && <span className="chip" title={avisoActualizacion}>{avisoActualizacion}</span>}
         <span className="chip">{usuario.nombre} · {usuario.rol}</span>
+        <button
+          className="btn plano chico"
+          onClick={buscarActualizacionAhora}
+          disabled={buscandoActualizacion}
+          title="Comprobar si hay una versión más nueva publicada"
+        >
+          {buscandoActualizacion ? 'Buscando…' : 'Actualizaciones'}
+        </button>
         <button className="btn plano chico" onClick={() => setVerProyectos(true)}>Proyectos</button>
         {usuario.rol === 'Super Admin' && (
           <button className="btn plano chico" onClick={() => setVerTarifas(true)}>Lista de precios</button>
