@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Verificar el PDF</title>
+    <style>
+      body { margin: 0; background: #4a5260; font-family: system-ui, sans-serif; }
+      #hojas { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 14px; }
+      canvas { background: #fff; box-shadow: 0 2px 14px rgba(0,0,0,.4); max-width: 100%; }
+      #estado { color: #fff; font-size: 13px; padding: 8px 14px; }
+    </style>
+  </head>
+  <body>
+    <div id="estado">Cargando…</div>
+    <div id="hojas"></div>
+    <script type="module">
+      // Vista de revisión: abre un PDF servido por el dev server y lo pinta
+      // en canvas, para poder mirar el plano impreso sin salir del navegador.
+      //   http://localhost:5183/verificar-pdf.html?src=/muestra.pdf
+      import * as pdfjs from 'pdfjs-dist'
+      import trabajador from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+      pdfjs.GlobalWorkerOptions.workerSrc = trabajador
+
+      const src = new URLSearchParams(location.search).get('src') ?? '/muestra.pdf'
+      const escala = Number(new URLSearchParams(location.search).get('escala') ?? 1.7)
+      const estado = document.getElementById('estado')
+      const hojas = document.getElementById('hojas')
+
+      try {
+        const doc = await pdfjs.getDocument({ url: src, disableWorker: true }).promise
+        estado.textContent = `${src} · ${doc.numPages} hoja(s)`
+        for (let n = 1; n <= doc.numPages; n++) {
+          const pagina = await doc.getPage(n)
+          const vista = pagina.getViewport({ scale: escala })
+          const canvas = document.createElement('canvas')
+          canvas.width = Math.floor(vista.width)
+          canvas.height = Math.floor(vista.height)
+          hojas.appendChild(canvas)
+          await pagina.render({ canvasContext: canvas.getContext('2d'), viewport: vista }).promise
+        }
+        document.title = 'PDF listo'
+      } catch (e) {
+        estado.textContent = 'No se pudo abrir el PDF: ' + e.message
+      }
+    </script>
+  </body>
+</html>

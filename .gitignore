@@ -1,0 +1,10 @@
+node_modules
+dist
+.env
+.env.local
+src-tauri/target
+src-tauri/gen
+.muestra.mjs
+instaladores
+public/*.pdf
+tsconfig.tsbuildinfo

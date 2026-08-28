@@ -1,0 +1,51 @@
+name: Publicar version de escritorio
+
+# Se dispara al subir una etiqueta de version (v2.0.1, v2.1.0, ...).
+# Compila el instalador en Windows, lo firma y lo publica en Releases junto con
+# latest.json, que es el archivo que la aplicacion instalada consulta para
+# saber si hay una version mas nueva.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publicar:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # guarda las dependencias de Rust ya compiladas: la primera vez tarda,
+      # las siguientes bajan de ~15 min a un par de minutos
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: Constructor de Planos v__VERSION__
+          releaseBody: |
+            Descarga el instalador `.exe` y ejecutalo.
+
+            A partir de esta version la aplicacion se actualiza sola: al abrirla
+            avisa cuando hay una version nueva y la instala si aceptas.
+          releaseDraft: false
+          prerelease: false

@@ -1,0 +1,368 @@
+import type { Acabado, HerrajeAcabado, Linea, Pais, TierColor, TipologiaId, Montaje } from './types'
+import { esColorMx } from './coloresMx'
+
+/** grueso real de la pilastra en laminado compacto, en cm (12.7 mm) */
+export const GRUESO_PILASTRA = 1.27
+
+/**
+ * Espesor del material de puertas, paneles y pilastras, en milímetros.
+ * Superior 2.0 va en cara de 3 mm; LEEDER y Touchless en compacto de 12 mm.
+ * El CIP deduce lo mismo de la columna Linea del CSV, así que esto tiene que
+ * coincidir con lo que se emite ahí.
+ */
+export function espesorPorLinea(linea: Linea): number {
+  return linea === 'SUPERIOR' ? 3 : 12
+}
+
+/** el arrastre de paneles cae a este paso */
+export const SNAP_CM = 0.5
+
+/** ancho mínimo de una cabina normal */
+export const MIN_CABINA_CM = 62
+
+/** ancho mínimo de una cabina accesible */
+export const MIN_ACCESIBLE_CM = 150
+
+export const PAISES: { id: Pais; nombre: string; nota: string }[] = [
+  { id: 'CR', nombre: 'Costa Rica', nota: 'Los diez colores del catálogo, en stock' },
+  { id: 'MX', nombre: 'México', nota: 'La lista de materia prima de la planta, con código' },
+]
+
+export function nombrePais(id: Pais): string {
+  return PAISES.find((p) => p.id === id)?.nombre ?? id
+}
+
+export const LINEAS: { id: Linea; nombre: string; nota: string }[] = [
+  { id: 'LEEDER', nombre: 'LEEDER', nota: 'Laminado compacto, la línea de siempre' },
+  { id: 'SUPERIOR', nombre: 'Superior 2.0', nota: 'Estructura y perfil, tres acabados' },
+  { id: 'TOUCHLESS', nombre: 'Touchless S3', nota: 'Sin contacto, altura del lugar' },
+]
+
+export interface Modelo {
+  /** el código con el que la tabla de tarifas conoce al modelo */
+  codigo: string
+  nombre: string
+}
+
+/** modelos por línea, con los códigos que usa `tarifa_m2` */
+export const MODELOS: Record<Linea, Modelo[]> = {
+  LEEDER: [
+    { codigo: 'ESTANDAR', nombre: 'Estándar' },
+    { codigo: 'ESTANDAR170', nombre: 'Estándar 170' },
+    { codigo: 'REFORZADO', nombre: 'Reforzado' },
+    { codigo: 'REFORZADO170', nombre: 'Reforzado 170' },
+    { codigo: 'IMPERIAL', nombre: 'Imperial' },
+    { codigo: 'REGADERAS', nombre: 'Regaderas' },
+    { codigo: 'KIDS', nombre: 'Kids' },
+    { codigo: 'SCUDO', nombre: 'Scudo' },
+    { codigo: 'COLGANTE', nombre: 'Colgante' },
+  ],
+  SUPERIOR: [
+    { codigo: 'SUP_ESTANDAR', nombre: 'Estándar' },
+    { codigo: 'SUP_ESTANDAR170', nombre: 'Estándar 170' },
+    { codigo: 'SUP_REFORZADO', nombre: 'Reforzado' },
+    { codigo: 'SUP_REFORZADO170', nombre: 'Reforzado 170' },
+    { codigo: 'SUP_COLGANTE', nombre: 'Colgante' },
+  ],
+  TOUCHLESS: [{ codigo: 'TL_S3', nombre: 'Touchless S3' }],
+}
+
+export function modeloDe(linea: Linea, codigo: string): Modelo {
+  return MODELOS[linea].find((m) => m.codigo === codigo) ?? MODELOS[linea][0]
+}
+
+/** el nombre que va al CSV y al cajetín */
+export function nombreModelo(linea: Linea, codigo: string): string {
+  return modeloDe(linea, codigo).nombre
+}
+
+/** los modelos reforzados llevan la pilastra a 210 */
+export function esReforzado(codigo: string): boolean {
+  return codigo.includes('REFORZADO')
+}
+
+/**
+ * Acabados por línea, igual que `acabadosDeLinea()` del Constructor actual:
+ * solo Superior 2.0 ofrece esmaltada y acero.
+ */
+export const ACABADOS: Record<Linea, Acabado[]> = {
+  LEEDER: ['Laminado Compacto'],
+  SUPERIOR: ['Laminado Compacto', 'Esmaltada Antigrafiti', 'Acero Inoxidable'],
+  TOUCHLESS: ['Laminado Compacto'],
+}
+
+export interface Color {
+  nombre: string
+  /** cómo se llamaba antes; se muestra al lado para que nadie se confunda */
+  nombreViejo?: string
+  tier: TierColor
+  /** color aproximado, para la muestra en pantalla */
+  hex: string
+  /** si está, el color solo existe en esas líneas */
+  lineas?: Linea[]
+  /** otros nombres con los que llega el mismo color (listas viejas, códigos) */
+  alias?: string[]
+  /** con el que se nombran los renders de mercadeo */
+  slug: string
+}
+
+/**
+ * Catálogo de colores, copiado tal cual del Constructor actual
+ * (CATALOGO.colores), con su nombre viejo y sus alias. Los ocho primeros
+ * son los de línea, en stock; los dos últimos son de Superior 2.0.
+ */
+export const COLORES: Color[] = [
+  { nombre: 'INOX SATÍN', nombreViejo: 'Gris Metalic', tier: 'linea', hex: '#6E6F71', alias: ['GRIS METALIZADO MT 240', 'INOX SATIN', 'MT-240'], slug: 'inox-satin' },
+  { nombre: 'GRIS', nombreViejo: 'Aluminak', tier: 'linea', hex: '#A8AAB0', alias: ['ALUMINA 2103', 'ALUMINAK', 'SL-210'], slug: 'gris' },
+  { nombre: 'NEGRO', nombreViejo: 'Negro Std', tier: 'linea', hex: '#1B1B1D', alias: ['NEGRO EBANO 2110', 'SL-600'], slug: 'negro' },
+  { nombre: 'BLANCO', nombreViejo: 'Whitec', tier: 'linea', hex: '#F4F4F0', alias: ['FASHION WHITE', 'WHITEC', 'SL-110'], slug: 'blanco' },
+  { nombre: 'ÁMBAR WOOD', nombreViejo: 'Walnut', tier: 'linea', hex: '#A9743B', alias: ['MD-310'], slug: 'ambar-wood' },
+  { nombre: 'NOGAL GRAFITO', nombreViejo: 'Skyline', tier: 'linea', hex: '#514A44', alias: ['MD-380'], slug: 'nogal-grafito' },
+  { nombre: 'GRAFITO NOCTURNO', tier: 'linea', hex: '#2B2E33', alias: ['SL-510'], slug: 'grafito-nocturno' },
+  { nombre: 'NEUTRAL OAK', tier: 'linea', hex: '#C2A878', alias: ['1266'], slug: 'neutral-oak' },
+  { nombre: 'ESMALTADA ANTIGRAFITI', tier: 'antigrafiti', hex: '#3B3B3D', lineas: ['SUPERIOR'], alias: ['ANTIGRAFITI'], slug: 'esmaltada-antigrafiti' },
+  { nombre: 'ACERO INOXIDABLE', tier: 'aceroInox', hex: '#C7CACE', lineas: ['SUPERIOR'], alias: ['ACERO INOX', 'INOXIDABLE'], slug: 'acero-inoxidable' },
+]
+
+/**
+ * Los herrajes van en juego completo: si el cliente pide negro, todo el juego
+ * es negro. No se elige pieza por pieza.
+ */
+export const HERRAJE_ACABADOS: { id: HerrajeAcabado; nombre: string; nota: string }[] = [
+  { id: 'INOX', nombre: 'Acero inoxidable', nota: 'El juego de siempre, en inoxidable pulido' },
+  { id: 'NEGRO', nombre: 'Negro', nota: 'Todo el juego en negro: bisagra, cerrojo, escuadras, patas y gancho' },
+]
+
+export function nombreHerraje(id: HerrajeAcabado): string {
+  return HERRAJE_ACABADOS.find((h) => h.id === id)?.nombre ?? id
+}
+
+/** "INOX SATÍN (Gris Metalic)", el mismo rótulo que usa el Constructor */
+export function etiquetaColor(c: Color): string {
+  return c.nombreViejo ? `${c.nombre} (${c.nombreViejo})` : c.nombre
+}
+
+export function etiquetaTier(tier: TierColor): string {
+  return { linea: 'Línea', especial: 'Especial', aceroInox: 'Acero Inox', antigrafiti: 'Antigrafiti' }[tier]
+}
+
+/**
+ * Qué colores se pueden elegir, con la misma regla que
+ * `coloresParaSeleccion()` del Constructor: el acabado manda en Superior,
+ * y fuera de Superior nunca aparecen esmaltada ni acero.
+ */
+export function coloresPara(linea: Linea, acabado: Acabado): Color[] {
+  const deLaLinea = COLORES.filter((c) => !c.lineas || c.lineas.includes(linea))
+  if (linea === 'SUPERIOR') {
+    if (acabado === 'Acero Inoxidable') return deLaLinea.filter((c) => c.tier === 'aceroInox')
+    if (acabado === 'Esmaltada Antigrafiti') return deLaLinea.filter((c) => c.tier === 'antigrafiti')
+  }
+  return deLaLinea.filter((c) => c.tier === 'linea')
+}
+
+/** busca el color por su nombre, por el viejo o por cualquiera de sus alias */
+export function buscarColor(nombre: string): Color | undefined {
+  const n = (nombre || '').trim().toUpperCase()
+  if (!n) return undefined
+  return COLORES.find(
+    (c) =>
+      c.nombre.toUpperCase() === n ||
+      (c.nombreViejo ?? '').toUpperCase() === n ||
+      (c.alias ?? []).some((a) => a.toUpperCase() === n),
+  )
+}
+
+export function tierDeColor(nombre: string, pais: Pais = 'CR'): TierColor {
+  const delCatalogo = buscarColor(nombre)
+  if (delCatalogo) return delCatalogo.tier
+  // los de la lista de la planta de México son todos de línea
+  if (pais === 'MX' && esColorMx(nombre)) return 'linea'
+  // un color que no está en ninguna lista se cotiza como especial, igual que hoy
+  return 'especial'
+}
+
+export function hexDeColor(nombre: string): string {
+  return buscarColor(nombre)?.hex ?? '#8b98a8'
+}
+
+/**
+ * Los tres montajes. Ya no se eligen en el paso 4 —quedó solo herrajes—, pero
+ * la lista se conserva porque la modulación distingue PISO_TECHO en el SKU de
+ * pilastra y PISO_HEADRAIL en el renglón del riel.
+ */
+export const MONTAJES: { id: Montaje; nombre: string; nota: string }[] = [
+  { id: 'PISO_HEADRAIL', nombre: 'Piso con riel superior', nota: 'El estándar: pilastra a piso y riel de amarre arriba' },
+  { id: 'PISO', nombre: 'Anclada a piso', nota: 'Sin riel superior, pilastra reforzada' },
+  { id: 'PISO_TECHO', nombre: 'Piso a techo', nota: 'Pilastra corrida de piso a cielo' },
+]
+
+export const BISAGRAS = [
+  { id: 'GRAV', nombre: 'Bisagra de gravedad', nota: 'Cierra sola, la de catálogo' },
+  { id: 'INOX', nombre: 'Bisagra de acero inoxidable', nota: 'Servicio pesado' },
+]
+
+export const CERROJOS = [
+  { id: 'IND', nombre: 'Cerrojo con indicador', nota: 'Muestra libre / ocupado' },
+  { id: 'STD', nombre: 'Cerrojo estándar', nota: 'Pasador de canto' },
+]
+
+/** anchos de puerta de catálogo, en cm */
+export const ANCHOS_PUERTA = [55, 60, 62, 64, 65, 70, 75, 80, 85, 90, 92, 94, 95, 100]
+
+/** una puerta necesita este margen contra el ancho de la cabina */
+export const MARGEN_PUERTA_CM = 8
+
+export function puertasPosibles(anchoCabinaCm: number): { ancho: number; cabe: boolean }[] {
+  const max = anchoCabinaCm - MARGEN_PUERTA_CM
+  return ANCHOS_PUERTA.map((ancho) => ({ ancho, cabe: ancho <= max }))
+}
+
+export interface Tipologia {
+  id: TipologiaId
+  nombre: string
+  descripcion: string
+  /** cuántos tramos de pared usa */
+  tramos: { orientacion: 'horizontal' | 'vertical'; muroInicio: boolean; muroFin: boolean; nombre: string }[]
+  esquinaCompartida: boolean
+  /** índice del tramo que recibe el claro y la cantidad de cabinas que da el vendedor */
+  principal: number
+  nuevo?: boolean
+}
+
+/** largo con el que arranca un tramo secundario, después se ajusta arrastrando */
+export const LARGO_SECUNDARIO_CM = 200
+
+export const TIPOLOGIAS: Tipologia[] = [
+  {
+    id: 'RECTA_ENTRE_MUROS',
+    nombre: 'Recta entre muros',
+    descripcion: 'Una tira de cabinas que cierra contra pared a los dos lados.',
+    tramos: [{ orientacion: 'horizontal', muroInicio: true, muroFin: true, nombre: 'Tira' }],
+    esquinaCompartida: false,
+    principal: 0,
+  },
+  {
+    id: 'RECTA_MURO_IZQ',
+    nombre: 'Recta con muro izquierdo',
+    descripcion: 'Arranca contra pared y termina con panel de cierre.',
+    tramos: [{ orientacion: 'horizontal', muroInicio: true, muroFin: false, nombre: 'Tira' }],
+    esquinaCompartida: false,
+    principal: 0,
+  },
+  {
+    id: 'RECTA_MURO_DER',
+    nombre: 'Recta con muro derecho',
+    descripcion: 'Cierra con panel al inicio y contra pared al final.',
+    tramos: [{ orientacion: 'horizontal', muroInicio: false, muroFin: true, nombre: 'Tira' }],
+    esquinaCompartida: false,
+    principal: 0,
+  },
+  {
+    id: 'ISLA',
+    nombre: 'Isla',
+    descripcion: 'Sin muros laterales, cierra con panel a los dos lados.',
+    tramos: [{ orientacion: 'horizontal', muroInicio: false, muroFin: false, nombre: 'Tira' }],
+    esquinaCompartida: false,
+    principal: 0,
+  },
+  {
+    id: 'ESQUINA_IZQ',
+    nombre: 'Esquina izquierda',
+    descripcion: 'Dos tiras en ángulo que comparten la pilastra de la esquina.',
+    tramos: [
+      { orientacion: 'horizontal', muroInicio: true, muroFin: false, nombre: 'Tira sobre el muro de fondo' },
+      { orientacion: 'vertical', muroInicio: true, muroFin: false, nombre: 'Tira sobre el muro izquierdo' },
+    ],
+    esquinaCompartida: true,
+    principal: 0,
+    nuevo: true,
+  },
+  {
+    id: 'ESQUINA_DER',
+    nombre: 'Esquina derecha',
+    descripcion: 'La misma esquina, espejada hacia la derecha.',
+    tramos: [
+      { orientacion: 'horizontal', muroInicio: false, muroFin: true, nombre: 'Tira sobre el muro de fondo' },
+      { orientacion: 'vertical', muroInicio: true, muroFin: false, nombre: 'Tira sobre el muro derecho' },
+    ],
+    esquinaCompartida: true,
+    principal: 0,
+    nuevo: true,
+  },
+  {
+    id: 'NICHO_IZQ',
+    nombre: 'Nicho izquierdo',
+    descripcion: 'Alcoba: la tira se mete en un receso de pared con muros a los dos lados.',
+    tramos: [
+      { orientacion: 'vertical', muroInicio: true, muroFin: true, nombre: 'Tira dentro del nicho' },
+      { orientacion: 'horizontal', muroInicio: false, muroFin: true, nombre: 'Tira sobre el muro de fondo' },
+    ],
+    esquinaCompartida: true,
+    principal: 1,
+    nuevo: true,
+  },
+  {
+    id: 'NICHO_DER',
+    nombre: 'Nicho derecho',
+    descripcion: 'El mismo nicho, espejado.',
+    tramos: [
+      { orientacion: 'horizontal', muroInicio: true, muroFin: false, nombre: 'Tira sobre el muro de fondo' },
+      { orientacion: 'vertical', muroInicio: true, muroFin: true, nombre: 'Tira dentro del nicho' },
+    ],
+    esquinaCompartida: true,
+    principal: 0,
+    nuevo: true,
+  },
+  {
+    id: 'U_TRES_MUROS',
+    nombre: 'U de tres muros',
+    descripcion: 'Tres tiras: fondo y los dos costados, con las dos esquinas compartidas.',
+    tramos: [
+      { orientacion: 'vertical', muroInicio: true, muroFin: false, nombre: 'Costado izquierdo' },
+      { orientacion: 'horizontal', muroInicio: true, muroFin: true, nombre: 'Tira de fondo' },
+      { orientacion: 'vertical', muroInicio: true, muroFin: false, nombre: 'Costado derecho' },
+    ],
+    esquinaCompartida: true,
+    principal: 1,
+    nuevo: true,
+  },
+  {
+    id: 'PMR',
+    nombre: 'Cuarto accesible + cabinas',
+    descripcion: 'Cabina accesible profunda cerrada con panel, más cabinas normales al lado.',
+    tramos: [{ orientacion: 'horizontal', muroInicio: true, muroFin: false, nombre: 'Tira' }],
+    esquinaCompartida: false,
+    principal: 0,
+  },
+  {
+    id: 'ORINALES',
+    nombre: 'Solo orinales',
+    descripcion: 'Área de orinales con divisores, sin cabinas.',
+    tramos: [{ orientacion: 'horizontal', muroInicio: true, muroFin: false, nombre: 'Tira de orinales' }],
+    esquinaCompartida: false,
+    principal: 0,
+  },
+]
+
+export function tipologia(id: TipologiaId): Tipologia {
+  return TIPOLOGIAS.find((t) => t.id === id) ?? TIPOLOGIAS[0]
+}
+
+/**
+ * Tarifa por m² según el tier del color, en dólares.
+ * ATENCIÓN: estos valores son de ejemplo. Las tarifas buenas viven en la tabla
+ * `tarifa_m2` de Supabase (por modelo, tier, moneda y familia) y hay que
+ * leerlas de ahí antes de cotizarle a un cliente.
+ */
+export function tarifaM2(_acabado: Acabado, color: string): number {
+  switch (tierDeColor(color)) {
+    case 'aceroInox':
+      return 268
+    case 'antigrafiti':
+      return 214
+    case 'especial':
+      return 198
+    default:
+      return 158
+  }
+}
