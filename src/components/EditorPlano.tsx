@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import type { Cabina, Config, Tramo } from '../types'
-import { GRUESO_PILASTRA, puertasPosibles, tipologia } from '../catalog'
+import { puertasPosibles, tipologia } from '../catalog'
 import { anchoTotal, minimoDe, moverDivisor, nuevaCabina, puertaSugerida, snap } from '../modulacion'
 import { Grupo, Item, Menu, Raya } from './Menu'
 import { cajaDelPlano, ESPESOR_MURO, marcosDe, profundidadDeTramo, pt, type Marco } from '../geometria'
@@ -423,14 +423,21 @@ export default function EditorPlano({
                   <g pointerEvents="none">
                     <line x1={f0.x} y1={f0.y} x2={f1.x} y2={f1.y} stroke="#9aa8b8" strokeWidth={1.2} strokeDasharray="10 7" />
                     {cortes.map((u2, k) => {
-                      const a = pt(m, u2 - GRUESO_PILASTRA * 2, prof - GRUESO_PILASTRA * 5)
-                      const b = pt(m, u2 + GRUESO_PILASTRA * 2, prof)
+                      // La pilastra se dibuja con SU ancho (el de la pieza, 10–85 cm según
+                      // catálogo), no con el espesor del material: son cosas distintas y
+                      // dibujarla de 1.27 cm la volvía invisible en planta.
+                      const ancho = Math.max(config.anchoPilastraCm, grueso)
+                      // en los extremos se corre hacia adentro para no invadir el muro
+                      const centro =
+                        k === 0 ? u2 + ancho / 2 : k === cortes.length - 1 ? u2 - ancho / 2 : u2
+                      const a = pt(m, centro - ancho / 2, prof - grueso)
+                      const b = pt(m, centro + ancho / 2, prof)
                       return (
                         <rect
                           key={k}
                           x={Math.min(a.x, b.x)} y={Math.min(a.y, b.y)}
-                          width={Math.max(Math.abs(b.x - a.x), 4)} height={Math.max(Math.abs(b.y - a.y), 4)}
-                          fill="#1b2430"
+                          width={Math.max(Math.abs(b.x - a.x), 3)} height={Math.max(Math.abs(b.y - a.y), 3)}
+                          fill="#3c4e63" stroke="#5f7590" strokeWidth={0.8}
                         />
                       )
                     })}

@@ -102,6 +102,24 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
     doc.line(f0x, f0y, f1x, f1y)
     doc.setLineDashPattern([], 0)
 
+    // Pilastras vistas en planta. Van con SU ancho de pieza (10–85 cm según el
+    // catálogo), no con el espesor del material: son dimensiones distintas.
+    // Antes no se dibujaban en el PDF, así que el plano salía sin ellas.
+    if (tramo.cabinas.length > 0) {
+      const anchoPil = Math.max(area.config.anchoPilastraCm, grueso)
+      const cortes = [0, ...acum.slice(1), largo]
+      doc.setFillColor(120, 120, 120)
+      doc.setDrawColor(70)
+      doc.setLineWidth(0.25)
+      cortes.forEach((u, k) => {
+        // en los extremos se corre hacia adentro para no invadir el muro
+        const centro = k === 0 ? u + anchoPil / 2 : k === cortes.length - 1 ? u - anchoPil / 2 : u
+        const [ax, ay] = aHoja(e, pt(m, centro - anchoPil / 2, prof - grueso))
+        const [bx, by] = aHoja(e, pt(m, centro + anchoPil / 2, prof))
+        doc.rect(Math.min(ax, bx), Math.min(ay, by), Math.abs(bx - ax), Math.abs(by - ay), 'FD')
+      })
+    }
+
     tramo.cabinas.forEach((cab, i) => {
       const u0 = acum[i]
       const u1 = u0 + cab.anchoCm
