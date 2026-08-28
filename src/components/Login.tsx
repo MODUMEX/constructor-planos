@@ -45,9 +45,7 @@ export default function Login({ onEntrar }: { onEntrar: (u: Usuario) => void }) 
         </button>
 
         <div className="aviso">
-          {hayNube ? (
-            <>Las cuentas se validan contra Supabase.</>
-          ) : import.meta.env.DEV ? (
+          {hayNube ? null : import.meta.env.DEV ? (
             // Las cuentas de respaldo solo se listan en desarrollo: en la app
             // repartida no se enseñan contraseñas en pantalla.
             <>

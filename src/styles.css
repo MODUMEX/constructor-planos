@@ -766,3 +766,76 @@ pre.payload {
   .props { flex-basis: 250px; }
   .pasos { flex-basis: 210px; }
 }
+
+/* ============================================================
+   Capa de actualización
+   Tapa la aplicación completa mientras se descarga e instala una
+   versión nueva: nadie debe empezar un plano que se va a perder
+   cuando la app se reinicie sola.
+   ============================================================ */
+.capa-actualizacion {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(3px);
+}
+.capa-actualizacion .tarjeta {
+  width: min(420px, 100%);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 28px 30px;
+  text-align: center;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+}
+.capa-actualizacion h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  color: var(--text);
+}
+.capa-actualizacion .version {
+  margin: 0 0 20px;
+  font-size: 14px;
+  color: var(--text-2);
+}
+.capa-actualizacion .barra {
+  height: 8px;
+  border-radius: 99px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.capa-actualizacion .barra i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+.capa-actualizacion .barra.indefinida i {
+  width: 35%;
+  animation: capa-vaiven 1.1s ease-in-out infinite alternate;
+}
+@keyframes capa-vaiven {
+  from { margin-left: 0; }
+  to   { margin-left: 65%; }
+}
+.capa-actualizacion .avance {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.capa-actualizacion .nota {
+  margin: 18px 0 0;
+  font-size: 12.5px;
+  color: var(--text-3);
+  line-height: 1.5;
+}
+@media (prefers-reduced-motion: reduce) {
+  .capa-actualizacion .barra.indefinida i { animation: none; width: 100%; }
+  .capa-actualizacion .barra i { transition: none; }
+}

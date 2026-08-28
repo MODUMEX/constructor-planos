@@ -18,7 +18,7 @@ import { coloresMxPara, slugRenderMx } from './coloresMx'
 import { fotoDe, fotosHerraje, faltanFotosHerraje } from './renders'
 import { anchoTotal, bom, crearTramos, modular, nuevoId, totalBOM } from './modulacion'
 import { cargarTarifas, type ResultadoTarifas } from './tarifas'
-import { buscarActualizacion } from './actualizar'
+import { buscarActualizacion, type FaseActualizacion } from './actualizar'
 import { versionActual, VERSION_COMPILADA } from './version'
 import { TARIFAS_BASE } from './datos/tarifas-base'
 import EditorTarifas from './components/EditorTarifas'
@@ -73,13 +73,13 @@ function tipoDeArea(area: Area): TipoCabina | undefined {
   return undefined
 }
 
-function areaInicial(nombre = 'Baño de hombres', conTramos = false, tipo?: TipologiaId): Area {
+function areaInicial(nombre = '', conTramos = false, tipo?: TipologiaId): Area {
   const config = configInicial()
   if (tipo) config.tipologia = tipo
   return {
     id: nuevoId('area'),
     nombre,
-    piso: 'Planta baja',
+    piso: demo ? 'Planta baja' : '',
     config,
     tramos: conTramos ? crearTramos(config.tipologia, 420, 4, config) : [],
   }
@@ -109,15 +109,17 @@ export default function App() {
   const [tema, setTema] = useState<'oscuro' | 'claro'>(params.get('tema') === 'claro' ? 'claro' : 'oscuro')
   const [paso, setPaso] = useState(demo ? pasoDemo : 1)
 
+  // Un proyecto nuevo arranca en blanco. Los datos de ejemplo solo se cargan con
+  // el atajo ?demo=1 de desarrollo, para no tener que teclearlos en cada prueba.
   const [proyecto, setProyecto] = useState<Proyecto>({
-    numero: '1042',
+    numero: demo ? '1042' : '',
     paisFabricacion: 'CR',
-    obra: 'Torre Escazú',
-    cliente: 'Constructora Volio',
-    ubicacion: 'San José, Escazú',
-    distribuidor: 'Modumex Costa Rica',
+    obra: demo ? 'Torre Escazú' : '',
+    cliente: demo ? 'Constructora Volio' : '',
+    ubicacion: demo ? 'San José, Escazú' : '',
+    distribuidor: demo ? 'Modumex Costa Rica' : '',
     creadoPor: '',
-    areas: [areaInicial('Baño de hombres', demo && pasoDemo >= 7, tipoDemo)],
+    areas: [areaInicial(demo ? 'Baño de hombres' : '', demo && pasoDemo >= 7, tipoDemo)],
   })
   const [activa, setActiva] = useState(0)
 
@@ -138,11 +140,12 @@ export default function App() {
   const [verTarifas, setVerTarifas] = useState(demo && params.has('tarifas'))
   const [verProyectos, setVerProyectos] = useState(false)
   const [version, setVersion] = useState(VERSION_COMPILADA)
+  const [actualizando, setActualizando] = useState<FaseActualizacion | null>(null)
 
   // al abrir: se muestra la versión en uso y se busca si hay una nueva publicada
   useEffect(() => {
     versionActual().then(setVersion)
-    buscarActualizacion()
+    buscarActualizacion(setActualizando)
   }, [])
 
   // al entrar, las tarifas por m² se traen de la tabla tarifa_m2
@@ -334,13 +337,50 @@ export default function App() {
     setEnviando(false)
   }
 
-  if (!usuario) return <Login onEntrar={setUsuario} />
+  // Tapa toda la aplicación mientras se instala una versión nueva. Va antes del
+  // login para que también bloquee esa pantalla.
+  const capaActualizacion = actualizando ? (
+    <div className="capa-actualizacion" role="alertdialog" aria-modal="true" aria-labelledby="actualizando-titulo">
+      <div className="tarjeta">
+        <h2 id="actualizando-titulo">
+          {actualizando.fase === 'descargando' ? 'Descargando la actualización' : 'Instalando la actualización'}
+        </h2>
+        <p className="version">Versión {actualizando.version}</p>
+        {actualizando.fase === 'descargando' ? (
+          <>
+            <div className={`barra${actualizando.porcentaje === null ? ' indefinida' : ''}`}>
+              <i style={actualizando.porcentaje === null ? undefined : { width: `${actualizando.porcentaje}%` }} />
+            </div>
+            <p className="avance">
+              {actualizando.porcentaje === null ? 'Preparando…' : `${actualizando.porcentaje}%`}
+            </p>
+          </>
+        ) : (
+          <div className="barra indefinida">
+            <i />
+          </div>
+        )}
+        <p className="nota">
+          No cierres la aplicación. Se va a reiniciar sola cuando termine.
+        </p>
+      </div>
+    </div>
+  ) : null
+
+  if (!usuario)
+    return (
+      <>
+        {capaActualizacion}
+        <Login onEntrar={setUsuario} />
+      </>
+    )
 
   const cabinasTotal = area.tramos.reduce((s, t) => s + t.cabinas.length, 0)
   const puedePasar = (n: number) => n <= 6 || area.tramos.length > 0
 
   return (
     <div className="app" data-tema={tema === 'claro' ? 'claro' : undefined}>
+      {capaActualizacion}
       <header className="topbar">
         <div className="brand">
           <b>Constructor de Planos</b>
