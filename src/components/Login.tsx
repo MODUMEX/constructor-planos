@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { CUENTAS_DEMO, hayNube, iniciarSesion, type Usuario } from '../auth'
 
 export default function Login({ onEntrar }: { onEntrar: (u: Usuario) => void }) {
-  const [email, setEmail] = useState('dlizano@modumex.com')
-  const [clave, setClave] = useState('modumex')
+  const [email, setEmail] = useState('')
+  const [clave, setClave] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [cargando, setCargando] = useState(false)
 
@@ -47,7 +47,9 @@ export default function Login({ onEntrar }: { onEntrar: (u: Usuario) => void }) 
         <div className="aviso">
           {hayNube ? (
             <>Las cuentas se validan contra Supabase.</>
-          ) : (
+          ) : import.meta.env.DEV ? (
+            // Las cuentas de respaldo solo se listan en desarrollo: en la app
+            // repartida no se enseñan contraseñas en pantalla.
             <>
               Sin Supabase configurado, así que por ahora entra con cuentas locales:{' '}
               {CUENTAS_DEMO.map((c, i) => (
@@ -57,6 +59,8 @@ export default function Login({ onEntrar }: { onEntrar: (u: Usuario) => void }) 
                 </span>
               ))}
             </>
+          ) : (
+            <>No hay conexión con el servidor de cuentas. Avisa a Modumex.</>
           )}
         </div>
       </form>
