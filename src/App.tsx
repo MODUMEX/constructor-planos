@@ -9,7 +9,7 @@ import { csvABytes, FILTRO_CSV, FILTRO_PDF, guardarArchivo } from './exportar/gu
 import { IVA_CR, type Usuario } from './auth'
 import type { Area, Cabina, Config, Pais, Proyecto, TipoCabina, TipologiaId } from './types'
 import {
-  ACABADOS, BISAGRAS, CERROJOS, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, MODELOS,
+  ACABADOS, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, MODELOS,
   PAISES, etiquetaTier, nombreHerraje, nombreModelo, tierDeColor, TIPOLOGIAS, tipologia,
 } from './catalog'
 import VistaRender from './components/VistaRender'
@@ -30,7 +30,7 @@ const PASOS = [
   { n: 1, titulo: 'Proyecto', nota: 'Obra, cliente y área' },
   { n: 2, titulo: 'Línea', nota: 'Producto y modelo' },
   { n: 3, titulo: 'Acabado', nota: 'Material y color' },
-  { n: 4, titulo: 'Herrajes', nota: 'Bisagra, cerrojo y acabado' },
+  { n: 4, titulo: 'Herrajes', nota: 'Acabado del juego' },
   { n: 5, titulo: 'Tipología', nota: 'Cómo queda el baño' },
   { n: 6, titulo: 'Medidas', nota: 'Claro y cabinas' },
   { n: 7, titulo: 'Plano', nota: 'Ajustar sobre el dibujo' },
@@ -745,25 +745,7 @@ export default function App() {
               {paso === 4 && (
                 <>
                   <h2>Herrajes</h2>
-                  <p className="sub">Se definen antes de la geometría, así no quedan combinaciones que después no se puedan fabricar.</p>
-                  <div className="grid-cards">
-                    {BISAGRAS.map((b) => (
-                      <button key={b.id} className={`card ${config.bisagra === b.id ? 'sel' : ''}`} onClick={() => setConfig({ bisagra: b.id })} type="button">
-                        <b>{b.nombre}</b>
-                        <small>{b.nota}</small>
-                      </button>
-                    ))}
-                    {CERROJOS.map((c) => (
-                      <button key={c.id} className={`card ${config.cerrojo === c.id ? 'sel' : ''}`} onClick={() => setConfig({ cerrojo: c.id })} type="button">
-                        <b>{c.nombre}</b>
-                        <small>{c.nota}</small>
-                      </button>
-                    ))}
-                  </div>
-                  <h4 style={{ margin: '28px 0 10px', color: 'var(--text-2)' }}>
-                    Acabado del juego de herrajes
-                  </h4>
-                  <p className="sub" style={{ marginTop: 0 }}>
+                  <p className="sub">
                     Va en juego completo: si el cliente pide negro, todas las piezas son negras. No se elige una por una.
                   </p>
                   <div className="grid-cards">
