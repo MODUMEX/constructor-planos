@@ -37,6 +37,16 @@ const PASOS = [
   { n: 8, titulo: 'Cotización', nota: 'Precio y pedido' },
 ]
 
+/**
+ * Líneas que hoy NO se fabrican en Costa Rica. Se OCULTAN, no se borran: el día
+ * que se fabriquen, basta con vaciar esta lista y vuelven a aparecer solas.
+ */
+const LINEAS_OCULTAS_CR = ['SUPERIOR']
+
+function lineasDe(pais: Pais) {
+  return pais === 'CR' ? LINEAS.filter((l) => !LINEAS_OCULTAS_CR.includes(l.id)) : LINEAS
+}
+
 function configInicial(): Config {
   return {
     linea: 'LEEDER',
@@ -214,10 +224,16 @@ export default function App() {
    * dejarle un color que exista en la lista nueva.
    */
   function cambiarPais(paisFabricacion: Pais) {
+    // México no cotiza: si estaba parada en Cotización, se regresa al plano.
+    if (paisFabricacion === 'MX') setPaso((n) => (n === 8 ? 7 : n))
     setProyecto((p) => ({
       ...p,
       paisFabricacion,
       areas: p.areas.map((a) => {
+        // en Costa Rica hoy solo se fabrica LEEDER: si venía en otra línea, se cambia
+        if (paisFabricacion === 'CR' && !lineasDe('CR').some((l) => l.id === a.config.linea)) {
+          a = { ...a, config: { ...a.config, linea: 'LEEDER', espesorMm: espesorPorLinea('LEEDER') } }
+        }
         if (paisFabricacion === 'MX') {
           const disponibles = coloresMxPara(a.config.linea)
           const sigue = disponibles.find((c) => c.color === a.config.color)
@@ -391,7 +407,11 @@ export default function App() {
     )
 
   const cabinasTotal = area.tramos.reduce((s, t) => s + t.cabinas.length, 0)
-  const puedePasar = (n: number) => n <= 6 || area.tramos.length > 0
+  /** solo se cotiza cuando se fabrica en Costa Rica; México entrega plano y OC, sin precio */
+  const cotiza = proyecto.paisFabricacion === 'CR'
+  const pasosVisibles = cotiza ? PASOS : PASOS.filter((p) => p.n !== 8)
+  const ultimoPaso = cotiza ? 8 : 7
+  const puedePasar = (n: number) => (n <= 6 || area.tramos.length > 0) && (n !== 8 || cotiza)
 
   return (
     <div className="app" data-tema={tema === 'claro' ? 'claro' : undefined}>
@@ -456,7 +476,7 @@ export default function App() {
       <div className="main">
         <nav className="pasos">
           <h4>Configuración</h4>
-          {PASOS.map((p) => (
+          {pasosVisibles.map((p) => (
             <button
               key={p.n}
               className={`paso ${paso === p.n ? 'activo' : ''} ${paso > p.n ? 'listo' : ''}`}
@@ -624,7 +644,7 @@ export default function App() {
                   <h2>Línea y modelo</h2>
                   <p className="sub">La línea define el acabado, las alturas y los herrajes disponibles.</p>
                   <div className="grid-cards">
-                    {LINEAS.map((l) => (
+                    {lineasDe(proyecto.paisFabricacion).map((l) => (
                       <button key={l.id} className={`card ${config.linea === l.id ? 'sel' : ''}`} onClick={() => cambiarLinea(l.id)} type="button">
                         <b>{l.nombre}</b>
                         <small>{l.nota}</small>
@@ -1030,21 +1050,21 @@ export default function App() {
 
           <div className="barra-pie">
             <button className="btn" onClick={() => setPaso(Math.max(1, paso - 1))} disabled={paso === 1}>← Atrás</button>
-            <span className="cuenta">Paso {paso} de 8</span>
+            <span className="cuenta">Paso {paso} de {ultimoPaso}</span>
             <div className="sep" />
             {paso === 6 && (
               <button className="btn" onClick={() => { remodular(); }}>Aplicar reparto</button>
             )}
-            {paso < 8 ? (
+            {paso < ultimoPaso ? (
               <button
                 className="btn primario"
                 onClick={() => (paso === 6 ? irAlPlano() : setPaso(paso + 1))}
               >
                 {paso === 6 ? 'Dibujar el plano →' : 'Siguiente →'}
               </button>
-            ) : (
+            ) : paso === 8 ? (
               <button className="btn primario" onClick={() => setPaso(7)}>Volver al plano</button>
-            )}
+            ) : null}
           </div>
         </div>
       </div>
