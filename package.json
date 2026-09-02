@@ -14,7 +14,8 @@
     "probar-tarifas": "esbuild scripts/probar-tarifas.ts --bundle --platform=node --format=esm --outfile=.probar.mjs --log-level=warning && node .probar.mjs",
     "tauri": "tauri",
     "app": "tauri dev",
-    "exe": "tauri build"
+    "exe": "tauri build",
+    "probar-modulador": "esbuild scripts/probar-modulador.ts --bundle --platform=node --format=esm --outfile=.modulador.mjs --log-level=warning && node .modulador.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",
