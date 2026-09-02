@@ -206,8 +206,42 @@ export const CERROJOS = [
   { id: 'STD', nombre: 'Cerrojo estándar', nota: 'Pasador de canto' },
 ]
 
-/** anchos de puerta de catálogo, en cm */
-export const ANCHOS_PUERTA = [55, 60, 62, 64, 65, 70, 75, 80, 85, 90, 92, 94, 95, 100]
+/**
+ * Medidas que EXISTEN en el catálogo, en cm. Salieron de la tabla de piezas del
+ * Constructor actual, que es la que fabrica: nada que no esté aquí se puede pedir.
+ *
+ * Ojo: antes esta app ofrecía puertas de 65, 80 y 95 cm, que no se fabrican.
+ */
+export const ANCHOS_PUERTA = [55, 60, 62, 64, 70, 75, 85, 90, 92, 94, 100]
+
+/** anchos de pilastra (familia PI) */
+export const ANCHOS_PILASTRA = [10, 12, 15, 17, 19, 24, 30, 35, 40, 45, 50, 55, 60, 70, 85, 90, 100, 120]
+
+/** anchos de panel divisor (familia PN); es la profundidad de la cabina */
+export const ANCHOS_PANEL = [55, 60, 85, 90, 95, 100, 110, 120, 130, 135, 140, 150, 165, 180]
+
+/**
+ * Canaleta (familia CN): la pieza de relleno contra la pared. Solo entra cuando
+ * la suma de las piezas queda CORTA, y como máximo 5 cm. Si el hueco es mayor
+ * falta material; si las piezas se pasan, no cabe (la canaleta no recorta).
+ */
+export const ANCHOS_CANALETA = [1, 2, 3, 4, 5]
+export const CANALETA_MAX_CM = 5
+
+/**
+ * Ecuación de la modulación, tal como la usa el Constructor actual: cada muro
+ * RESTA 1 cm (el herraje de fijación ocupa ~1 cm) y cada puerta SUMA 1,5 cm
+ * (holgura de bisagra). Lo que las piezas deben sumar no es el claro pelado.
+ */
+export function claroAjustado(claroCm: number, murosPilastra: number, puertas: number): number {
+  return claroCm - murosPilastra + 1.5 * puertas
+}
+
+/** la medida de catálogo más cercana que no se pasa de `max` */
+export function medidaQueCabe(opciones: number[], max: number): number | null {
+  const posibles = opciones.filter((a) => a <= max)
+  return posibles.length ? posibles[posibles.length - 1] : null
+}
 
 /** una puerta necesita este margen contra el ancho de la cabina */
 export const MARGEN_PUERTA_CM = 8
