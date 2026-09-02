@@ -237,16 +237,12 @@ export function bom(
       precioUnit: enMoneda(14.5),
     })
   }
-  const cabinasTotal = tramos.reduce((s, t) => s + t.cabinas.length, 0)
-  if (cabinasTotal > 0) {
-    renglones.push({
-      sku: config.bisagra === 'INOX' ? 'KH-INOX' : 'KH-GRAV',
-      descripcion: `Kit de herraje por cabina (${config.bisagra === 'INOX' ? 'bisagra inoxidable' : 'bisagra de gravedad'} + ${config.cerrojo === 'IND' ? 'cerrojo con indicador' : 'cerrojo estándar'})`,
-      tipo: 'Herraje',
-      cantidad: cabinasTotal,
-      precioUnit: enMoneda(config.bisagra === 'INOX' ? 38 : 26),
-    })
-  }
+  // El herraje NO se cotiza aparte: ya viene dentro de la tarifa por m² de las
+  // piezas. Antes se agregaba un "Kit de herraje por cabina" de $26 (o $38) que
+  // no existe en la lista de precios y que cobraba dos veces lo mismo.
+  // Si hay que cobrar herraje EXTRA, va como renglón aparte con su código real
+  // (KBDL, KCL, KTL…), no automático por cabina. Las piezas que de verdad lleva
+  // el pedido las calcula el CIP, ya con el plano y la cotización hechos.
   if (config.orinales > 1) {
     renglones.push({
       sku: `${codigoLinea}-MG60${config.mgAlturaCm}`,
