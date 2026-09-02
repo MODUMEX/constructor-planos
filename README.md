@@ -101,9 +101,12 @@ son las políticas RLS de Supabase: el rol en pantalla es comodidad, no
 seguridad.
 
 La pantalla de cotización dice de dónde vinieron las tarifas y cuántas filas
-llegaron. Los **kits** (riel y herrajes) no están en `tarifa_m2`: van con precio
-estimado en dólares —convertido si se cotiza en colones— y aparecen marcados
-como `estimado` en la tabla.
+llegaron. **Todos los renglones salen de `tarifa_m2`**: puerta, panel, pilastra y
+divisor de orinal. El herraje y el riel de amarre NO se cotizan aparte porque ya
+van dentro de esa tarifa; hasta la v2.0.10 se sumaban como kits con precio
+inventado ($26 por cabina y $14.50 el metro de riel) y toda cotización salía
+inflada. Las piezas de herraje que de verdad lleva el pedido las calcula el CIP,
+ya con el plano y la cotización hechos.
 
 **Los modelos se guardan por código** (`ESTANDAR`, `SUP_REFORZADO`, `TL_S3`…)
 porque así los conoce la tabla de tarifas; el CSV, el cajetín y el pedido llevan

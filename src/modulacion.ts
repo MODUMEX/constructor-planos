@@ -188,9 +188,6 @@ export function bom(
   const codigoLinea = config.linea === 'SUPERIOR' ? 'SUP' : config.linea === 'TOUCHLESS' ? 'TL' : 'LDR'
 
   const altoPil = esReforzado(config.modelo) ? 210 : config.alturaCm + 30
-  // los kits no están en tarifa_m2: su precio está en dólares y hay que
-  // pasarlo a colones cuando se cotiza en esa moneda
-  const enMoneda = (usd: number) => (precios.moneda === 'CRC' ? usd * precios.tipoCambio : usd)
 
   for (const [ancho, cantidad] of [...puertas.entries()].sort((a, b) => a[0] - b[0])) {
     renglones.push({
@@ -228,15 +225,9 @@ export function bom(
       tarifaReal: true,
     })
   }
-  if (config.montaje === 'PISO_HEADRAIL') {
-    renglones.push({
-      sku: 'KHR-AL',
-      descripcion: 'Riel superior de aluminio, por metro',
-      tipo: 'Riel',
-      cantidad: Math.ceil(tramos.reduce((s, t) => s + t.claroCm, 0) / 100),
-      precioUnit: enMoneda(14.5),
-    })
-  }
+  // El riel de amarre tampoco se cotiza aparte: va dentro de la tarifa por m²,
+  // igual que el herraje. Antes se sumaba un "Riel superior de aluminio" a
+  // $14.50 el metro, un precio inventado que no existe en la lista.
   // El herraje NO se cotiza aparte: ya viene dentro de la tarifa por m² de las
   // piezas. Antes se agregaba un "Kit de herraje por cabina" de $26 (o $38) que
   // no existe en la lista de precios y que cobraba dos veces lo mismo.
