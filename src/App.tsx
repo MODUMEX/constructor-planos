@@ -41,7 +41,7 @@ const PASOS = [
  * Líneas que hoy NO se fabrican en Costa Rica. Se OCULTAN, no se borran: el día
  * que se fabriquen, basta con vaciar esta lista y vuelven a aparecer solas.
  */
-const LINEAS_OCULTAS_CR = ['SUPERIOR']
+const LINEAS_OCULTAS_CR = ['SUPERIOR', 'TOUCHLESS']
 
 function lineasDe(pais: Pais) {
   return pais === 'CR' ? LINEAS.filter((l) => !LINEAS_OCULTAS_CR.includes(l.id)) : LINEAS
