@@ -8,3 +8,4 @@ src-tauri/gen
 instaladores
 public/*.pdf
 tsconfig.tsbuildinfo
+.modulador.mjs
