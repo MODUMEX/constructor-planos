@@ -164,9 +164,17 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
         texto(doc, cab.tipo === 'accesible' ? 'ACCESIBLE' : 'AMBULATORIA', cx, cy, { size: 5.5, align: 'center', color: GRIS })
       }
 
+      // La puerta cuelga de la PILASTRA, no del límite de la cabina: ese límite
+      // cae en el centro de la pilastra, así que hay que correrse hasta su cara.
+      // Las de los extremos van enteras dentro de su cabina.
+      const nCab = tramo.cabinas.length
+      const anchoPil = (j: number) => tramo.pilastras?.[j] ?? area.config.anchoPilastraCm
+      const caraIzq = i === 0 ? anchoPil(0) : anchoPil(i) / 2
+      const caraDer = i === nCab - 1 ? anchoPil(nCab) : anchoPil(i + 1) / 2
+
       // puerta: hoja a 45° y arco de barrido
       if (cab.puerta.tipo !== 'ninguna') {
-        const pivU = cab.puerta.mano === 'der' ? u1 : u0
+        const pivU = cab.puerta.mano === 'der' ? u1 - caraDer : u0 + caraIzq
         const dir = cab.puerta.mano === 'der' ? -1 : 1
         const hoja = cab.puerta.anchoCm
         const afuera = cab.puerta.apertura === 'afuera'
@@ -208,6 +216,37 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
     doc.line(tix, tiy, tfx, tfy)
     const [ttx, tty] = aHoja(e, pt(m, largo / 2, -ESPESOR_MURO - 34))
     texto(doc, `${largo} cm`, ttx, tty, { size: 8, bold: true, align: 'center', angle: rot })
+
+    // Cotas por PIEZA, al frente: pilastra y puerta en horizontal, panel girado
+    // a lo largo de la pieza. Son las medidas que se fabrican, no el reparto.
+    if (tramo.cabinas.length > 0) {
+      const anchoPilDe = (j: number) => tramo.pilastras?.[j] ?? area.config.anchoPilastraCm
+      const nCab = tramo.cabinas.length
+      const cortes = [0, ...acum.slice(1), largo]
+
+      cortes.forEach((u, k) => {
+        const ancho = anchoPilDe(k)
+        const centro = k === 0 ? u + ancho / 2 : k === cortes.length - 1 ? u - ancho / 2 : u
+        const [px, py] = aHoja(e, pt(m, centro, prof + 13))
+        texto(doc, String(ancho), px, py, { size: 5.5, align: 'center', angle: rot, color: COTA })
+      })
+
+      tramo.cabinas.forEach((cab, i) => {
+        if (cab.puerta.tipo === 'ninguna') return
+        const u0 = acum[i]
+        const u1 = u0 + cab.anchoCm
+        const izq = i === 0 ? anchoPilDe(0) : anchoPilDe(i) / 2
+        const der = i === nCab - 1 ? anchoPilDe(nCab) : anchoPilDe(i + 1) / 2
+        const [dx, dy] = aHoja(e, pt(m, (u0 + izq + (u1 - der)) / 2, prof + 22))
+        texto(doc, String(cab.puerta.anchoCm), dx, dy, { size: 6, align: 'center', angle: rot, color: COTA })
+
+        // el panel divisor va a la derecha de la cabina; su cota, en vertical
+        if (i < nCab - 1) {
+          const [nx, ny] = aHoja(e, pt(m, u1 + 7, prof / 2))
+          texto(doc, String(prof), nx, ny, { size: 5.5, align: 'center', angle: rot + 90, color: COTA })
+        }
+      })
+    }
   })
 }
 

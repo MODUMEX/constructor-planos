@@ -24,7 +24,7 @@ export const MIN_CABINA_CM = 62
 export const MIN_ACCESIBLE_CM = 150
 
 export const PAISES: { id: Pais; nombre: string; nota: string }[] = [
-  { id: 'CR', nombre: 'Costa Rica', nota: 'Los diez colores del catálogo, en stock' },
+  { id: 'CR', nombre: 'Costa Rica', nota: 'Los colores del catálogo, en stock' },
   { id: 'MX', nombre: 'México', nota: 'La lista de materia prima de la planta, con código' },
 ]
 
@@ -108,8 +108,11 @@ export interface Color {
 
 /**
  * Catálogo de colores, copiado tal cual del Constructor actual
- * (CATALOGO.colores), con su nombre viejo y sus alias. Los ocho primeros
- * son los de línea, en stock; los dos últimos son de Superior 2.0.
+ * (CATALOGO.colores), con su nombre viejo y sus alias. Los primeros son los
+ * de línea, en stock; los dos últimos son de Superior 2.0.
+ *
+ * NEUTRAL OAK se quitó: no se ofrece en Costa Rica. México tiene su propia
+ * lista de materia prima y no se toca desde aquí.
  */
 export const COLORES: Color[] = [
   { nombre: 'INOX SATÍN', nombreViejo: 'Gris Metalic', tier: 'linea', hex: '#6E6F71', alias: ['GRIS METALIZADO MT 240', 'INOX SATIN', 'MT-240'], slug: 'inox-satin' },
@@ -119,7 +122,6 @@ export const COLORES: Color[] = [
   { nombre: 'ÁMBAR WOOD', nombreViejo: 'Walnut', tier: 'linea', hex: '#A9743B', alias: ['MD-310'], slug: 'ambar-wood' },
   { nombre: 'NOGAL GRAFITO', nombreViejo: 'Skyline', tier: 'linea', hex: '#514A44', alias: ['MD-380'], slug: 'nogal-grafito' },
   { nombre: 'GRAFITO NOCTURNO', tier: 'linea', hex: '#2B2E33', alias: ['SL-510'], slug: 'grafito-nocturno' },
-  { nombre: 'NEUTRAL OAK', tier: 'linea', hex: '#C2A878', alias: ['1266'], slug: 'neutral-oak' },
   { nombre: 'ESMALTADA ANTIGRAFITI', tier: 'antigrafiti', hex: '#3B3B3D', lineas: ['SUPERIOR'], alias: ['ANTIGRAFITI'], slug: 'esmaltada-antigrafiti' },
   { nombre: 'ACERO INOXIDABLE', tier: 'aceroInox', hex: '#C7CACE', lineas: ['SUPERIOR'], alias: ['ACERO INOX', 'INOXIDABLE'], slug: 'acero-inoxidable' },
 ]
