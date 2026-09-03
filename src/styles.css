@@ -299,6 +299,15 @@ input, select { font: inherit; }
 }
 .campo input:focus, .campo select:focus { outline: 2px solid var(--focus); outline-offset: -1px; border-color: var(--focus); }
 .campo .ayuda { font-size: 12px; color: var(--text-3); }
+/* dato que no se edita: lo decide el modelo o la línea */
+.campo .fijo {
+  background: transparent;
+  border: 1px dashed var(--line);
+  color: var(--text-2);
+  border-radius: var(--r);
+  padding: 9px 11px;
+  font-family: var(--mono);
+}
 
 /* ---------- barra inferior ---------- */
 .barra-pie {

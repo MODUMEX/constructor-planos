@@ -9,13 +9,13 @@ import { csvABytes, FILTRO_CSV, FILTRO_PDF, guardarArchivo } from './exportar/gu
 import { IVA_CR, type Usuario } from './auth'
 import type { Area, Cabina, Config, Pais, Proyecto, TipoCabina, TipologiaId } from './types'
 import {
-  ACABADOS, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, MODELOS,
+  ACABADOS, alturasDe, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, MODELOS,
   PAISES, etiquetaTier, nombreHerraje, nombreModelo, tierDeColor, TIPOLOGIAS, tipologia,
 } from './catalog'
 import VistaRender from './components/VistaRender'
 import ColoresMexico from './components/ColoresMexico'
 import { coloresMxPara, slugRenderMx } from './coloresMx'
-import { fotoDe, fotosHerraje, faltanFotosHerraje } from './renders'
+import { fotoDe, fotosHerraje, faltanFotosHerraje, terminacionesDe } from './renders'
 import { anchoTotal, bom, crearTramos, modular, modularConCatalogo, nuevoId, totalBOM } from './modulacion'
 import { cargarTarifas, type ResultadoTarifas } from './tarifas'
 import { buscarActualizacion, type FaseActualizacion } from './actualizar'
@@ -201,6 +201,8 @@ export default function App() {
 
   const area = proyecto.areas[activa]
   const config = area.config
+  // la altura de cada pieza la manda el modelo, no el vendedor
+  const alturas = alturasDe(config.modelo)
 
   /** los colores de México no están en el catálogo, así que el render se busca por nombre */
   function conFoto(cfg: Config, cabina?: TipoCabina) {
@@ -253,15 +255,31 @@ export default function App() {
 
   function cambiarLinea(linea: Config['linea']) {
     const acabado = ACABADOS[linea][0]
+    const modelo = MODELOS[linea][0].codigo
     setConfig({
       linea,
-      modelo: MODELOS[linea][0].codigo,
+      modelo,
       acabado,
       ...colorInicial(linea, acabado),
-      alturaCm: linea === 'TOUCHLESS' ? 200 : 150,
+      alturaCm: alturasDe(modelo).puerta,
       // Superior 2.0 va en cara de 3 mm; el resto en compacto de 12
       espesorMm: espesorPorLinea(linea),
     })
+  }
+
+  /** el modelo define la altura de las piezas, así que se cambian juntas */
+  function elegirModelo(modelo: string) {
+    setConfig({ modelo, alturaCm: alturasDe(modelo).puerta })
+  }
+
+  /**
+   * El juego negro no tiene zoclo: va siempre con pata. Al elegirlo se corrige
+   * la terminación, para que la foto y el pedido digan lo mismo.
+   */
+  function elegirHerraje(herrajeAcabado: Config['herrajeAcabado']) {
+    const posibles = terminacionesDe(herrajeAcabado)
+    const terminacion = posibles.includes(config.terminacion) ? config.terminacion : posibles[0]
+    setConfig({ herrajeAcabado, terminacion })
   }
 
   function cambiarAcabado(acabado: Config['acabado']) {
@@ -694,7 +712,7 @@ export default function App() {
                         <button
                           key={m.codigo}
                           className={`modelo-card ${config.modelo === m.codigo ? 'sel' : ''}`}
-                          onClick={() => setConfig({ modelo: m.codigo })}
+                          onClick={() => elegirModelo(m.codigo)}
                           type="button"
                         >
                           <span className={`foto ${foto ? '' : 'sin'}`}>
@@ -806,7 +824,7 @@ export default function App() {
                       <button
                         key={h.id}
                         className={`card ${config.herrajeAcabado === h.id ? 'sel' : ''}`}
-                        onClick={() => setConfig({ herrajeAcabado: h.id })}
+                        onClick={() => elegirHerraje(h.id)}
                         type="button"
                       >
                         <b>{h.nombre}</b>
@@ -828,10 +846,10 @@ export default function App() {
                     </div>
                   ) : (
                     <div className="herrajes-tira" style={{ marginTop: 14 }}>
-                      {fotosHerraje(config.linea, config.herrajeAcabado).map((f) => (
+                      {fotosHerraje(config.linea, config.herrajeAcabado, config.terminacion).map((f) => (
                         <figure className="herraje-pieza" key={f.archivo}>
                           <img src={f.archivo} alt={f.pieza} />
-                          <span>{f.pieza}</span>
+                          <span>{f.pieza}{f.prestada ? ' · foto del juego negro' : ''}</span>
                         </figure>
                       ))}
                     </div>
@@ -840,35 +858,28 @@ export default function App() {
                   <div className="campos" style={{ marginTop: 24 }}>
                     <div className="campo">
                       <label>Altura de pieza (cm)</label>
-                      <input type="number" value={config.alturaCm} onChange={(e) => setConfig({ alturaCm: Number(e.target.value) })} />
-                    </div>
-                    <div className="campo">
-                      <label>Profundidad de cabina (cm)</label>
-                      <input type="number" value={config.profundidadCm} onChange={(e) => setConfig({ profundidadCm: Number(e.target.value) })} />
-                    </div>
-                    <div className="campo">
-                      <label>Ancho de pilastra (cm)</label>
-                      <input type="number" value={config.anchoPilastraCm} onChange={(e) => setConfig({ anchoPilastraCm: Number(e.target.value) })} />
-                      <span className="ayuda">Va en el SKU que lee el CIP</span>
+                      <div className="fijo">{alturas.puerta}</div>
+                      <span className="ayuda">
+                        La pone el modelo {nombreModelo(config.linea, config.modelo)}: puerta y panel{' '}
+                        {alturas.puerta === alturas.panel ? alturas.puerta : `${alturas.puerta} y ${alturas.panel}`},{' '}
+                        pilastra {alturas.pilastra}
+                      </span>
                     </div>
                     <div className="campo">
                       <label>Espesor de PT, PN y PL (mm)</label>
-                      <select value={config.espesorMm} onChange={(e) => setConfig({ espesorMm: Number(e.target.value) })}>
-                        <option value={3}>3 · cara Superior 2.0</option>
-                        <option value={12}>12 · laminado compacto</option>
-                      </select>
-                      <span className="ayuda">
-                        {config.espesorMm === espesorPorLinea(config.linea)
-                          ? `Lo normal en ${config.linea === 'SUPERIOR' ? 'Superior 2.0' : 'esta línea'}`
-                          : `Ojo: en esta línea lo normal son ${espesorPorLinea(config.linea)} mm`}
-                      </span>
+                      <div className="fijo">{config.espesorMm} · {config.espesorMm === 3 ? 'cara Superior 2.0' : 'laminado compacto'}</div>
+                      <span className="ayuda">Fijo en {config.linea === 'SUPERIOR' ? 'Superior 2.0' : config.linea === 'TOUCHLESS' ? 'Touchless S3' : 'LEEDER'}</span>
                     </div>
                     <div className="campo">
                       <label>Terminación</label>
                       <select value={config.terminacion} onChange={(e) => setConfig({ terminacion: e.target.value as 'ZOCLO' | 'PATAS' })}>
-                        <option value="ZOCLO">Zoclo</option>
-                        <option value="PATAS">Pata</option>
+                        {terminacionesDe(config.herrajeAcabado).map((t) => (
+                          <option key={t} value={t}>{t === 'ZOCLO' ? 'Zoclo' : 'Pata'}</option>
+                        ))}
                       </select>
+                      {terminacionesDe(config.herrajeAcabado).length === 1 && (
+                        <span className="ayuda">El juego negro va siempre con pata</span>
+                      )}
                     </div>
                     <div className="campo">
                       <label>KAP</label>
@@ -923,6 +934,11 @@ export default function App() {
                     <div className="campo">
                       <label>Cantidad de cabinas</label>
                       <input type="number" min={1} max={12} value={cantidad} onChange={(e) => setCantidad(Number(e.target.value))} />
+                    </div>
+                    <div className="campo">
+                      <label>Profundidad de cabina (cm)</label>
+                      <input type="number" value={config.profundidadCm} onChange={(e) => setConfig({ profundidadCm: Number(e.target.value) })} />
+                      <span className="ayuda">Es el ancho del panel divisor</span>
                     </div>
                     <div className="campo">
                       <label>Ancho de la accesible (cm)</label>

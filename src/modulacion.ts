@@ -3,7 +3,7 @@ import {
   LARGO_SECUNDARIO_CM,
 } from './catalog'
 import type { Cabina, Config, Moneda, Pais, Tramo, TipologiaId, RenglonBOM } from './types'
-import { esReforzado, tipologia, tierDeColor } from './catalog'
+import { alturasDe, tipologia, tierDeColor } from './catalog'
 import { modularTira } from './modulador'
 import { precioPieza, type TablaTarifas } from './tarifas'
 
@@ -271,11 +271,18 @@ export function bom(
     tarifas: precios.tarifas,
   }
   const puertas = new Map<number, number>()
-  let pilastras = 0
+  // Las pilastras ya no son todas del mismo ancho: la modulación elige la
+  // medida de catálogo que le toca a cada posición, así que se cuentan por
+  // ancho para que la cotización cobre los m² de verdad.
+  const pilastrasPorAncho = new Map<number, number>()
   let paneles = 0
 
   for (const tramo of tramos) {
-    pilastras += pilastrasDe(tramo)
+    const n = pilastrasDe(tramo)
+    for (let i = 0; i < n; i++) {
+      const ancho = tramo.pilastras?.[i] ?? config.anchoPilastraCm
+      pilastrasPorAncho.set(ancho, (pilastrasPorAncho.get(ancho) ?? 0) + 1)
+    }
     paneles += panelesDe(tramo)
     for (const cab of tramo.cabinas) {
       if (cab.puerta.tipo === 'puerta') {
@@ -286,41 +293,41 @@ export function bom(
 
   const codigoLinea = config.linea === 'SUPERIOR' ? 'SUP' : config.linea === 'TOUCHLESS' ? 'TL' : 'LDR'
 
-  const altoPil = esReforzado(config.modelo) ? 210 : config.alturaCm + 30
+  // las alturas las manda el modelo, no el vendedor
+  const alturas = alturasDe(config.modelo)
+  const altoPil = alturas.pilastra
 
   for (const [ancho, cantidad] of [...puertas.entries()].sort((a, b) => a[0] - b[0])) {
     renglones.push({
       sku: `${codigoLinea}-PT${ancho}`,
-      descripcion: `Puerta ${ancho} × ${config.alturaCm} cm`,
+      descripcion: `Puerta ${ancho} × ${alturas.puerta} cm`,
       tipo: 'Puerta',
       cantidad,
-      precioUnit: precioPieza({ familia: 'PT', anchoCm: ancho, altoCm: config.alturaCm }, opciones),
+      precioUnit: precioPieza({ familia: 'PT', anchoCm: ancho, altoCm: alturas.puerta }, opciones),
       tarifaReal: true,
     })
   }
   if (paneles > 0) {
     renglones.push({
       sku: `${codigoLinea}-PN${config.profundidadCm}`,
-      descripcion: `Panel divisor ${config.profundidadCm} × ${config.alturaCm} cm`,
+      descripcion: `Panel divisor ${config.profundidadCm} × ${alturas.panel} cm`,
       tipo: 'Panel',
       cantidad: paneles,
       precioUnit: precioPieza(
-        { familia: 'PN', anchoCm: config.profundidadCm, altoCm: config.alturaCm },
+        { familia: 'PN', anchoCm: config.profundidadCm, altoCm: alturas.panel },
         opciones,
       ),
       tarifaReal: true,
     })
   }
-  if (pilastras > 0) {
+  const sufijoPil = config.montaje === 'PISO_TECHO' ? 'PT' : 'STD'
+  for (const [ancho, cantidad] of [...pilastrasPorAncho.entries()].sort((a, b) => a[0] - b[0])) {
     renglones.push({
-      sku: `${codigoLinea}-PI${config.montaje === 'PISO_TECHO' ? 'PT' : 'STD'}`,
-      descripcion: `Pilastra ${config.anchoPilastraCm} × ${altoPil} cm`,
+      sku: `${codigoLinea}-PI${sufijoPil}${ancho}`,
+      descripcion: `Pilastra ${ancho} × ${altoPil} cm`,
       tipo: 'Pilastra',
-      cantidad: pilastras,
-      precioUnit: precioPieza(
-        { familia: 'PL', anchoCm: config.anchoPilastraCm, altoCm: altoPil },
-        opciones,
-      ),
+      cantidad,
+      precioUnit: precioPieza({ familia: 'PL', anchoCm: ancho, altoCm: altoPil }, opciones),
       tarifaReal: true,
     })
   }

@@ -1,7 +1,7 @@
 import { COLORES, buscarColor } from './catalog'
 import { COLORES_FUERA_DE_CATALOGO, RENDERS } from './datos/renders'
 import { FOTOS_HERRAJES } from './datos/herrajes'
-import type { Acabado, HerrajeAcabado, Linea, TipoCabina } from './types'
+import type { Acabado, HerrajeAcabado, Linea, Terminacion, TipoCabina } from './types'
 
 /**
  * Busca el render que le corresponde a lo que el vendedor eligió. Las fotos son
@@ -115,8 +115,49 @@ export { COLORES_FUERA_DE_CATALOGO }
  * inoxidable sí, porque Superior 2.0 tiene bisagra de autorretorno y su propia
  * escuadra U.
  */
-export function fotosHerraje(linea: Linea, acabado: HerrajeAcabado) {
-  return FOTOS_HERRAJES.filter((f) => f.acabado === acabado && (f.linea === undefined || f.linea === linea))
+export interface FotoHerraje {
+  pieza: string
+  archivo: string
+  /** true si la foto es la del juego negro porque en ese acabado falta */
+  prestada?: boolean
+}
+
+/** el zoclo y la pata son la misma pieza en dos versiones: va solo la elegida */
+function esDeTerminacion(pieza: string, terminacion: Terminacion): boolean {
+  const p = pieza.toLowerCase()
+  return terminacion === 'ZOCLO' ? p.includes('zoclo') : p.includes('pata')
+}
+
+function esZocloOPata(pieza: string): boolean {
+  return esDeTerminacion(pieza, 'ZOCLO') || esDeTerminacion(pieza, 'PATAS')
+}
+
+export function fotosHerraje(
+  linea: Linea,
+  acabado: HerrajeAcabado,
+  terminacion: Terminacion = 'ZOCLO',
+): FotoHerraje[] {
+  const juego = FOTOS_HERRAJES.filter(
+    (f) => f.acabado === acabado && (f.linea === undefined || f.linea === linea),
+  )
+  const comunes = juego.filter((f) => !esZocloOPata(f.pieza))
+  const propia = juego.find((f) => esDeTerminacion(f.pieza, terminacion))
+  if (propia) return [...comunes, { pieza: propia.pieza, archivo: propia.archivo }]
+  // Falta la foto de esa terminación en este acabado (hoy: la pata en acero
+  // inoxidable). Entra la del juego negro, avisando que es prestada.
+  const negra = FOTOS_HERRAJES.find(
+    (f) => f.acabado === 'NEGRO' && esDeTerminacion(f.pieza, terminacion),
+  )
+  if (!negra) return comunes
+  return [...comunes, { pieza: negra.pieza, archivo: negra.archivo, prestada: true }]
+}
+
+/**
+ * Terminaciones que se pueden pedir con ese juego de herrajes. El juego negro
+ * no tiene zoclo: va siempre con pata.
+ */
+export function terminacionesDe(acabado: HerrajeAcabado): Terminacion[] {
+  return acabado === 'NEGRO' ? ['PATAS'] : ['ZOCLO', 'PATAS']
 }
 
 /** true si todavía no llegaron las fotos de ese juego */

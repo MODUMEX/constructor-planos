@@ -1,5 +1,5 @@
 import type { Area, Cabina, Config, Tramo } from '../types'
-import { esReforzado, nombreModelo, tipologia } from '../catalog'
+import { alturasDe, nombreModelo, tipologia } from '../catalog'
 
 /**
  * Piezas del proyecto con el SubTipo que espera el CIP.
@@ -53,10 +53,9 @@ export function nombreSistema(config: Config): string {
   return config.terminacion === 'PATAS' ? 'Pata' : 'Zoclo'
 }
 
-/** el alto de la pilastra depende del modelo: los reforzados van a 210 */
+/** el alto de la pilastra lo pone el modelo, no la altura de la puerta */
 export function altoPilastra(config: Config): number {
-  if (esReforzado(config.modelo)) return 210
-  return config.alturaCm + 30
+  return alturasDe(config.modelo).pilastra
 }
 
 /** el CSV y el cajetín llevan el nombre del modelo, no su código de tarifa */
@@ -89,7 +88,11 @@ export function orientacionDeSubTipo(subTipo: string): string {
 function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastraInicial = false): Pieza[] {
   const piezas: Pieza[] = []
   const n = tramo.cabinas.length
-  const alto = config.alturaCm
+  // cada familia lleva la altura que le da el modelo; solo en SCUDO el panel
+  // es más alto que la puerta
+  const alturas = alturasDe(config.modelo)
+  const alto = alturas.puerta
+  const altoPanel = alturas.panel
   const altoPil = altoPilastra(config)
 
   tramo.cabinas.forEach((cab, i) => {
@@ -125,7 +128,7 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
         piezas.push({
           familia: 'PN',
           anchoCm: config.profundidadCm,
-          altoCm: alto,
+          altoCm: altoPanel,
           subTipo: esUltima ? 'PNLAT' : 'PNCEN',
           area,
         })
@@ -135,7 +138,7 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
 
   // pilastra de cierre al inicio cuando el tramo no arranca contra pared
   if (n > 0 && !tramo.muroInicio) {
-    piezas.push({ familia: 'PN', anchoCm: config.profundidadCm, altoCm: alto, subTipo: 'PNLAT', area })
+    piezas.push({ familia: 'PN', anchoCm: config.profundidadCm, altoCm: altoPanel, subTipo: 'PNLAT', area })
   }
 
   // pilastras: una en cada extremo y una por divisor interno.

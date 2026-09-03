@@ -81,6 +81,47 @@ export function esReforzado(codigo: string): boolean {
   return codigo.includes('REFORZADO')
 }
 
+export interface AlturasModelo {
+  puerta: number
+  panel: number
+  pilastra: number
+  mingitorio: number
+}
+
+/**
+ * Altura de cada pieza, en cm, según el modelo. Es la tabla alturasPorModelo
+ * del Constructor actual, que sale de la ficha LEEDER M1 y del BOM.
+ *
+ * La pieza se FABRICA a una sola altura, igual con zoclo que con patas: la
+ * resta de 6 o de 10 cm se hace en planta al optimizar el corte, así que no
+ * cambia la medida que va en la OC. Por eso hay una sola columna por familia.
+ *
+ * Verificadas contra el cotizador: ESTANDAR y REFORZADO PT70 = 150 y PI19 = 180;
+ * IMPERIAL PI = 190; KIDS PT = 130 y PI = 150. SCUDO, COLGANTE y TL_S3 son
+ * estimadas y falta confirmarlas con la ficha.
+ */
+export const ALTURAS_POR_MODELO: Record<string, AlturasModelo> = {
+  ESTANDAR: { puerta: 150, panel: 150, pilastra: 180, mingitorio: 120 },
+  ESTANDAR170: { puerta: 170, panel: 170, pilastra: 180, mingitorio: 120 },
+  REFORZADO: { puerta: 150, panel: 150, pilastra: 210, mingitorio: 120 },
+  REFORZADO170: { puerta: 170, panel: 170, pilastra: 210, mingitorio: 120 },
+  IMPERIAL: { puerta: 180, panel: 180, pilastra: 190, mingitorio: 120 },
+  REGADERAS: { puerta: 180, panel: 180, pilastra: 180, mingitorio: 120 },
+  SCUDO: { puerta: 200, panel: 210, pilastra: 210, mingitorio: 120 },
+  KIDS: { puerta: 130, panel: 130, pilastra: 150, mingitorio: 120 },
+  COLGANTE: { puerta: 180, panel: 180, pilastra: 220, mingitorio: 120 },
+  SUP_ESTANDAR: { puerta: 150, panel: 150, pilastra: 180, mingitorio: 120 },
+  SUP_ESTANDAR170: { puerta: 170, panel: 170, pilastra: 180, mingitorio: 120 },
+  SUP_REFORZADO: { puerta: 150, panel: 150, pilastra: 210, mingitorio: 120 },
+  SUP_REFORZADO170: { puerta: 170, panel: 170, pilastra: 210, mingitorio: 120 },
+  TL_S3: { puerta: 180, panel: 180, pilastra: 210, mingitorio: 120 },
+}
+
+/** las alturas del modelo; si es uno viejo o desconocido, las del estándar */
+export function alturasDe(modelo: string): AlturasModelo {
+  return ALTURAS_POR_MODELO[(modelo || '').toUpperCase()] ?? ALTURAS_POR_MODELO.ESTANDAR
+}
+
 /**
  * Acabados por línea, igual que `acabadosDeLinea()` del Constructor actual:
  * solo Superior 2.0 ofrece esmaltada y acero.
