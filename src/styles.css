@@ -365,6 +365,14 @@ input, select { font: inherit; }
 .props .fila { display: flex; justify-content: space-between; gap: 10px; font-size: 13.5px; }
 .props .fila span { color: var(--text-2); }
 .props .fila b { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.props .fila .editable {
+  flex: 1; min-width: 0; text-align: right;
+  background: transparent; border: 1px solid transparent; border-radius: 6px;
+  color: var(--text); font: inherit; font-family: var(--mono); padding: 1px 5px;
+}
+.props .fila .editable::placeholder { color: var(--text-3); }
+.props .fila .editable:hover { border-color: var(--line); }
+.props .fila .editable:focus { outline: none; border-color: var(--focus); background: var(--surface); text-align: left; }
 .props .vacio { color: var(--text-3); font-size: 13px; line-height: 1.5; }
 
 .pildoras { display: flex; flex-wrap: wrap; gap: 6px; }

@@ -129,7 +129,7 @@ export default function App() {
     ubicacion: demo ? 'San José, Escazú' : '',
     distribuidor: demo ? 'Modumex Costa Rica' : '',
     creadoPor: '',
-    areas: [areaInicial(demo ? 'Baño de hombres' : '', demo && pasoDemo >= 7, tipoDemo)],
+    areas: [areaInicial(demo ? 'Baño de hombres' : 'Área 1', demo && pasoDemo >= 7, tipoDemo)],
   })
   const [activa, setActiva] = useState(0)
 
@@ -564,7 +564,24 @@ export default function App() {
                   <VistaRender consulta={conFoto(config, tipoDeArea(area))} alto={130} />
                   <h4>Área</h4>
                   <div className="bloque">
-                    <div className="fila"><span>Nombre</span><b>{area.nombre}</b></div>
+                    <div className="fila">
+                      <span>Nombre</span>
+                      <input
+                        className="editable"
+                        value={area.nombre}
+                        placeholder="Baño de hombres 101"
+                        onChange={(e) => setArea({ nombre: e.target.value })}
+                      />
+                    </div>
+                    <div className="fila">
+                      <span>Piso</span>
+                      <input
+                        className="editable"
+                        value={area.piso}
+                        placeholder="Planta baja"
+                        onChange={(e) => setArea({ piso: e.target.value })}
+                      />
+                    </div>
                     <div className="fila"><span>Tipología</span><b>{tipologia(config.tipologia).nombre}</b></div>
                     <div className="fila"><span>Cabinas</span><b>{cabinasTotal}</b></div>
                     <div className="fila"><span>Línea · modelo</span><b>{config.linea === 'SUPERIOR' ? 'Superior 2.0' : config.linea} · {config.modelo}</b></div>
@@ -650,15 +667,6 @@ export default function App() {
                     <div className="campo">
                       <label>Distribuidor</label>
                       <input value={proyecto.distribuidor} onChange={(e) => setProyecto({ ...proyecto, distribuidor: e.target.value })} />
-                    </div>
-                    <div className="campo">
-                      <label>Nombre del área</label>
-                      <input value={area.nombre} onChange={(e) => setArea({ nombre: e.target.value })} />
-                      <span className="ayuda">Por ejemplo: Baño de hombres 101</span>
-                    </div>
-                    <div className="campo">
-                      <label>Piso</label>
-                      <input value={area.piso} onChange={(e) => setArea({ piso: e.target.value })} />
                     </div>
                   </div>
                 </>
