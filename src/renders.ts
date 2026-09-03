@@ -118,8 +118,8 @@ export { COLORES_FUERA_DE_CATALOGO }
 export interface FotoHerraje {
   pieza: string
   archivo: string
-  /** true si la foto es la del juego negro porque en ese acabado falta */
-  prestada?: boolean
+  /** de dónde salió la foto, cuando no es la del juego que se está viendo */
+  nota?: string
 }
 
 /** el zoclo y la pata son la misma pieza en dos versiones: va solo la elegida */
@@ -143,13 +143,25 @@ export function fotosHerraje(
   const comunes = juego.filter((f) => !esZocloOPata(f.pieza))
   const propia = juego.find((f) => esDeTerminacion(f.pieza, terminacion))
   if (propia) return [...comunes, { pieza: propia.pieza, archivo: propia.archivo }]
-  // Falta la foto de esa terminación en este acabado (hoy: la pata en acero
-  // inoxidable). Entra la del juego negro, avisando que es prestada.
+
+  // No hay foto de esa terminación en esta línea. La pata de acero inoxidable,
+  // por ejemplo, solo vino en la carpeta de LEEDER, pero Superior 2.0 también
+  // se puede pedir con pata. Se toma la del mismo acabado en otra línea, y si
+  // tampoco hay, la del juego negro. En los dos casos se dice de dónde salió.
+  const deOtraLinea = FOTOS_HERRAJES.find(
+    (f) => f.acabado === acabado && esDeTerminacion(f.pieza, terminacion),
+  )
+  if (deOtraLinea) {
+    return [
+      ...comunes,
+      { pieza: deOtraLinea.pieza, archivo: deOtraLinea.archivo, nota: `foto de ${deOtraLinea.linea ?? 'otra línea'}` },
+    ]
+  }
   const negra = FOTOS_HERRAJES.find(
     (f) => f.acabado === 'NEGRO' && esDeTerminacion(f.pieza, terminacion),
   )
   if (!negra) return comunes
-  return [...comunes, { pieza: negra.pieza, archivo: negra.archivo, prestada: true }]
+  return [...comunes, { pieza: negra.pieza, archivo: negra.archivo, nota: 'foto del juego negro' }]
 }
 
 /**
@@ -162,5 +174,9 @@ export function terminacionesDe(acabado: HerrajeAcabado): Terminacion[] {
 
 /** true si todavía no llegaron las fotos de ese juego */
 export function faltanFotosHerraje(linea: Linea, acabado: HerrajeAcabado): boolean {
-  return fotosHerraje(linea, acabado).length === 0
+  // se mira el juego propio, no el que sale con fotos prestadas de otra línea:
+  // una pata prestada no quiere decir que ya llegaron las fotos de esta
+  return !FOTOS_HERRAJES.some(
+    (x) => x.acabado === acabado && (x.linea === undefined || x.linea === linea),
+  )
 }

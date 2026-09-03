@@ -888,7 +888,7 @@ export default function App() {
                       {fotosHerraje(config.linea, config.herrajeAcabado, config.terminacion).map((f) => (
                         <figure className="herraje-pieza" key={f.archivo}>
                           <img src={f.archivo} alt={f.pieza} />
-                          <span>{f.pieza}{f.prestada ? ' · foto del juego negro' : ''}</span>
+                          <span>{f.pieza}{f.nota ? ` · ${f.nota}` : ''}</span>
                         </figure>
                       ))}
                     </div>

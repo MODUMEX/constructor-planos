@@ -63,6 +63,12 @@ export const FOTOS_HERRAJES: { linea?: Linea; acabado: HerrajeAcabado; pieza: st
     "archivo": "herrajes/inox-leeder-zoclo.webp"
   },
   {
+    "linea": "LEEDER",
+    "acabado": "INOX",
+    "pieza": "Pata",
+    "archivo": "herrajes/inox-leeder-pata.webp"
+  },
+  {
     "linea": "SUPERIOR",
     "acabado": "INOX",
     "pieza": "Bisagra",
