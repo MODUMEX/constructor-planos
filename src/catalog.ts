@@ -117,9 +117,21 @@ export const ALTURAS_POR_MODELO: Record<string, AlturasModelo> = {
   TL_S3: { puerta: 180, panel: 180, pilastra: 210, mingitorio: 120 },
 }
 
+/**
+ * Correcciones que un administrador guardó en la nube. Se aplican encima de la
+ * tabla de fábrica al entrar, así que el plano, el CSV y la cotización usan
+ * todos la misma altura sin tener que pasarla de mano en mano.
+ */
+let alturasCorregidas: Record<string, AlturasModelo> | null = null
+
+export function aplicarAlturas(tabla: Record<string, AlturasModelo> | null) {
+  alturasCorregidas = tabla
+}
+
 /** las alturas del modelo; si es uno viejo o desconocido, las del estándar */
 export function alturasDe(modelo: string): AlturasModelo {
-  return ALTURAS_POR_MODELO[(modelo || '').toUpperCase()] ?? ALTURAS_POR_MODELO.ESTANDAR
+  const codigo = (modelo || '').toUpperCase()
+  return alturasCorregidas?.[codigo] ?? ALTURAS_POR_MODELO[codigo] ?? ALTURAS_POR_MODELO.ESTANDAR
 }
 
 /**

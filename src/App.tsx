@@ -6,7 +6,7 @@ import { armarPedido, enviarPedido, erpConectado, type RespuestaERP } from './er
 import { generarCSV, nombreArchivoCSV } from './exportar/csv'
 import { generarPDF, nombreArchivoPDF } from './exportar/pdf'
 import { csvABytes, FILTRO_CSV, FILTRO_PDF, guardarArchivo } from './exportar/guardar'
-import { IVA_CR, type Usuario } from './auth'
+import { esAdmin, IVA_CR, type Usuario } from './auth'
 import type { Area, Cabina, Config, Pais, Proyecto, TipoCabina, TipologiaId } from './types'
 import {
   ACABADOS, alturasDe, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, MODELOS,
@@ -22,6 +22,8 @@ import { buscarActualizacion, type FaseActualizacion } from './actualizar'
 import { versionActual, VERSION_COMPILADA } from './version'
 import { TARIFAS_BASE } from './datos/tarifas-base'
 import EditorTarifas from './components/EditorTarifas'
+import EditorAlturas from './components/EditorAlturas'
+import { alturasDeFabrica, cargarAlturas, usarAlturas, type TablaAlturas } from './alturas'
 import Proyectos from './components/Proyectos'
 
 const TC = 512
@@ -148,6 +150,9 @@ export default function App() {
   const [guardado, setGuardado] = useState<string | null>(null)
   const [tarifas, setTarifas] = useState<ResultadoTarifas | null>(null)
   const [verTarifas, setVerTarifas] = useState(demo && params.has('tarifas'))
+  const [alturasTabla, setAlturasTabla] = useState<TablaAlturas>(alturasDeFabrica)
+  const [alturasNube, setAlturasNube] = useState(false)
+  const [verAlturas, setVerAlturas] = useState(false)
   const [verProyectos, setVerProyectos] = useState(false)
   const [version, setVersion] = useState(VERSION_COMPILADA)
   const [actualizando, setActualizando] = useState<FaseActualizacion | null>(null)
@@ -184,6 +189,27 @@ export default function App() {
       vigente = false
     }
   }, [usuario?.token])
+
+  // las alturas por modelo viven en app_config: si un administrador corrigió
+  // alguna, se aplica encima de la tabla de fábrica para todo el mundo
+  useEffect(() => {
+    if (!usuario?.token) return
+    let vigente = true
+    cargarAlturas(usuario.token).then((r) => {
+      if (!vigente) return
+      setAlturasTabla(r.tabla)
+      setAlturasNube(r.deLaNube)
+    })
+    return () => {
+      vigente = false
+    }
+  }, [usuario?.token])
+
+  // el plano, el CSV y la cotización leen las alturas del catálogo, así que
+  // la tabla activa se deja puesta ahí en vez de pasarla por cada llamada
+  useEffect(() => {
+    usarAlturas(alturasTabla)
+  }, [alturasTabla])
 
   function recargarTarifas() {
     if (!usuario?.token) {
@@ -477,8 +503,11 @@ export default function App() {
           {buscandoActualizacion ? 'Buscando…' : 'Actualizaciones'}
         </button>
         <button className="btn plano chico" onClick={() => setVerProyectos(true)}>Proyectos</button>
-        {usuario.rol === 'Super Admin' && (
-          <button className="btn plano chico" onClick={() => setVerTarifas(true)}>Lista de precios</button>
+        {esAdmin(usuario) && (
+          <>
+            <button className="btn plano chico" onClick={() => setVerAlturas(true)}>Alturas</button>
+            <button className="btn plano chico" onClick={() => setVerTarifas(true)}>Lista de precios</button>
+          </>
         )}
         <button className="btn plano chico" onClick={() => setTema(tema === 'oscuro' ? 'claro' : 'oscuro')}>
           {tema === 'oscuro' ? '☀ Claro' : '☾ Oscuro'}
@@ -503,7 +532,17 @@ export default function App() {
         />
       )}
 
-      {verTarifas && usuario.rol === 'Super Admin' && (
+      {verAlturas && esAdmin(usuario) && (
+        <EditorAlturas
+          usuario={usuario}
+          tabla={alturasTabla}
+          deLaNube={alturasNube}
+          onCambio={setAlturasTabla}
+          onCerrar={() => setVerAlturas(false)}
+        />
+      )}
+
+      {verTarifas && esAdmin(usuario) && (
         <EditorTarifas
           usuario={usuario}
           tabla={tarifas?.tabla ?? TARIFAS_BASE}
