@@ -4,7 +4,7 @@ import { puertasPosibles, tipologia } from '../catalog'
 import { anchoTotal, minimoDe, moverDivisor, nuevaCabina, puertaSugerida, snap } from '../modulacion'
 import { medidaCercana, PILASTRAS_EXTREMO, PILASTRAS_INTERNAS } from '../modulador'
 import { Grupo, Item, Menu, Raya } from './Menu'
-import { cajaDelPlano, ESPESOR_MURO, marcosDe, profundidadDeTramo, pt, type Marco } from '../geometria'
+import { cajaDelPlano, ESPESOR_MURO, marcosDe, profundidadDeTramo, pt, SOBRA_MURO_CM, type Marco } from '../geometria'
 import { ALTO_ORINAL_CM, ALTO_WC_CM, ORINAL, WC } from '../assets/sanitarios'
 
 /** medio alto de la zona invisible para agarrar una pilastra, en cm de plano */
@@ -250,8 +250,10 @@ export default function EditorPlano({
           let u = 0
           for (const c of tramo.cabinas) { acum.push(u); u += c.anchoCm }
 
-          const muroA = pt(m, 0, -ESPESOR_MURO)
-          const muroB = pt(m, largo, 0)
+          // El muro de fondo sobresale un poco de las piezas por los dos lados,
+          // para que no termine al ras del último panel o pilastra.
+          const muroA = pt(m, -SOBRA_MURO_CM, -ESPESOR_MURO)
+          const muroB = pt(m, largo + SOBRA_MURO_CM, 0)
 
           return (
             <g key={tramo.id}>

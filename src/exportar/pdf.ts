@@ -1,7 +1,8 @@
 import { jsPDF } from 'jspdf'
 import type { Area, Proyecto } from '../types'
 import {
-  acumulado, cajaDelPlano, ESPESOR_MURO, marcosDe, PROF_ORINAL_CM, profundidadDeTramo, pt, type Marco,
+  acumulado, cajaDelPlano, ESPESOR_MURO, marcosDe, PROF_ORINAL_CM, profundidadDeTramo, pt, SOBRA_MURO_CM,
+  type Marco,
 } from '../geometria'
 import { nombreHerraje, tipologia } from '../catalog'
 import { anchoTotal } from '../modulacion'
@@ -81,8 +82,9 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
     doc.setFillColor(214, 214, 214)
     doc.setDrawColor(90)
     doc.setLineWidth(0.35)
-    const [mx, my] = aHoja(e, pt(m, 0, -ESPESOR_MURO))
-    const [mx2, my2] = aHoja(e, pt(m, largo, 0))
+    // el muro sobresale un poco de las piezas, para no terminar al ras
+    const [mx, my] = aHoja(e, pt(m, -SOBRA_MURO_CM, -ESPESOR_MURO))
+    const [mx2, my2] = aHoja(e, pt(m, largo + SOBRA_MURO_CM, 0))
     doc.rect(Math.min(mx, mx2), Math.min(my, my2), Math.abs(mx2 - mx) || ESPESOR_MURO * e.k, Math.abs(my2 - my) || ESPESOR_MURO * e.k, 'FD')
 
     const muroLateral = (u0: number, u1: number) => {
