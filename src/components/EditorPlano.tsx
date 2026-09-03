@@ -7,6 +7,9 @@ import { Grupo, Item, Menu, Raya } from './Menu'
 import { cajaDelPlano, ESPESOR_MURO, marcosDe, profundidadDeTramo, pt, type Marco } from '../geometria'
 import { ALTO_ORINAL_CM, ALTO_WC_CM, ORINAL, WC } from '../assets/sanitarios'
 
+/** medio alto de la zona invisible para agarrar una pilastra, en cm de plano */
+const AGARRE_CM = 9
+
 export function formatear(cm: number, unidad: 'cm' | 'in'): string {
   if (unidad === 'cm') return `${Number.isInteger(cm) ? cm : cm.toFixed(1)}`
   const pulg = cm / 2.54
@@ -302,14 +305,24 @@ export default function EditorPlano({
                 const pisoW = Math.abs(esq2.x - esq.x)
                 const pisoH = Math.abs(esq2.y - esq.y)
 
+                // La puerta cuelga de la PILASTRA, no del límite de la cabina: el
+                // límite cae en el centro de la pilastra, así que hay que correrse
+                // hasta su cara. Las de los extremos van enteras dentro de su cabina.
+                const n = tramo.cabinas.length
+                const anchoPil = (j: number) => tramo.pilastras?.[j] ?? config.anchoPilastraCm
+                const caraIzq = i === 0 ? anchoPil(0) : anchoPil(i) / 2
+                const caraDer = i === n - 1 ? anchoPil(n) : anchoPil(i + 1) / 2
+
                 // pivote de la puerta y hoja
-                const pivU = cab.puerta.mano === 'der' ? u1 : u0
+                const pivU = cab.puerta.mano === 'der' ? u1 - caraDer : u0 + caraIzq
                 const dir = cab.puerta.mano === 'der' ? -1 : 1
                 const hoja = cab.puerta.anchoCm
                 const pivote = pt(m, pivU, prof)
                 const abre = cab.puerta.apertura === 'afuera' ? prof + hoja * 0.72 : prof - hoja * 0.72
                 const extremo = pt(m, pivU + dir * hoja * 0.72, abre)
                 const centro = pt(m, (u0 + u1) / 2, prof * 0.42)
+                // la cota de la puerta va en horizontal, centrada en el vano
+                const cotaPuerta = pt(m, (u0 + caraIzq + (u1 - caraDer)) / 2, prof)
 
                 return (
                   <g key={cab.id}>
@@ -326,6 +339,16 @@ export default function EditorPlano({
                         setMenu({ tipo: 'cabina', tramoId: tramo.id, indice: i, x: e.clientX, y: e.clientY })
                       }}
                     />
+
+                    {/* cota de la puerta: horizontal, centrada en el vano entre pilastras */}
+                    {verCotas && cab.puerta.tipo !== 'ninguna' && (
+                      <text
+                        x={cotaPuerta.x} y={cotaPuerta.y + (horizontal ? 26 : 0)}
+                        textAnchor="middle" fontSize={14} fill="#8fa2bb" pointerEvents="none"
+                      >
+                        {formatear(cab.puerta.anchoCm, unidad)}
+                      </text>
+                    )}
 
                     {/* sanitario: el dibujo real del catálogo, con el fluxómetro contra el muro */}
                     {verInodoros && cab.inodoro && cab.tipo !== 'regadera' && (() => {
@@ -417,6 +440,19 @@ export default function EditorPlano({
                           {activo && (
                             <circle cx={(a.x + b.x) / 2} cy={(a.y + b.y) / 2} r={9} fill="#2e6fd9" opacity={0.28} />
                           )}
+                          {/* cota del panel: va en vertical, a lo largo de la pieza */}
+                          {verCotas && (() => {
+                            const c = pt(m, u1, prof * 0.5)
+                            return (
+                              <text
+                                x={c.x} y={c.y} textAnchor="middle" fontSize={14} fill="#7f8fa3"
+                                pointerEvents="none"
+                                transform={`rotate(${horizontal ? -90 : 0} ${c.x} ${c.y})`}
+                              >
+                                {formatear(prof, unidad)}
+                              </text>
+                            )
+                          })()}
                         </g>
                       )
                     })()}
@@ -495,18 +531,38 @@ export default function EditorPlano({
                       const b = pt(m, centro + ancho / 2, prof)
                       const extremo = k === 0 || k === cortes.length - 1
                       const activa = arrastrando === `pil:${tramo.id}:${k}`
+                      // En planta la pilastra es una tira del grueso del material: en
+                      // pantalla quedan 3 o 4 píxeles, imposibles de agarrar. Por eso
+                      // encima va una zona de agarre invisible, mucho más alta.
+                      const g0 = pt(m, centro - ancho / 2, prof - AGARRE_CM)
+                      const g1 = pt(m, centro + ancho / 2, prof + AGARRE_CM)
+                      const cursor = horizontal ? 'ew-resize' : 'ns-resize'
                       return (
-                        <rect
-                          key={k}
-                          x={Math.min(a.x, b.x)} y={Math.min(a.y, b.y)}
-                          width={Math.max(Math.abs(b.x - a.x), 3)} height={Math.max(Math.abs(b.y - a.y), 3)}
-                          fill={activa ? '#2e6fd9' : '#3c4e63'} stroke="#5f7590" strokeWidth={0.8}
-                          pointerEvents="auto"
-                          style={{ cursor: horizontal ? 'ew-resize' : 'ns-resize' }}
-                          onPointerDown={(e) => empezarArrastrePilastra(e, tramo, k, m, ancho, extremo)}
-                        >
-                          <title>{`Pilastra ${ancho} cm — arrastra para cambiar la medida`}</title>
-                        </rect>
+                        <g key={k}>
+                          <rect
+                            x={Math.min(a.x, b.x)} y={Math.min(a.y, b.y)}
+                            width={Math.max(Math.abs(b.x - a.x), 3)} height={Math.max(Math.abs(b.y - a.y), 3)}
+                            fill={activa ? '#2e6fd9' : '#3c4e63'} stroke="#5f7590" strokeWidth={0.8}
+                            pointerEvents="none"
+                          />
+                          <rect
+                            x={Math.min(g0.x, g1.x)} y={Math.min(g0.y, g1.y)}
+                            width={Math.max(Math.abs(g1.x - g0.x), 8)} height={Math.max(Math.abs(g1.y - g0.y), 8)}
+                            fill="transparent" pointerEvents="auto" style={{ cursor }}
+                            onPointerDown={(e) => empezarArrastrePilastra(e, tramo, k, m, ancho, extremo)}
+                          >
+                            <title>{`Pilastra ${ancho} cm — arrastra para cambiar la medida`}</title>
+                          </rect>
+                          {verCotas && (
+                            <text
+                              x={(a.x + b.x) / 2}
+                              y={(a.y + b.y) / 2 + (horizontal ? 26 : 0)}
+                              textAnchor="middle" fontSize={14} fill="#7f8fa3" pointerEvents="none"
+                            >
+                              {formatear(ancho, unidad)}
+                            </text>
+                          )}
+                        </g>
                       )
                     })}
                   </g>
