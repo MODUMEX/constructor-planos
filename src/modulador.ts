@@ -9,8 +9,9 @@
  * llevan N+1 pilastras. Las de los extremos salen del grupo chico (≤24) y las
  * internas del grande (≥24).
  *
- * No cubre todavía PMR, cabina accesible ni mingitorios: esos casos tienen su
- * propia rama en el Constructor actual y se portan aparte.
+ * Cubre cabinas normales, cabina accesible (que es una cabina con puerta ancha,
+ * no otra geometría) y orinales. Falta el PMR de cuarto, que en el Constructor
+ * actual tiene su propia rama porque el cuarto va perpendicular a la tira.
  */
 
 import {
@@ -48,6 +49,10 @@ export interface Modulacion {
   mensaje: string
   /** pieza de relleno contra la pared, cuando el hueco es de 5 cm o menos */
   canaleta: { anchoCm: number; codigo: string } | null
+  /** ancho de la puerta de la cabina accesible, si la hay */
+  anchoPuertaAccesible: number | null
+  /** ancho de cada orinal: 60 cm mas lo que le toque del sobrante */
+  anchoOrinal: number | null
 }
 
 export interface OpcionesModulacion {
@@ -68,7 +73,17 @@ export interface OpcionesModulacion {
   pilInternaFija?: number
   /** lo mismo para las pilastras de los extremos */
   pilExtremoFija?: number
+  /** orinales de 60 cm; entre dos va una mampara MG, no una pilastra */
+  mingitorios?: number
+  /** una cabina accesible: es una cabina con puerta ancha, no otra geometría */
+  accesible?: boolean
 }
+
+/** ancho de un orinal y grueso de la mampara que los separa, en cm */
+const ANCHO_ORINAL = 60
+const GRUESO_MG = 1.27
+/** la puerta de una cabina accesible nunca baja de esta medida */
+const PUERTA_ACCESIBLE_MIN = 85
 
 /** la medida de catálogo más cercana a `cm`, dentro de las opciones dadas */
 export function medidaCercana(opciones: number[], cm: number): number {
@@ -76,28 +91,40 @@ export function medidaCercana(opciones: number[], cm: number): number {
 }
 
 export function modularTira(o: OpcionesModulacion): Modulacion | null {
-  const n = o.puertas
-  if (n < 1) return null
-  const internas = n - 1
-  const objetivo = calcularClaroAjustado(o.claroCm, o.murosPilastra, n)
+  const nEst = o.puertas
+  const nAcc = o.accesible ? 1 : 0
+  const nMing = o.mingitorios ?? 0
+  const cabinas = nEst + nAcc + nMing
+  if (cabinas < 1) return null
+
+  const internas = Math.max(0, cabinas - 1)
+  // los orinales no llevan puerta, así que no suman holgura de bisagra
+  const objetivo = calcularClaroAjustado(o.claroCm, o.murosPilastra, nEst + nAcc)
   const dosMuros = o.murosPilastra >= 2
+  const grosorMG = Math.max(0, nMing - 1) * GRUESO_MG
+  const fijoMG = nMing * ANCHO_ORINAL + grosorMG
 
   const puertas = o.puertaFija ? [o.puertaFija] : ANCHOS_PUERTA
+  const puertasAcc = nAcc > 0 ? ANCHOS_PUERTA.filter((a) => a >= PUERTA_ACCESIBLE_MIN) : [0]
   const opInternas = internas > 0 ? (o.pilInternaFija ? [o.pilInternaFija] : PILASTRAS_INTERNAS) : [0]
   const opExtremos = o.pilExtremoFija ? [o.pilExtremoFija] : PILASTRAS_EXTREMO
 
-  let mejor: { ap: number; api: number; ae1: number; ae2: number; total: number; score: number } | null = null
-  for (const ap of puertas) {
-    for (const api of opInternas) {
-      for (const ae1 of opExtremos) {
-        for (const ae2 of opExtremos) {
-          const total = n * ap + internas * api + ae1 + ae2
-          const dif = objetivo - total
-          const score =
-            Math.abs(dif) +
-            Math.abs(ap - PUERTA_PREFERIDA) * PENALIZA_PUERTA +
-            (dosMuros && total > objetivo ? (total - objetivo) * PENALIZA_PASARSE : 0)
-          if (!mejor || score < mejor.score) mejor = { ap, api, ae1, ae2, total, score }
+  let mejor:
+    | { ap: number; acc: number; api: number; ae1: number; ae2: number; total: number; score: number }
+    | null = null
+  for (const acc of puertasAcc.length ? puertasAcc : [0]) {
+    for (const ap of nEst > 0 ? puertas : [0]) {
+      for (const api of opInternas) {
+        for (const ae1 of opExtremos) {
+          for (const ae2 of opExtremos) {
+            const total = nEst * ap + nAcc * acc + fijoMG + internas * api + ae1 + ae2
+            const dif = objetivo - total
+            const score =
+              Math.abs(dif) +
+              (nEst > 0 ? Math.abs(ap - PUERTA_PREFERIDA) * PENALIZA_PUERTA : 0) +
+              (dosMuros && total > objetivo ? (total - objetivo) * PENALIZA_PASARSE : 0)
+            if (!mejor || score < mejor.score) mejor = { ap, acc, api, ae1, ae2, total, score }
+          }
         }
       }
     }
@@ -134,6 +161,19 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
         })()
       : null
 
+  // Con orinales, el sobrante NO va a canaleta: se reparte ensanchandolos, que es
+  // lo que hace el Constructor actual. La canaleta queda para cuando no los hay.
+  let anchoOrinal = ANCHO_ORINAL
+  let ajusteFinal = ajuste
+  let mensajeFinal = mensaje
+  let canaletaFinal = canaleta
+  if (nMing > 0 && diferencia > 0.5) {
+    anchoOrinal = ANCHO_ORINAL + diferencia / nMing
+    ajusteFinal = "exacto"
+    mensajeFinal = `Calza; los ${abs.toFixed(1)} cm de sobra se reparten entre los ${nMing} orinales`
+    canaletaFinal = null
+  }
+
   const pilastras = [mejor.ae1, ...Array(internas).fill(mejor.api), mejor.ae2]
 
   return {
@@ -145,8 +185,10 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
     total: mejor.total,
     claroAjustado: objetivo,
     diferencia,
-    ajuste,
-    mensaje,
-    canaleta,
+    ajuste: ajusteFinal,
+    mensaje: mensajeFinal,
+    canaleta: canaletaFinal,
+    anchoPuertaAccesible: mejor.acc || null,
+    anchoOrinal: nMing > 0 ? anchoOrinal : null,
   }
 }
