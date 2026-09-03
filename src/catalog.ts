@@ -314,8 +314,6 @@ export interface Tipologia {
   esquinaCompartida: boolean
   /** índice del tramo que recibe el claro y la cantidad de cabinas que da el vendedor */
   principal: number
-  /** fuera del selector; la definición se queda para los planos ya hechos */
-  oculta?: boolean
 }
 
 /** largo con el que arranca un tramo secundario, después se ajusta arrastrando */
@@ -353,67 +351,6 @@ export const TIPOLOGIAS: Tipologia[] = [
     tramos: [{ orientacion: 'horizontal', muroInicio: false, muroFin: false, nombre: 'Tira' }],
     esquinaCompartida: false,
     principal: 0,
-  },
-  {
-    id: 'ESQUINA_IZQ',
-    nombre: 'Esquina izquierda',
-    descripcion: 'Dos tiras en ángulo que comparten la pilastra de la esquina.',
-    tramos: [
-      { orientacion: 'horizontal', muroInicio: true, muroFin: false, nombre: 'Tira sobre el muro de fondo' },
-      { orientacion: 'vertical', muroInicio: true, muroFin: false, nombre: 'Tira sobre el muro izquierdo' },
-    ],
-    esquinaCompartida: true,
-    principal: 0,
-    oculta: true,
-  },
-  {
-    id: 'ESQUINA_DER',
-    nombre: 'Esquina derecha',
-    descripcion: 'La misma esquina, espejada hacia la derecha.',
-    tramos: [
-      { orientacion: 'horizontal', muroInicio: false, muroFin: true, nombre: 'Tira sobre el muro de fondo' },
-      { orientacion: 'vertical', muroInicio: true, muroFin: false, nombre: 'Tira sobre el muro derecho' },
-    ],
-    esquinaCompartida: true,
-    principal: 0,
-    oculta: true,
-  },
-  {
-    id: 'NICHO_IZQ',
-    nombre: 'Nicho izquierdo',
-    descripcion: 'Alcoba: la tira se mete en un receso de pared con muros a los dos lados.',
-    tramos: [
-      { orientacion: 'vertical', muroInicio: true, muroFin: true, nombre: 'Tira dentro del nicho' },
-      { orientacion: 'horizontal', muroInicio: false, muroFin: true, nombre: 'Tira sobre el muro de fondo' },
-    ],
-    esquinaCompartida: true,
-    principal: 1,
-    oculta: true,
-  },
-  {
-    id: 'NICHO_DER',
-    nombre: 'Nicho derecho',
-    descripcion: 'El mismo nicho, espejado.',
-    tramos: [
-      { orientacion: 'horizontal', muroInicio: true, muroFin: false, nombre: 'Tira sobre el muro de fondo' },
-      { orientacion: 'vertical', muroInicio: true, muroFin: true, nombre: 'Tira dentro del nicho' },
-    ],
-    esquinaCompartida: true,
-    principal: 0,
-    oculta: true,
-  },
-  {
-    id: 'U_TRES_MUROS',
-    nombre: 'U de tres muros',
-    descripcion: 'Tres tiras: fondo y los dos costados, con las dos esquinas compartidas.',
-    tramos: [
-      { orientacion: 'vertical', muroInicio: true, muroFin: false, nombre: 'Costado izquierdo' },
-      { orientacion: 'horizontal', muroInicio: true, muroFin: true, nombre: 'Tira de fondo' },
-      { orientacion: 'vertical', muroInicio: true, muroFin: false, nombre: 'Costado derecho' },
-    ],
-    esquinaCompartida: true,
-    principal: 1,
-    oculta: true,
   },
   {
     id: 'PMR',

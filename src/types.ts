@@ -80,11 +80,6 @@ export type TipologiaId =
   | 'RECTA_MURO_IZQ'
   | 'RECTA_MURO_DER'
   | 'ISLA'
-  | 'ESQUINA_IZQ'
-  | 'ESQUINA_DER'
-  | 'NICHO_IZQ'
-  | 'NICHO_DER'
-  | 'U_TRES_MUROS'
   | 'PMR'
   | 'ORINALES'
 

@@ -49,9 +49,9 @@ const proyecto: Proyecto = {
   creadoPor: 'Dayanna Lizano',
   areas: [
     area('Baño de hombres 101', 'RECTA_MURO_IZQ', 420, 4),
-    area('Baño de mujeres 102', 'ESQUINA_IZQ', 420, 4),
+    area('Baño de mujeres 102', 'RECTA_MURO_DER', 420, 4),
     // esta va en Superior 2.0 para ver el espesor de 3 mm en el cajetín y en el CSV
-    area('Baño de hombres 201', 'U_TRES_MUROS', 420, 4, 'SUPERIOR'),
+    area('Baño de hombres 201', 'RECTA_ENTRE_MUROS', 420, 4, 'SUPERIOR'),
     area('Orinales 101', 'ORINALES', 240, 4),
   ],
 }

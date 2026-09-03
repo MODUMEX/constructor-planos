@@ -354,7 +354,7 @@ export function generarPDF(proyecto: Proyecto, fecha = new Date().toLocaleDateSt
     doc.rect(M / 2, M / 2, HOJA.w - M, HOJA.h - M)
 
     const prof = area.config.profundidadCm
-    const marcos = marcosDe(area.config.tipologia, area.tramos, prof)
+    const marcos = marcosDe(area.tramos)
     const caja = cajaDelPlano(area.tramos, marcos, prof, 46)
 
     const zonaW = HOJA.w - M * 2 - PANEL_W - 6

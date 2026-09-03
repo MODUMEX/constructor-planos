@@ -19,9 +19,12 @@ export function profundidadDeTramo(tramo: Tramo, profundidadCm: number): number 
 
 /**
  * Cada tramo se dibuja en su propio marco: un origen más dos direcciones,
- * `a` a lo largo del muro y `p` hacia el frente de las cabinas. Con esto,
- * la esquina, el nicho y la U salen del mismo código que la tira recta,
- * y el PDF puede dibujar exactamente el mismo plano que la pantalla.
+ * `a` a lo largo del muro y `p` hacia el frente de las cabinas. La pantalla
+ * y el PDF usan el mismo marco, así que dibujan exactamente el mismo plano.
+ *
+ * Hoy todas las tipologías son tiras rectas, así que todos los marcos son el
+ * mismo. El marco existe igual porque es lo que permitiría volver a dibujar
+ * tramos en ángulo sin tocar los dos dibujantes.
  */
 export interface Marco {
   ox: number
@@ -32,38 +35,8 @@ export interface Marco {
   py: number
 }
 
-export function marcosDe(tipologia: string, tramos: Tramo[], prof: number): Marco[] {
-  const L = (i: number) => tramos[i]?.claroCm ?? 0
-  switch (tipologia) {
-    case 'ESQUINA_IZQ':
-      return [
-        { ox: 0, oy: 0, ax: 1, ay: 0, px: 0, py: 1 },
-        { ox: 0, oy: prof, ax: 0, ay: 1, px: 1, py: 0 },
-      ]
-    case 'ESQUINA_DER':
-      return [
-        { ox: 0, oy: 0, ax: 1, ay: 0, px: 0, py: 1 },
-        { ox: L(0), oy: prof, ax: 0, ay: 1, px: -1, py: 0 },
-      ]
-    case 'NICHO_IZQ':
-      return [
-        { ox: 0, oy: 0, ax: 0, ay: 1, px: 1, py: 0 },
-        { ox: prof, oy: 0, ax: 1, ay: 0, px: 0, py: 1 },
-      ]
-    case 'NICHO_DER':
-      return [
-        { ox: 0, oy: 0, ax: 1, ay: 0, px: 0, py: 1 },
-        { ox: L(0) + prof, oy: 0, ax: 0, ay: 1, px: -1, py: 0 },
-      ]
-    case 'U_TRES_MUROS':
-      return [
-        { ox: 0, oy: prof, ax: 0, ay: 1, px: 1, py: 0 },
-        { ox: 0, oy: 0, ax: 1, ay: 0, px: 0, py: 1 },
-        { ox: L(1), oy: prof, ax: 0, ay: 1, px: -1, py: 0 },
-      ]
-    default:
-      return tramos.map(() => ({ ox: 0, oy: 0, ax: 1, ay: 0, px: 0, py: 1 }))
-  }
+export function marcosDe(tramos: Tramo[]): Marco[] {
+  return tramos.map(() => ({ ox: 0, oy: 0, ax: 1, ay: 0, px: 0, py: 1 }))
 }
 
 export function pt(m: Marco, u: number, v: number): { x: number; y: number } {

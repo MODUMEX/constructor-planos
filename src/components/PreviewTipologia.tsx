@@ -9,7 +9,6 @@ import type { TipologiaId } from '../types'
 const MURO = '#2b3542'
 const PIEZA = '#15274b'
 const ARCO = '#5f92dd'
-const LIBRE = '#eef2f7'
 
 function Muro({ x, y, w, h }: { x: number; y: number; w: number; h: number }) {
   return (
@@ -35,19 +34,6 @@ function CabinaH({ x, y, w, d, mano = 'der' }: { x: number; y: number; w: number
         strokeDasharray="2 1.6"
       />
       <line x1={pivote} y1={y + d} x2={pivote + dir * hoja} y2={y + d - hoja} stroke={ARCO} strokeWidth={1.5} />
-    </g>
-  )
-}
-
-function CabinaV({ x, y, h, d, hacia = 'der' }: { x: number; y: number; h: number; d: number; hacia?: 'der' | 'izq' }) {
-  const sx = hacia === 'der' ? x : x - d
-  const hoja = Math.min(h * 0.78, d * 0.9)
-  const frente = hacia === 'der' ? sx + d : sx
-  const dir = hacia === 'der' ? -1 : 1
-  return (
-    <g>
-      <rect x={sx} y={y + h - 1.2} width={d} height={2.4} fill={PIEZA} />
-      <line x1={frente} y1={y + h} x2={frente + dir * hoja} y2={y + h - hoja} stroke={ARCO} strokeWidth={1.5} />
     </g>
   )
 }
@@ -105,81 +91,6 @@ export default function PreviewTipologia({ id, size = 148 }: { id: TipologiaId; 
             <rect x={14} y={17} width={2.4} height={D} fill={PIEZA} />
             {[0, 1, 2].map((i) => (
               <CabinaH key={i} x={16 + i * 30} y={17} w={30} d={D} />
-            ))}
-          </>
-        )
-      case 'ESQUINA_IZQ':
-        return (
-          <>
-            <Muro x={6} y={10} w={108} h={5} />
-            <Muro x={6} y={15} w={5} h={70} />
-            {[0, 1].map((i) => (
-              <CabinaH key={i} x={11 + 34 + i * 34} y={15} w={34} d={D} />
-            ))}
-            <CabinaH x={11} y={15} w={34} d={D} mano="izq" />
-            <Accesible x={17} y={22} />
-            {[0, 1].map((i) => (
-              <CabinaV key={i} x={11} y={41 + 3 + i * 20} h={20} d={D} />
-            ))}
-          </>
-        )
-      case 'ESQUINA_DER':
-        return (
-          <>
-            <Muro x={6} y={10} w={108} h={5} />
-            <Muro x={109} y={15} w={5} h={70} />
-            {[0, 1, 2].map((i) => (
-              <CabinaH key={i} x={6 + i * 34} y={15} w={34} d={D} mano="izq" />
-            ))}
-            {[0, 1].map((i) => (
-              <CabinaV key={i} x={109} y={44 + i * 20} h={20} d={D} hacia="izq" />
-            ))}
-          </>
-        )
-      case 'NICHO_IZQ':
-        return (
-          <>
-            <Muro x={6} y={10} w={108} h={5} />
-            <Muro x={6} y={15} w={5} h={70} />
-            <Muro x={6} y={80} w={40} h={5} />
-            <rect x={11} y={15} width={35} height={65} fill={LIBRE} opacity={0.55} />
-            {[0, 1].map((i) => (
-              <CabinaV key={i} x={11} y={20 + i * 28} h={28} d={35} />
-            ))}
-            {[0, 1].map((i) => (
-              <CabinaH key={i} x={46 + i * 34} y={15} w={34} d={D} />
-            ))}
-          </>
-        )
-      case 'NICHO_DER':
-        return (
-          <>
-            <Muro x={6} y={10} w={108} h={5} />
-            <Muro x={109} y={15} w={5} h={70} />
-            <Muro x={74} y={80} w={40} h={5} />
-            <rect x={74} y={15} width={35} height={65} fill={LIBRE} opacity={0.55} />
-            {[0, 1].map((i) => (
-              <CabinaV key={i} x={109} y={20 + i * 28} h={28} d={35} hacia="izq" />
-            ))}
-            {[0, 1].map((i) => (
-              <CabinaH key={i} x={6 + i * 34} y={15} w={34} d={D} mano="izq" />
-            ))}
-          </>
-        )
-      case 'U_TRES_MUROS':
-        return (
-          <>
-            <Muro x={6} y={10} w={108} h={5} />
-            <Muro x={6} y={15} w={5} h={70} />
-            <Muro x={109} y={15} w={5} h={70} />
-            {[0, 1, 2].map((i) => (
-              <CabinaH key={i} x={11 + i * 32.7} y={15} w={32.7} d={D} />
-            ))}
-            {[0, 1].map((i) => (
-              <CabinaV key={i} x={11} y={44 + i * 20} h={20} d={24} />
-            ))}
-            {[0, 1].map((i) => (
-              <CabinaV key={`d${i}`} x={109} y={44 + i * 20} h={20} d={24} hacia="izq" />
             ))}
           </>
         )

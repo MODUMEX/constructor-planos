@@ -77,7 +77,7 @@ export default function EditorPlano({
   } | null>(null)
 
   const prof = config.profundidadCm
-  const marcos = useMemo(() => marcosDe(config.tipologia, tramos, prof), [config.tipologia, tramos, prof])
+  const marcos = useMemo(() => marcosDe(tramos), [tramos])
   /** en esquina, nicho y U los muros de fondo de cada tramo ya forman el ángulo:
    *  dibujar además los laterales metería una pared en medio del baño */
   const conEsquina = tipologia(config.tipologia).esquinaCompartida

@@ -940,7 +940,7 @@ export default function App() {
                     el Constructor viejo no podía armar.
                   </p>
                   <div className="tipos">
-                    {TIPOLOGIAS.filter((t) => !t.oculta).map((t) => (
+                    {TIPOLOGIAS.map((t) => (
                       <button
                         key={t.id}
                         className={`tipo ${config.tipologia === t.id ? 'sel' : ''}`}
