@@ -9,3 +9,5 @@ instaladores
 public/*.pdf
 tsconfig.tsbuildinfo
 .modulador.mjs
+.orinales.mjs
+.probar.mjs
