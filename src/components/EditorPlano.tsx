@@ -5,7 +5,7 @@ import { anchoTotal, minimoDe, moverDivisor, nuevaCabina, puertaSugerida, snap }
 import { medidaCercana, PILASTRAS_EXTREMO, PILASTRAS_INTERNAS } from '../modulador'
 import { Grupo, Item, Menu, Raya } from './Menu'
 import { cajaDelPlano, ESPESOR_MURO, marcosDe, profundidadDeTramo, pt, SOBRA_MURO_CM, type Marco } from '../geometria'
-import { ALTO_ORINAL_CM, ALTO_WC_CM, ORINAL, WC } from '../assets/sanitarios'
+import { ALTO_ORINAL_CM, ALTO_REGADERA_CM, ALTO_WC_CM, ORINAL, REGADERA, WC } from '../assets/sanitarios'
 
 /** medio alto de la zona invisible para agarrar una pilastra, en cm de plano */
 const AGARRE_CM = 9
@@ -353,9 +353,9 @@ export default function EditorPlano({
                     )}
 
                     {/* sanitario: el dibujo real del catálogo, con el fluxómetro contra el muro */}
-                    {verInodoros && cab.inodoro && cab.tipo !== 'regadera' && (() => {
-                      const dibujo = cab.tipo === 'orinal' ? ORINAL : WC
-                      const alto = cab.tipo === 'orinal' ? ALTO_ORINAL_CM : ALTO_WC_CM
+                    {verInodoros && cab.inodoro && (() => {
+                      const dibujo = cab.tipo === 'orinal' ? ORINAL : cab.tipo === 'regadera' ? REGADERA : WC
+                      const alto = cab.tipo === 'orinal' ? ALTO_ORINAL_CM : cab.tipo === 'regadera' ? ALTO_REGADERA_CM : ALTO_WC_CM
                       const ancho = (alto * dibujo.ancho) / dibujo.alto
                       // el sanitario se apoya contra el muro, centrado en su cabina
                       const esquina = pt(m, (u0 + u1) / 2, 6)
@@ -378,9 +378,7 @@ export default function EditorPlano({
                         fontSize={26} fill="#8b98a8" pointerEvents="none"
                       >♿</text>
                     )}
-                    {cab.tipo === 'regadera' && (
-                      <text x={centro.x} y={centro.y} textAnchor="middle" fontSize={22} fill="#8b98a8" pointerEvents="none">🚿</text>
-                    )}
+
 
                     {/* puerta: hoja abierta a 45° más el arco de barrido */}
                     {cab.puerta.tipo !== 'ninguna' && (() => {

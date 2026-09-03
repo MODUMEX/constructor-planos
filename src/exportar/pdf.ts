@@ -7,7 +7,7 @@ import {
 import { nombreHerraje, tipologia } from '../catalog'
 import { anchoTotal } from '../modulacion'
 import { agrupar, modeloParaCsv, nombreLinea, nombreSistema, piezasDeArea } from './piezas'
-import { ALTO_ORINAL_CM, ALTO_WC_CM, ORINAL, WC } from '../assets/sanitarios'
+import { ALTO_ORINAL_CM, ALTO_REGADERA_CM, ALTO_WC_CM, ORINAL, REGADERA, WC } from '../assets/sanitarios'
 
 /**
  * Plano en PDF: una hoja por área, con el dibujo a escala, las cotas
@@ -144,9 +144,9 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
       }
 
       // sanitario: el mismo dibujo del catálogo que se ve en pantalla
-      if (cab.inodoro && cab.tipo !== 'regadera') {
-        const dibujo = cab.tipo === 'orinal' ? ORINAL : WC
-        const altoCm = cab.tipo === 'orinal' ? ALTO_ORINAL_CM : ALTO_WC_CM
+      if (cab.inodoro) {
+        const dibujo = cab.tipo === 'orinal' ? ORINAL : cab.tipo === 'regadera' ? REGADERA : WC
+        const altoCm = cab.tipo === 'orinal' ? ALTO_ORINAL_CM : cab.tipo === 'regadera' ? ALTO_REGADERA_CM : ALTO_WC_CM
         const anchoCm = (altoCm * dibujo.ancho) / dibujo.alto
         const [ax, ay] = aHoja(e, pt(m, (u0 + u1) / 2, 6))
         const w = anchoCm * e.k

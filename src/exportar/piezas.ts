@@ -108,7 +108,10 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
     // divisor a la derecha de esta cabina; contra el muro no lleva nada.
     // Entre orinales el divisor es una mampara MG, no un panel de cabina.
     const esUltima = i === n - 1
-    const llevaDivisor = !esUltima || !tramo.muroFin
+    // N orinales llevan N−1 mamparas: la del extremo abierto no existe, ahí
+    // el orinal da a la nada.
+    const llevaDivisor =
+      cab.tipo === 'orinal' ? tramo.cabinas[i + 1]?.tipo === 'orinal' : !esUltima || !tramo.muroFin
     if (llevaDivisor) {
       if (cab.tipo === 'orinal') {
         piezas.push({

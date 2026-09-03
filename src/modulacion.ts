@@ -13,6 +13,9 @@ export function nuevoId(prefijo: string): string {
   return `${prefijo}-${seq}`
 }
 
+/** grueso de la mampara que separa dos orinales, en cm */
+const GRUESO_MG_CM = 1.27
+
 export function snap(valor: number): number {
   return Math.round(valor / SNAP_CM) * SNAP_CM
 }
@@ -67,17 +70,19 @@ export function modularConCatalogo(
   murosPilastra: number,
   extremoAbierto: boolean,
   fijar?: { pilInterna?: number; pilExtremo?: number; puerta?: number },
-  extra?: { accesible?: boolean; anchoAccesibleMinCm?: number },
+  extra?: { accesible?: boolean; anchoAccesibleMinCm?: number; mingitorios?: number },
 ): { cabinas: Cabina[]; pilastras: number[]; canaletaCm: number } | null {
   const conAcc = extra?.accesible === true
-  // la accesible va primera, como en el Constructor actual
-  const normales = conAcc ? cantidad - 1 : cantidad
+  const nMing = extra?.mingitorios ?? 0
+  // la accesible va primera y los orinales al final, como en el Constructor actual
+  const normales = cantidad - (conAcc ? 1 : 0) - nMing
   if (normales < 0) return null
 
   const m = modularTira({
     claroCm,
     puertas: normales,
     accesible: conAcc,
+    mingitorios: nMing,
     murosPilastra,
     extremoAbierto,
     puertaFija: fijar?.puerta,
@@ -86,14 +91,28 @@ export function modularConCatalogo(
   })
   if (!m) return null
 
+  // Entre dos orinales no hay pilastra sino mampara, así que en esas fronteras
+  // la lista lleva el grueso de la mampara. El dibujo y las cotas leen esta
+  // lista por posición, por eso tiene que traer una entrada por cada frontera.
+  const pilastras: number[] = [m.pilastras[0]]
+  for (let i = 1; i <= cantidad - 1; i++) {
+    const izqOrinal = i > cantidad - 1 - nMing
+    const derOrinal = i >= cantidad - nMing
+    pilastras.push(izqOrinal && derOrinal ? GRUESO_MG_CM : m.anchoPilInterna)
+  }
+  pilastras.push(m.pilastras[m.pilastras.length - 1])
+
   const cabinas: Cabina[] = []
   for (let i = 0; i < cantidad; i++) {
-    const izq = i === 0 ? m.pilastras[0] : m.pilastras[i] / 2
-    const der = i === cantidad - 1 ? m.pilastras[cantidad] : m.pilastras[i + 1] / 2
+    const izq = i === 0 ? pilastras[0] : pilastras[i] / 2
+    const der = i === cantidad - 1 ? pilastras[cantidad] : pilastras[i + 1] / 2
     const esAcc = conAcc && i === 0
+    const esOrinal = i >= cantidad - nMing
     const puerta = esAcc ? (m.anchoPuertaAccesible ?? m.anchoPuerta) : m.anchoPuerta
-    const c = nuevaCabina(izq + puerta + der, esAcc ? 'accesible' : 'normal')
-    c.puerta.anchoCm = puerta
+    const cuerpo = esOrinal ? (m.anchoOrinal ?? 60) : puerta
+    const c = nuevaCabina(izq + cuerpo + der, esAcc ? 'accesible' : esOrinal ? 'orinal' : 'normal')
+    if (esOrinal) c.puerta = { ...c.puerta, tipo: 'ninguna' }
+    else c.puerta.anchoCm = puerta
     cabinas.push(c)
   }
 
@@ -103,7 +122,7 @@ export function modularConCatalogo(
   const minAcc = extra?.anchoAccesibleMinCm ?? MIN_ACCESIBLE_CM
   if (conAcc && cabinas[0] && cabinas[0].anchoCm < minAcc) return null
 
-  return { cabinas, pilastras: m.pilastras, canaletaCm: m.canaleta?.anchoCm ?? 0 }
+  return { cabinas, pilastras, canaletaCm: m.canaleta?.anchoCm ?? 0 }
 }
 
 /**
@@ -196,7 +215,12 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
     // los secundarios arrancan con una medida de partida que después se arrastra
     const esPrincipal = i === tipo.principal
     const cant = esPrincipal ? cantidad : 2
-    const claroTramo = soloOrinales ? cant * 60 : esPrincipal ? claroCm : LARGO_SECUNDARIO_CM
+    // En un área de solo orinales el vendedor da la cantidad, no el claro: la
+    // tira mide los orinales, las mamparas que los separan y las dos pilastras
+    // de los extremos, que también son piezas de catálogo.
+    const murosT = (t.muroInicio ? 1 : 0) + (t.muroFin ? 1 : 0)
+    const claroOrinales = cant * 60 + Math.max(0, cant - 1) * GRUESO_MG_CM + 2 * 10 + murosT
+    const claroTramo = soloOrinales ? claroOrinales : esPrincipal ? claroCm : LARGO_SECUNDARIO_CM
     const base = {
       id: nuevoId('tramo'),
       nombre: t.nombre,
@@ -205,17 +229,19 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
       muroInicio: t.muroInicio,
       muroFin: t.muroFin,
     }
-    if (soloOrinales) return { ...base, cabinas: orinales(cant) }
-    const muros = (t.muroInicio ? 1 : 0) + (t.muroFin ? 1 : 0)
+    const muros = murosT
     // La cabina accesible ya no tiene camino aparte: es una cabina con puerta
     // ancha, así que sale del mismo buscador que las demás.
     const conCatalogo = modularConCatalogo(claroTramo, cant, muros, muros < 2, undefined, {
       accesible: conAccesible && esPrincipal,
+      mingitorios: soloOrinales ? cant : 0,
     })
     if (!conCatalogo) {
       return {
         ...base,
-        cabinas: modular(claroTramo, cant, conAccesible && esPrincipal ? config.anchoAccesibleCm : 0),
+        cabinas: soloOrinales
+          ? orinales(cant)
+          : modular(claroTramo, cant, conAccesible && esPrincipal ? config.anchoAccesibleCm : 0),
       }
     }
     return {

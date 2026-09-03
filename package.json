@@ -1,7 +1,7 @@
 {
   "name": "constructor-de-planos",
   "private": true,
-  "version": "2.3.1",
+  "version": "2.3.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -15,7 +15,9 @@
     "tauri": "tauri",
     "app": "tauri dev",
     "exe": "tauri build",
-    "probar-modulador": "esbuild scripts/probar-modulador.ts --bundle --platform=node --format=esm --outfile=.modulador.mjs --log-level=warning && node .modulador.mjs"
+    "probar-modulador": "esbuild scripts/probar-modulador.ts --bundle --platform=node --format=esm --outfile=.modulador.mjs --log-level=warning && node .modulador.mjs",
+    "probar-orinales": "esbuild scripts/probar-orinales.ts --bundle --platform=node --format=esm --outfile=.orinales.mjs --log-level=warning && node .orinales.mjs",
+    "generar-regadera": "node scripts/generar-regadera.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",
