@@ -67,10 +67,17 @@ export function modularConCatalogo(
   murosPilastra: number,
   extremoAbierto: boolean,
   fijar?: { pilInterna?: number; pilExtremo?: number; puerta?: number },
+  extra?: { accesible?: boolean; anchoAccesibleMinCm?: number },
 ): { cabinas: Cabina[]; pilastras: number[]; canaletaCm: number } | null {
+  const conAcc = extra?.accesible === true
+  // la accesible va primera, como en el Constructor actual
+  const normales = conAcc ? cantidad - 1 : cantidad
+  if (normales < 0) return null
+
   const m = modularTira({
     claroCm,
-    puertas: cantidad,
+    puertas: normales,
+    accesible: conAcc,
     murosPilastra,
     extremoAbierto,
     puertaFija: fijar?.puerta,
@@ -83,10 +90,19 @@ export function modularConCatalogo(
   for (let i = 0; i < cantidad; i++) {
     const izq = i === 0 ? m.pilastras[0] : m.pilastras[i] / 2
     const der = i === cantidad - 1 ? m.pilastras[cantidad] : m.pilastras[i + 1] / 2
-    const c = nuevaCabina(izq + m.anchoPuerta + der)
-    c.puerta.anchoCm = m.anchoPuerta
+    const esAcc = conAcc && i === 0
+    const puerta = esAcc ? (m.anchoPuertaAccesible ?? m.anchoPuerta) : m.anchoPuerta
+    const c = nuevaCabina(izq + puerta + der, esAcc ? 'accesible' : 'normal')
+    c.puerta.anchoCm = puerta
     cabinas.push(c)
   }
+
+  // La cabina accesible tiene que salir al menos tan ancha como pide la
+  // configuración. Si el catálogo no da para eso, se devuelve null y quien
+  // llama cae en la modulación vieja: mejor eso que una accesible angosta.
+  const minAcc = extra?.anchoAccesibleMinCm ?? MIN_ACCESIBLE_CM
+  if (conAcc && cabinas[0] && cabinas[0].anchoCm < minAcc) return null
+
   return { cabinas, pilastras: m.pilastras, canaletaCm: m.canaleta?.anchoCm ?? 0 }
 }
 
@@ -190,13 +206,18 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
       muroFin: t.muroFin,
     }
     if (soloOrinales) return { ...base, cabinas: orinales(cant) }
-    // el PMR conserva la modulación vieja: su rama no está portada todavía
-    if (conAccesible && esPrincipal) {
-      return { ...base, cabinas: modular(claroTramo, cant, config.anchoAccesibleCm) }
-    }
     const muros = (t.muroInicio ? 1 : 0) + (t.muroFin ? 1 : 0)
-    const conCatalogo = modularConCatalogo(claroTramo, cant, muros, muros < 2)
-    if (!conCatalogo) return { ...base, cabinas: modular(claroTramo, cant) }
+    // La cabina accesible ya no tiene camino aparte: es una cabina con puerta
+    // ancha, así que sale del mismo buscador que las demás.
+    const conCatalogo = modularConCatalogo(claroTramo, cant, muros, muros < 2, undefined, {
+      accesible: conAccesible && esPrincipal,
+    })
+    if (!conCatalogo) {
+      return {
+        ...base,
+        cabinas: modular(claroTramo, cant, conAccesible && esPrincipal ? config.anchoAccesibleCm : 0),
+      }
+    }
     return {
       ...base,
       cabinas: conCatalogo.cabinas,
