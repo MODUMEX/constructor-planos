@@ -105,6 +105,12 @@ export const FOTOS_HERRAJES: { linea?: Linea; acabado: HerrajeAcabado; pieza: st
     "archivo": "herrajes/inox-superior-zoclo.webp"
   },
   {
+    "linea": "SUPERIOR",
+    "acabado": "INOX",
+    "pieza": "Pata",
+    "archivo": "herrajes/inox-superior-pata.webp"
+  },
+  {
     "acabado": "NEGRO",
     "pieza": "Bisagra",
     "archivo": "herrajes/negro-bisagra.webp"
