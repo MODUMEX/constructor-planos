@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import type { Cabina, Config, Tramo } from '../types'
 import { puertasPosibles, tipologia } from '../catalog'
 import { anchoTotal, minimoDe, moverDivisor, nuevaCabina, puertaSugerida, snap } from '../modulacion'
+import { medidaCercana, PILASTRAS_EXTREMO, PILASTRAS_INTERNAS } from '../modulador'
 import { Grupo, Item, Menu, Raya } from './Menu'
 import { cajaDelPlano, ESPESOR_MURO, marcosDe, profundidadDeTramo, pt, type Marco } from '../geometria'
 import { ALTO_ORINAL_CM, ALTO_WC_CM, ORINAL, WC } from '../assets/sanitarios'
@@ -27,6 +28,8 @@ interface Props {
   seleccion: string | null
   onSeleccion: (id: string | null) => void
   onCabinas: (tramoId: string, cabinas: Cabina[]) => void
+  /** al arrastrar una pilastra: se elige su medida y el resto se reacomoda */
+  onPilastra: (tramoId: string, indice: number, anchoCm: number) => void
 }
 
 type MenuEstado =
@@ -43,6 +46,7 @@ export default function EditorPlano({
   seleccion,
   onSeleccion,
   onCabinas,
+  onPilastra,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [menu, setMenu] = useState<MenuEstado>(null)
@@ -56,6 +60,17 @@ export default function EditorPlano({
     ay: number
     cabinas: Cabina[]
     escala: number
+  } | null>(null)
+  const arrastrePil = useRef<{
+    tramoId: string
+    indice: number
+    x0: number
+    y0: number
+    ax: number
+    ay: number
+    escala: number
+    ancho0: number
+    extremo: boolean
   } | null>(null)
 
   const prof = config.profundidadCm
@@ -92,7 +107,49 @@ export default function EditorPlano({
     }
   }
 
+  /** arrastre de una pilastra: cambia SU medida y el resto se reacomoda solo */
+  function empezarArrastrePilastra(
+    e: React.PointerEvent,
+    tramo: Tramo,
+    indice: number,
+    m: Marco,
+    ancho0: number,
+    extremo: boolean,
+  ) {
+    e.stopPropagation()
+    const svg = svgRef.current
+    if (!svg) return
+    const r = svg.getBoundingClientRect()
+    arrastrePil.current = {
+      tramoId: tramo.id,
+      indice,
+      x0: e.clientX,
+      y0: e.clientY,
+      ax: m.ax,
+      ay: m.ay,
+      escala: r.width / caja.w,
+      ancho0,
+      extremo,
+    }
+    setArrastrando(`pil:${tramo.id}:${indice}`)
+    try {
+      (e.target as Element).setPointerCapture(e.pointerId)
+    } catch {
+      /* sin captura el arrastre sigue mientras el puntero esté sobre el plano */
+    }
+  }
+
   function moviendo(e: React.PointerEvent) {
+    const p = arrastrePil.current
+    if (p) {
+      const dx = (e.clientX - p.x0) / p.escala
+      const dy = (e.clientY - p.y0) / p.escala
+      // arrastrar hacia afuera engorda la pilastra por los dos lados
+      const deseado = p.ancho0 + (dx * p.ax + dy * p.ay) * 2
+      const opciones = p.extremo ? PILASTRAS_EXTREMO : PILASTRAS_INTERNAS
+      onPilastra(p.tramoId, p.indice, medidaCercana(opciones, deseado))
+      return
+    }
     const a = arrastre.current
     if (!a) return
     const dx = (e.clientX - a.x0) / a.escala
@@ -107,6 +164,7 @@ export default function EditorPlano({
       try { (e.target as Element).releasePointerCapture(e.pointerId) } catch { /* ya liberado */ }
     }
     arrastre.current = null
+    arrastrePil.current = null
     setArrastrando(null)
   }
 
@@ -420,8 +478,11 @@ export default function EditorPlano({
                 const f1 = pt(m, largo, prof)
                 const cortes = [0, ...acum.slice(1), largo]
                 return (
-                  <g pointerEvents="none">
-                    <line x1={f0.x} y1={f0.y} x2={f1.x} y2={f1.y} stroke="#9aa8b8" strokeWidth={1.2} strokeDasharray="10 7" />
+                  <g>
+                    <line
+                      x1={f0.x} y1={f0.y} x2={f1.x} y2={f1.y}
+                      stroke="#9aa8b8" strokeWidth={1.2} strokeDasharray="10 7" pointerEvents="none"
+                    />
                     {cortes.map((u2, k) => {
                       // La pilastra se dibuja con SU ancho (el de la pieza, 10–85 cm según
                       // catálogo), no con el espesor del material: son cosas distintas y
@@ -432,13 +493,20 @@ export default function EditorPlano({
                         k === 0 ? u2 + ancho / 2 : k === cortes.length - 1 ? u2 - ancho / 2 : u2
                       const a = pt(m, centro - ancho / 2, prof - grueso)
                       const b = pt(m, centro + ancho / 2, prof)
+                      const extremo = k === 0 || k === cortes.length - 1
+                      const activa = arrastrando === `pil:${tramo.id}:${k}`
                       return (
                         <rect
                           key={k}
                           x={Math.min(a.x, b.x)} y={Math.min(a.y, b.y)}
                           width={Math.max(Math.abs(b.x - a.x), 3)} height={Math.max(Math.abs(b.y - a.y), 3)}
-                          fill="#3c4e63" stroke="#5f7590" strokeWidth={0.8}
-                        />
+                          fill={activa ? '#2e6fd9' : '#3c4e63'} stroke="#5f7590" strokeWidth={0.8}
+                          pointerEvents="auto"
+                          style={{ cursor: horizontal ? 'ew-resize' : 'ns-resize' }}
+                          onPointerDown={(e) => empezarArrastrePilastra(e, tramo, k, m, ancho, extremo)}
+                        >
+                          <title>{`Pilastra ${ancho} cm — arrastra para cambiar la medida`}</title>
+                        </rect>
                       )
                     })}
                   </g>

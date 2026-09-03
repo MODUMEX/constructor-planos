@@ -66,8 +66,17 @@ export function modularConCatalogo(
   cantidad: number,
   murosPilastra: number,
   extremoAbierto: boolean,
+  fijar?: { pilInterna?: number; pilExtremo?: number; puerta?: number },
 ): { cabinas: Cabina[]; pilastras: number[]; canaletaCm: number } | null {
-  const m = modularTira({ claroCm, puertas: cantidad, murosPilastra, extremoAbierto })
+  const m = modularTira({
+    claroCm,
+    puertas: cantidad,
+    murosPilastra,
+    extremoAbierto,
+    puertaFija: fijar?.puerta,
+    pilInternaFija: fijar?.pilInterna,
+    pilExtremoFija: fijar?.pilExtremo,
+  })
   if (!m) return null
 
   const cabinas: Cabina[] = []

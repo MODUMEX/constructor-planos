@@ -60,6 +60,19 @@ export interface OpcionesModulacion {
   extremoAbierto?: boolean
   /** si el cliente pide una medida concreta de puerta */
   puertaFija?: number
+  /**
+   * Fija el ancho de las pilastras internas y deja que el buscador reacomode
+   * el resto. Es lo que pasa al arrastrar una pilastra: se elige su medida y
+   * las demás piezas se adaptan para que la tira siga cuadrando.
+   */
+  pilInternaFija?: number
+  /** lo mismo para las pilastras de los extremos */
+  pilExtremoFija?: number
+}
+
+/** la medida de catálogo más cercana a `cm`, dentro de las opciones dadas */
+export function medidaCercana(opciones: number[], cm: number): number {
+  return opciones.reduce((a, b) => (Math.abs(b - cm) < Math.abs(a - cm) ? b : a), opciones[0])
 }
 
 export function modularTira(o: OpcionesModulacion): Modulacion | null {
@@ -70,13 +83,14 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
   const dosMuros = o.murosPilastra >= 2
 
   const puertas = o.puertaFija ? [o.puertaFija] : ANCHOS_PUERTA
-  const opInternas = internas > 0 ? PILASTRAS_INTERNAS : [0]
+  const opInternas = internas > 0 ? (o.pilInternaFija ? [o.pilInternaFija] : PILASTRAS_INTERNAS) : [0]
+  const opExtremos = o.pilExtremoFija ? [o.pilExtremoFija] : PILASTRAS_EXTREMO
 
   let mejor: { ap: number; api: number; ae1: number; ae2: number; total: number; score: number } | null = null
   for (const ap of puertas) {
     for (const api of opInternas) {
-      for (const ae1 of PILASTRAS_EXTREMO) {
-        for (const ae2 of PILASTRAS_EXTREMO) {
+      for (const ae1 of opExtremos) {
+        for (const ae2 of opExtremos) {
           const total = n * ap + internas * api + ae1 + ae2
           const dif = objetivo - total
           const score =

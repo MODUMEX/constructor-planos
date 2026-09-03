@@ -16,7 +16,7 @@ import VistaRender from './components/VistaRender'
 import ColoresMexico from './components/ColoresMexico'
 import { coloresMxPara, slugRenderMx } from './coloresMx'
 import { fotoDe, fotosHerraje, faltanFotosHerraje } from './renders'
-import { anchoTotal, bom, crearTramos, modular, nuevoId, totalBOM } from './modulacion'
+import { anchoTotal, bom, crearTramos, modular, modularConCatalogo, nuevoId, totalBOM } from './modulacion'
 import { cargarTarifas, type ResultadoTarifas } from './tarifas'
 import { buscarActualizacion, type FaseActualizacion } from './actualizar'
 import { versionActual, VERSION_COMPILADA } from './version'
@@ -295,6 +295,30 @@ export default function App() {
     setArea({ tramos: area.tramos.map((t) => (t.id === tramoId ? { ...t, cabinas } : t)) })
   }
 
+  /**
+   * Se arrastró una pilastra: se fija SU medida y el buscador reacomoda el
+   * resto de la tira con piezas de catálogo, para que siga cuadrando el claro.
+   * Arrastrar una interna cambia todas las internas, que es como se modula.
+   */
+  function onPilastra(tramoId: string, indice: number, anchoCm: number) {
+    const t = area.tramos.find((x) => x.id === tramoId)
+    if (!t || t.cabinas.length === 0) return
+    const extremo = indice === 0 || indice === t.cabinas.length
+    const muros = (t.muroInicio ? 1 : 0) + (t.muroFin ? 1 : 0)
+    const r = modularConCatalogo(t.claroCm, t.cabinas.length, muros, muros < 2, {
+      pilInterna: extremo ? undefined : anchoCm,
+      pilExtremo: extremo ? anchoCm : undefined,
+    })
+    if (!r) return
+    setArea({
+      tramos: area.tramos.map((x) =>
+        x.id === tramoId
+          ? { ...x, cabinas: r.cabinas, pilastras: r.pilastras, canaletaCm: r.canaletaCm }
+          : x,
+      ),
+    })
+  }
+
   function siguienteArea() {
     const nueva: Area = {
       id: nuevoId('area'),
@@ -531,6 +555,7 @@ export default function App() {
                     seleccion={seleccion}
                     onSeleccion={setSeleccion}
                     onCabinas={onCabinas}
+                    onPilastra={onPilastra}
                   />
                 </div>
 
