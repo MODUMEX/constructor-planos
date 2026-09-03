@@ -97,7 +97,7 @@ function areaInicial(nombre = '', conTramos = false, tipo?: TipologiaId): Area {
   }
 }
 
-/** atajo de desarrollo: ?demo=1&paso=7&tipo=ESQUINA_IZQ entra sin login para revisar una pantalla */
+/** atajo de desarrollo: ?demo=1&paso=7&tipo=RECTA_MURO_IZQ entra sin login para revisar una pantalla */
 const params = new URLSearchParams(typeof location === 'undefined' ? '' : location.search)
 const demo = import.meta.env.DEV && params.has('demo')
 const pasoDemo = Number(params.get('paso') ?? 1)
@@ -940,7 +940,7 @@ export default function App() {
                     el Constructor viejo no podía armar.
                   </p>
                   <div className="tipos">
-                    {TIPOLOGIAS.map((t) => (
+                    {TIPOLOGIAS.filter((t) => !t.oculta).map((t) => (
                       <button
                         key={t.id}
                         className={`tipo ${config.tipologia === t.id ? 'sel' : ''}`}
@@ -949,7 +949,7 @@ export default function App() {
                       >
                         <span className="lienzo"><PreviewTipologia id={t.id} /></span>
                         <span className="pie">
-                          <b>{t.nombre}{t.nuevo ? ' ·' : ''}{t.nuevo && <span className="nuevo" style={{ marginLeft: 6 }}>nuevo</span>}</b>
+                          <b>{t.nombre}</b>
                           <small>{t.descripcion}</small>
                         </span>
                       </button>

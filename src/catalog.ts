@@ -314,7 +314,8 @@ export interface Tipologia {
   esquinaCompartida: boolean
   /** índice del tramo que recibe el claro y la cantidad de cabinas que da el vendedor */
   principal: number
-  nuevo?: boolean
+  /** fuera del selector; la definición se queda para los planos ya hechos */
+  oculta?: boolean
 }
 
 /** largo con el que arranca un tramo secundario, después se ajusta arrastrando */
@@ -363,7 +364,7 @@ export const TIPOLOGIAS: Tipologia[] = [
     ],
     esquinaCompartida: true,
     principal: 0,
-    nuevo: true,
+    oculta: true,
   },
   {
     id: 'ESQUINA_DER',
@@ -375,7 +376,7 @@ export const TIPOLOGIAS: Tipologia[] = [
     ],
     esquinaCompartida: true,
     principal: 0,
-    nuevo: true,
+    oculta: true,
   },
   {
     id: 'NICHO_IZQ',
@@ -387,7 +388,7 @@ export const TIPOLOGIAS: Tipologia[] = [
     ],
     esquinaCompartida: true,
     principal: 1,
-    nuevo: true,
+    oculta: true,
   },
   {
     id: 'NICHO_DER',
@@ -399,7 +400,7 @@ export const TIPOLOGIAS: Tipologia[] = [
     ],
     esquinaCompartida: true,
     principal: 0,
-    nuevo: true,
+    oculta: true,
   },
   {
     id: 'U_TRES_MUROS',
@@ -412,7 +413,7 @@ export const TIPOLOGIAS: Tipologia[] = [
     ],
     esquinaCompartida: true,
     principal: 1,
-    nuevo: true,
+    oculta: true,
   },
   {
     id: 'PMR',
