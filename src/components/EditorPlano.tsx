@@ -426,7 +426,7 @@ export default function EditorPlano({
                       // La pilastra se dibuja con SU ancho (el de la pieza, 10–85 cm según
                       // catálogo), no con el espesor del material: son cosas distintas y
                       // dibujarla de 1.27 cm la volvía invisible en planta.
-                      const ancho = Math.max(config.anchoPilastraCm, grueso)
+                      const ancho = Math.max(tramo.pilastras?.[k] ?? config.anchoPilastraCm, grueso)
                       // en los extremos se corre hacia adentro para no invadir el muro
                       const centro =
                         k === 0 ? u2 + ancho / 2 : k === cortes.length - 1 ? u2 - ancho / 2 : u2

@@ -64,7 +64,7 @@ function configInicial(): Config {
     alturaCm: 150,
     profundidadCm: 150,
     anchoAccesibleCm: 150,
-    anchoPilastraCm: 16,
+    anchoPilastraCm: 15,   // 16 no existe en catalogo; 15 si (familia PI)
     espesorMm: 12,
     terminacion: 'ZOCLO',
     kap: false,

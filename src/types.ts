@@ -62,6 +62,17 @@ export interface Tramo {
   muroInicio: boolean
   muroFin: boolean
   cabinas: Cabina[]
+  /**
+   * Ancho de cada pilastra, en orden y en cm: son `cabinas.length + 1` piezas,
+   * porque la tira es PILASTRA · PUERTA · PILASTRA · PUERTA … PILASTRA.
+   * Salen del catálogo (familia PI), no son un ancho libre.
+   *
+   * Los proyectos guardados antes de esto no la traen: quien la lea debe
+   * tolerar que falte y caer en el ancho único de la configuración.
+   */
+  pilastras?: number[]
+  /** relleno contra la pared cuando las piezas quedan cortas por 5 cm o menos */
+  canaletaCm?: number
 }
 
 export type TipologiaId =

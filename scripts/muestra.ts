@@ -24,7 +24,7 @@ function config(tipologia: TipologiaId, linea: Config['linea'] = 'LEEDER'): Conf
     alturaCm: 150,
     profundidadCm: 150,
     anchoAccesibleCm: 150,
-    anchoPilastraCm: 16,
+    anchoPilastraCm: 15,
     espesorMm: espesorPorLinea(linea),
     terminacion: 'ZOCLO',
     kap: false,

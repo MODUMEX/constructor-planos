@@ -139,21 +139,25 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
   // En esquina, nicho y U la pilastra del arranque es la misma que ya puso el
   // tramo anterior, así que ahí se omite para no contarla dos veces.
   if (n > 0) {
+    // Cada pilastra lleva SU ancho de catálogo, que la modulación eligió por
+    // posición. Los tramos guardados antes de eso no traen la lista: ahí se cae
+    // en el ancho único de la configuración, como se hacía antes.
+    const anchoDe = (i: number) => tramo.pilastras?.[i] ?? config.anchoPilastraCm
     if (!omitirPilastraInicial) {
       piezas.push({
         familia: 'PL',
-        anchoCm: config.anchoPilastraCm,
+        anchoCm: anchoDe(0),
         altoCm: altoPil,
         subTipo: tramo.muroInicio ? 'PLLATMUR' : 'PLLAT',
         area,
       })
     }
     for (let i = 0; i < n - 1; i++) {
-      piezas.push({ familia: 'PL', anchoCm: config.anchoPilastraCm, altoCm: altoPil, subTipo: 'PLCEN', area })
+      piezas.push({ familia: 'PL', anchoCm: anchoDe(i + 1), altoCm: altoPil, subTipo: 'PLCEN', area })
     }
     piezas.push({
       familia: 'PL',
-      anchoCm: config.anchoPilastraCm,
+      anchoCm: anchoDe(n),
       altoCm: altoPil,
       subTipo: tramo.muroFin ? 'PLLATMUR' : 'PLLAT',
       area,

@@ -4,6 +4,7 @@ import {
 } from './catalog'
 import type { Cabina, Config, Moneda, Pais, Tramo, TipologiaId, RenglonBOM } from './types'
 import { esReforzado, tipologia, tierDeColor } from './catalog'
+import { modularTira } from './modulador'
 import { precioPieza, type TablaTarifas } from './tarifas'
 
 let seq = 0
@@ -50,8 +51,39 @@ export function anchoTotal(cabinas: Cabina[]): number {
 }
 
 /**
+ * Modula un tramo con PIEZAS DE CATÁLOGO: elige el ancho de puerta y el de cada
+ * pilastra de las medidas que existen, en vez de estirar las cabinas para que
+ * cuadren. Devuelve además la canaleta de relleno si las piezas quedan cortas.
+ *
+ * El ancho de cada cabina se reparte a partir de las piezas: cada cabina se
+ * queda con su puerta más media pilastra de cada lado (las de los extremos van
+ * enteras a la primera y a la última). Así la suma de las cabinas sigue dando
+ * el largo del tramo y los límites entre cabinas caen justo en el centro de
+ * cada pilastra, que es donde se dibujan.
+ */
+export function modularConCatalogo(
+  claroCm: number,
+  cantidad: number,
+  murosPilastra: number,
+  extremoAbierto: boolean,
+): { cabinas: Cabina[]; pilastras: number[]; canaletaCm: number } | null {
+  const m = modularTira({ claroCm, puertas: cantidad, murosPilastra, extremoAbierto })
+  if (!m) return null
+
+  const cabinas: Cabina[] = []
+  for (let i = 0; i < cantidad; i++) {
+    const izq = i === 0 ? m.pilastras[0] : m.pilastras[i] / 2
+    const der = i === cantidad - 1 ? m.pilastras[cantidad] : m.pilastras[i + 1] / 2
+    const c = nuevaCabina(izq + m.anchoPuerta + der)
+    c.puerta.anchoCm = m.anchoPuerta
+    cabinas.push(c)
+  }
+  return { cabinas, pilastras: m.pilastras, canaletaCm: m.canaleta?.anchoCm ?? 0 }
+}
+
+/**
  * Reparte el claro del tramo entre N cabinas, dejando el ancho de la accesible fijo.
- * Es la modulación automática: el vendedor da el claro y la cantidad, no los anchos.
+ * Se usa todavía en el caso PMR, que tiene su propia modulación sin portar.
  */
 export function modular(claroCm: number, cantidad: number, anchoAccesibleCm = 0): Cabina[] {
   if (cantidad <= 0) return []
@@ -140,16 +172,27 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
     const esPrincipal = i === tipo.principal
     const cant = esPrincipal ? cantidad : 2
     const claroTramo = soloOrinales ? cant * 60 : esPrincipal ? claroCm : LARGO_SECUNDARIO_CM
-    return {
+    const base = {
       id: nuevoId('tramo'),
       nombre: t.nombre,
       orientacion: t.orientacion,
       claroCm: claroTramo,
       muroInicio: t.muroInicio,
       muroFin: t.muroFin,
-      cabinas: soloOrinales
-        ? orinales(cant)
-        : modular(claroTramo, cant, conAccesible && esPrincipal ? config.anchoAccesibleCm : 0),
+    }
+    if (soloOrinales) return { ...base, cabinas: orinales(cant) }
+    // el PMR conserva la modulación vieja: su rama no está portada todavía
+    if (conAccesible && esPrincipal) {
+      return { ...base, cabinas: modular(claroTramo, cant, config.anchoAccesibleCm) }
+    }
+    const muros = (t.muroInicio ? 1 : 0) + (t.muroFin ? 1 : 0)
+    const conCatalogo = modularConCatalogo(claroTramo, cant, muros, muros < 2)
+    if (!conCatalogo) return { ...base, cabinas: modular(claroTramo, cant) }
+    return {
+      ...base,
+      cabinas: conCatalogo.cabinas,
+      pilastras: conCatalogo.pilastras,
+      canaletaCm: conCatalogo.canaletaCm,
     }
   })
 }

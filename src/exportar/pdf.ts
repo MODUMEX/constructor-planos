@@ -106,12 +106,13 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
     // catálogo), no con el espesor del material: son dimensiones distintas.
     // Antes no se dibujaban en el PDF, así que el plano salía sin ellas.
     if (tramo.cabinas.length > 0) {
-      const anchoPil = Math.max(area.config.anchoPilastraCm, grueso)
       const cortes = [0, ...acum.slice(1), largo]
       doc.setFillColor(120, 120, 120)
       doc.setDrawColor(70)
       doc.setLineWidth(0.25)
       cortes.forEach((u, k) => {
+        // cada pilastra con SU ancho de catálogo, el que eligió la modulación
+        const anchoPil = Math.max(tramo.pilastras?.[k] ?? area.config.anchoPilastraCm, grueso)
         // en los extremos se corre hacia adentro para no invadir el muro
         const centro = k === 0 ? u + anchoPil / 2 : k === cortes.length - 1 ? u - anchoPil / 2 : u
         const [ax, ay] = aHoja(e, pt(m, centro - anchoPil / 2, prof - grueso))
