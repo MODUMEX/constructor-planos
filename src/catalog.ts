@@ -96,9 +96,8 @@ export interface AlturasModelo {
  * resta de 6 o de 10 cm se hace en planta al optimizar el corte, así que no
  * cambia la medida que va en la OC. Por eso hay una sola columna por familia.
  *
- * Verificadas contra el cotizador: ESTANDAR y REFORZADO PT70 = 150 y PI19 = 180;
- * IMPERIAL PI = 190; KIDS PT = 130 y PI = 150. SCUDO, COLGANTE y TL_S3 son
- * estimadas y falta confirmarlas con la ficha.
+ * Confirmadas por Dayanna el 3-sep-2026. Si alguna hay que corregir, se hace
+ * desde el botón Alturas de la aplicación, no acá: lo que se guarde ahí manda.
  */
 export const ALTURAS_POR_MODELO: Record<string, AlturasModelo> = {
   ESTANDAR: { puerta: 150, panel: 150, pilastra: 180, mingitorio: 120 },

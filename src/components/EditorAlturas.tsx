@@ -12,12 +12,7 @@ import type { Usuario } from '../auth'
  *
  * Lo que se guarde acá va a `app_config` y lo usa todo el mundo al dibujar y al
  * cotizar, así que el botón pide confirmación antes de escribir.
- *
- * Ojo con las estimadas: SCUDO, COLGANTE y TL_S3 vienen del Constructor viejo
- * marcadas como estimadas y son las que hay que confirmar contra la ficha.
  */
-
-const ESTIMADAS = new Set(['SCUDO', 'COLGANTE', 'TL_S3'])
 
 const COLUMNAS: { key: keyof TablaAlturas[string]; label: string }[] = [
   { key: 'puerta', label: 'Puerta' },
@@ -79,14 +74,6 @@ export default function EditorAlturas({ usuario, tabla, deLaNube, onCambio, onCe
         </header>
 
         <div className="modal-cuerpo">
-          <div className="aviso-caja" style={{ marginBottom: 16 }}>
-            <b>Las marcadas «por confirmar» vienen estimadas del Constructor viejo</b>
-            <span>
-              Scudo, Colgante y Touchless S3 nunca se cotejaron contra la ficha. Las demás sí: Estándar y
-              Reforzado PT70 = 150 y PI19 = 180, Imperial PI = 190, Kids PT = 130 y PI = 150.
-            </span>
-          </div>
-
           {LINEAS.map((linea) => (
             <div key={linea.id}>
               <h4 style={{ marginTop: 18 }}>{linea.nombre}</h4>
@@ -106,12 +93,7 @@ export default function EditorAlturas({ usuario, tabla, deLaNube, onCambio, onCe
                       if (!a) return null
                       return (
                         <tr key={m.codigo}>
-                          <td style={{ fontWeight: 600 }}>
-                            {m.nombre}
-                            {ESTIMADAS.has(m.codigo) && (
-                              <span className="nuevo" style={{ marginLeft: 8 }}>por confirmar</span>
-                            )}
-                          </td>
+                          <td style={{ fontWeight: 600 }}>{m.nombre}</td>
                           {COLUMNAS.map((c) => (
                             <td key={c.key} className="der">
                               <input
