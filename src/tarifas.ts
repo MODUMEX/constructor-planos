@@ -1,5 +1,6 @@
 import type { Moneda, TierColor } from './types'
 import { TARIFAS_BASE } from './datos/tarifas-base'
+import { LLAVE_SUPABASE, URL_SUPABASE } from './entorno'
 
 /**
  * Precio por m² de cada pieza, con la misma mecánica que el Constructor actual
@@ -109,16 +110,6 @@ export function precioPieza(pieza: Pieza, o: OpcionesPrecio): number {
 }
 
 // ---------- carga desde Supabase ----------
-
-// leído así para que el módulo también se pueda usar desde los scripts de Node,
-// donde import.meta.env no existe
-function variable(nombre: string): string | undefined {
-  const meta = import.meta as unknown as { env?: Record<string, string | undefined> }
-  return meta.env?.[nombre]
-}
-
-const URL_SUPABASE = variable('VITE_SUPABASE_URL')
-const LLAVE_SUPABASE = variable('VITE_SUPABASE_ANON_KEY')
 
 interface FilaTarifa {
   modelo_codigo: string

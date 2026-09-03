@@ -11,16 +11,10 @@
  */
 
 import { ALTURAS_POR_MODELO, aplicarAlturas, type AlturasModelo } from './catalog'
+import { LLAVE_SUPABASE, URL_SUPABASE } from './entorno'
 
 export const CLAVE_ALTURAS = 'alturas_modelo'
 
-function variable(nombre: string): string | undefined {
-  const meta = import.meta as unknown as { env?: Record<string, string | undefined> }
-  return meta.env?.[nombre]
-}
-
-const URL_SUPABASE = variable('VITE_SUPABASE_URL')
-const LLAVE_SUPABASE = variable('VITE_SUPABASE_ANON_KEY')
 
 export type TablaAlturas = Record<string, AlturasModelo>
 
