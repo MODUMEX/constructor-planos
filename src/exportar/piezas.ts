@@ -153,6 +153,10 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
       })
     }
     for (let i = 0; i < n - 1; i++) {
+      // entre dos orinales va solo la mampara MG, no pilastra
+      const entreOrinales =
+        tramo.cabinas[i].tipo === 'orinal' && tramo.cabinas[i + 1].tipo === 'orinal'
+      if (entreOrinales) continue
       piezas.push({ familia: 'PL', anchoCm: anchoDe(i + 1), altoCm: altoPil, subTipo: 'PLCEN', area })
     }
     piezas.push({

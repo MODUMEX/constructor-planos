@@ -97,7 +97,9 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
   const cabinas = nEst + nAcc + nMing
   if (cabinas < 1) return null
 
-  const internas = Math.max(0, cabinas - 1)
+  // Entre dos orinales va SOLO la mampara MG, no pilastra: por eso se descuentan
+  // esas fronteras del conteo de pilastras internas.
+  const internas = Math.max(0, cabinas - 1 - Math.max(0, nMing - 1))
   // los orinales no llevan puerta, así que no suman holgura de bisagra
   const objetivo = calcularClaroAjustado(o.claroCm, o.murosPilastra, nEst + nAcc)
   const dosMuros = o.murosPilastra >= 2
