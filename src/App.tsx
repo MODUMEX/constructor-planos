@@ -30,6 +30,9 @@ import Proyectos from './components/Proyectos'
 
 const TC = 512
 
+/** cuántas cabinas se pueden pedir de una vez: se elige de la lista, no se escribe */
+const CANTIDADES = Array.from({ length: 15 }, (_, i) => i + 1)
+
 const PASOS = [
   { n: 1, titulo: 'Proyecto', nota: 'Obra, cliente y área' },
   { n: 2, titulo: 'Línea', nota: 'Producto y modelo' },
@@ -1019,7 +1022,11 @@ export default function App() {
                     </div>
                     <div className="campo">
                       <label>Cantidad de cabinas</label>
-                      <input type="number" min={1} max={12} value={cantidad} onChange={(e) => setCantidad(Number(e.target.value))} />
+                      <select value={cantidad} onChange={(e) => setCantidad(Number(e.target.value))}>
+                        {CANTIDADES.map((n) => (
+                          <option key={n} value={n}>{n}</option>
+                        ))}
+                      </select>
                     </div>
                     <div className="campo">
                       <label>Profundidad de cabina (cm)</label>
