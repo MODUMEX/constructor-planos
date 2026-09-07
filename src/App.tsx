@@ -24,6 +24,7 @@ import { TARIFAS_BASE } from './datos/tarifas-base'
 import EditorTarifas from './components/EditorTarifas'
 import EditorAlturas from './components/EditorAlturas'
 import Distribuidores from './components/Distribuidores'
+import DuplicarArea from './components/DuplicarArea'
 import { listarDistribuidores, type Distribuidor } from './distribuidores'
 import { alturasDeFabrica, cargarAlturas, usarAlturas, type TablaAlturas } from './alturas'
 import Proyectos from './components/Proyectos'
@@ -144,7 +145,6 @@ export default function App() {
 
   const [claroCm, setClaroCm] = useState(420)
   const [cantidad, setCantidad] = useState(4)
-  const [copias, setCopias] = useState(1)
 
   const [unidad, setUnidad] = useState<'cm' | 'in'>('cm')
   const [verInodoros, setVerInodoros] = useState(true)
@@ -162,6 +162,7 @@ export default function App() {
   const [verAlturas, setVerAlturas] = useState(false)
   const [distribuidores, setDistribuidores] = useState<Distribuidor[]>([])
   const [verDistribuidores, setVerDistribuidores] = useState(false)
+  const [verDuplicar, setVerDuplicar] = useState(false)
   const [verProyectos, setVerProyectos] = useState(false)
   const [version, setVersion] = useState(VERSION_COMPILADA)
   const [actualizando, setActualizando] = useState<FaseActualizacion | null>(null)
@@ -253,6 +254,13 @@ export default function App() {
   const alturas = alturasDe(config.modelo)
   // los proyectos viejos no traen la pregunta: ahí manda la tipología, como antes
   const llevaAccesible = config.llevaAccesible ?? config.tipologia === 'PMR'
+
+  /**
+   * Tramos que no cerraron contra su claro. El buscador siempre devuelve la
+   * mejor tira que encontró, así que sin este aviso un claro imposible —doce
+   * cabinas en siete metros— se dibuja igual y nadie se entera hasta fabricar.
+   */
+  const tramosConProblema = area.tramos.filter((t) => t.ajuste && t.ajuste !== 'exacto')
 
   /** los colores de México no están en el catálogo, así que el render se busca por nombre */
   function conFoto(cfg: Config, cabina?: TipoCabina) {
@@ -381,10 +389,37 @@ export default function App() {
     setArea({
       tramos: area.tramos.map((x) =>
         x.id === tramoId
-          ? { ...x, cabinas: r.cabinas, pilastras: r.pilastras, canaletaCm: r.canaletaCm }
+          ? { ...x, cabinas: r.cabinas, pilastras: r.pilastras, canaletaCm: r.canaletaCm, ajuste: r.ajuste, mensaje: r.mensaje }
           : x,
       ),
     })
+  }
+
+  /**
+   * Repite el plano de un área en otras. Se copian las piezas tal como quedaron
+   * —incluidas las ediciones hechas a mano— y cada copia estrena identificadores
+   * para que después se puedan editar por separado sin arrastrarse entre sí.
+   */
+  function duplicarArea(filas: { nombre: string; piso: string }[]) {
+    const copiasNuevas: Area[] = filas.map((fila) => ({
+      id: nuevoId('area'),
+      nombre: fila.nombre.trim(),
+      piso: fila.piso.trim(),
+      config: { ...area.config },
+      tramos: area.tramos.map((t) => ({
+        ...t,
+        id: nuevoId('tramo'),
+        pilastras: t.pilastras ? [...t.pilastras] : undefined,
+        cabinas: t.cabinas.map((c) => ({
+          ...c,
+          id: nuevoId('cab'),
+          puerta: { ...c.puerta },
+          panel: { ...c.panel },
+        })),
+      })),
+    }))
+    setProyecto((p) => ({ ...p, areas: [...p.areas, ...copiasNuevas] }))
+    setVerDuplicar(false)
   }
 
   function siguienteArea() {
@@ -557,6 +592,10 @@ export default function App() {
         />
       )}
 
+      {verDuplicar && (
+        <DuplicarArea base={area} onCrear={duplicarArea} onCerrar={() => setVerDuplicar(false)} />
+      )}
+
       {verDistribuidores && esAdmin(usuario) && (
         <Distribuidores
           usuario={usuario}
@@ -627,6 +666,8 @@ export default function App() {
                   Sanitarios
                 </label>
                 <div className="div" />
+                <button className="btn chico" onClick={() => setVerDuplicar(true)}>Repetir en otras áreas</button>
+                <div className="div" />
                 <button className="btn chico" onClick={bajarPDF}>Plano en PDF</button>
                 <button className="btn chico" onClick={bajarCSV}>CSV para el CIP</button>
                 <div className="div" />
@@ -634,6 +675,21 @@ export default function App() {
                 <div className="sep" style={{ flex: 1 }} />
                 <button className="btn chico" onClick={siguienteArea}>+ Siguiente área, misma configuración</button>
               </div>
+
+              {tramosConProblema.length > 0 && (
+                <div className={`aviso-caja ${tramosConProblema.some((t) => t.ajuste === 'canaleta') && !tramosConProblema.some((t) => t.ajuste !== 'canaleta') ? 'ok' : ''}`} style={{ margin: '0 0 12px' }}>
+                  <b>
+                    {tramosConProblema.some((t) => t.ajuste === 'falta')
+                      ? 'Las piezas no caben en el claro'
+                      : tramosConProblema.some((t) => t.ajuste === 'sobra')
+                        ? 'Queda un hueco que la canaleta no rellena'
+                        : 'Cierra con canaleta'}
+                  </b>
+                  {tramosConProblema.map((t) => (
+                    <span key={t.id}>{t.nombre}: {t.mensaje}</span>
+                  ))}
+                </div>
+              )}
 
               <div className="editor">
                 <div className="lienzo-wrap">
@@ -1096,11 +1152,6 @@ export default function App() {
                         </div>
                       </>
                     )}
-                    <div className="campo">
-                      <label>Áreas iguales a crear</label>
-                      <input type="number" min={1} max={12} value={copias} onChange={(e) => setCopias(Number(e.target.value))} />
-                      <span className="ayuda">Para obras de varios pisos con baños idénticos</span>
-                    </div>
                   </div>
 
                   <div className="aviso-caja" style={{ marginTop: 22, maxWidth: 620 }}>

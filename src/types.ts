@@ -73,6 +73,14 @@ export interface Tramo {
   pilastras?: number[]
   /** relleno contra la pared cuando las piezas quedan cortas por 5 cm o menos */
   canaletaCm?: number
+  /**
+   * Cómo cerró la tira contra el claro: 'exacto', 'canaleta' (falta relleno),
+   * 'sobra' (queda un hueco que la canaleta no tapa) o 'falta' (las piezas se
+   * pasan). Lo pone el buscador de modulación para poder avisarlo en pantalla.
+   */
+  ajuste?: 'exacto' | 'canaleta' | 'sobra' | 'falta'
+  /** lo mismo, explicado para el vendedor */
+  mensaje?: string
 }
 
 export type TipologiaId =

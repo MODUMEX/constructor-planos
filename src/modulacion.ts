@@ -71,7 +71,7 @@ export function modularConCatalogo(
   extremoAbierto: boolean,
   fijar?: { pilInterna?: number; pilExtremo?: number; puerta?: number },
   extra?: { accesible?: boolean; anchoAccesibleMinCm?: number; mingitorios?: number; anchoOrinalCm?: number },
-): { cabinas: Cabina[]; pilastras: number[]; canaletaCm: number } | null {
+): { cabinas: Cabina[]; pilastras: number[]; canaletaCm: number; ajuste: Tramo['ajuste']; mensaje: string } | null {
   const conAcc = extra?.accesible === true
   const nMing = extra?.mingitorios ?? 0
   const anchoOrinal = extra?.anchoOrinalCm && extra.anchoOrinalCm > 0 ? extra.anchoOrinalCm : 60
@@ -124,7 +124,7 @@ export function modularConCatalogo(
   const minAcc = extra?.anchoAccesibleMinCm ?? MIN_ACCESIBLE_CM
   if (conAcc && cabinas[0] && cabinas[0].anchoCm < minAcc) return null
 
-  return { cabinas, pilastras, canaletaCm: m.canaleta?.anchoCm ?? 0 }
+  return { cabinas, pilastras, canaletaCm: m.canaleta?.anchoCm ?? 0, ajuste: m.ajuste, mensaje: m.mensaje }
 }
 
 /**
@@ -256,6 +256,8 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
       cabinas: conCatalogo.cabinas,
       pilastras: conCatalogo.pilastras,
       canaletaCm: conCatalogo.canaletaCm,
+      ajuste: conCatalogo.ajuste,
+      mensaje: conCatalogo.mensaje,
     }
   })
 }
