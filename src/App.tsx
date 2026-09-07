@@ -23,6 +23,8 @@ import { versionActual, VERSION_COMPILADA } from './version'
 import { TARIFAS_BASE } from './datos/tarifas-base'
 import EditorTarifas from './components/EditorTarifas'
 import EditorAlturas from './components/EditorAlturas'
+import Distribuidores from './components/Distribuidores'
+import { listarDistribuidores, type Distribuidor } from './distribuidores'
 import { alturasDeFabrica, cargarAlturas, usarAlturas, type TablaAlturas } from './alturas'
 import Proyectos from './components/Proyectos'
 
@@ -153,6 +155,8 @@ export default function App() {
   const [alturasTabla, setAlturasTabla] = useState<TablaAlturas>(alturasDeFabrica)
   const [alturasNube, setAlturasNube] = useState(false)
   const [verAlturas, setVerAlturas] = useState(false)
+  const [distribuidores, setDistribuidores] = useState<Distribuidor[]>([])
+  const [verDistribuidores, setVerDistribuidores] = useState(false)
   const [verProyectos, setVerProyectos] = useState(false)
   const [version, setVersion] = useState(VERSION_COMPILADA)
   const [actualizando, setActualizando] = useState<FaseActualizacion | null>(null)
@@ -199,6 +203,19 @@ export default function App() {
       if (!vigente) return
       setAlturasTabla(r.tabla)
       setAlturasNube(r.deLaNube)
+    })
+    return () => {
+      vigente = false
+    }
+  }, [usuario?.token])
+
+  // la lista de distribuidores se trae una vez al entrar: el vendedor elige de
+  // ahí en vez de escribir el nombre a mano en el cajetín
+  useEffect(() => {
+    if (!usuario?.token) return
+    let vigente = true
+    listarDistribuidores(usuario).then((r) => {
+      if (vigente && r.ok && r.dato) setDistribuidores(r.dato)
     })
     return () => {
       vigente = false
@@ -505,6 +522,7 @@ export default function App() {
         <button className="btn plano chico" onClick={() => setVerProyectos(true)}>Proyectos</button>
         {esAdmin(usuario) && (
           <>
+            <button className="btn plano chico" onClick={() => setVerDistribuidores(true)}>Distribuidores</button>
             <button className="btn plano chico" onClick={() => setVerAlturas(true)}>Alturas</button>
             <button className="btn plano chico" onClick={() => setVerTarifas(true)}>Lista de precios</button>
           </>
@@ -529,6 +547,15 @@ export default function App() {
           }}
           onCambiarNumero={(numero) => setProyecto({ ...proyecto, numero })}
           onCerrar={() => setVerProyectos(false)}
+        />
+      )}
+
+      {verDistribuidores && esAdmin(usuario) && (
+        <Distribuidores
+          usuario={usuario}
+          lista={distribuidores}
+          onLista={setDistribuidores}
+          onCerrar={() => setVerDistribuidores(false)}
         />
       )}
 
@@ -723,7 +750,27 @@ export default function App() {
                     </div>
                     <div className="campo">
                       <label>Distribuidor</label>
-                      <input value={proyecto.distribuidor} onChange={(e) => setProyecto({ ...proyecto, distribuidor: e.target.value })} />
+                      <select value={proyecto.distribuidor} onChange={(e) => setProyecto({ ...proyecto, distribuidor: e.target.value })}>
+                        <option value="">—</option>
+                        {/* uno que ya no esté activo sigue apareciendo si el proyecto es suyo,
+                            para no borrarle el cajetín a un plano viejo */}
+                        {distribuidores
+                          .filter((x) => x.activo || x.nombre === proyecto.distribuidor)
+                          .map((x) => (
+                            <option key={x.distribuidorId} value={x.nombre}>{x.nombre}</option>
+                          ))}
+                        {proyecto.distribuidor !== '' &&
+                          !distribuidores.some((x) => x.nombre === proyecto.distribuidor) && (
+                            <option value={proyecto.distribuidor}>{proyecto.distribuidor}</option>
+                          )}
+                      </select>
+                      {distribuidores.length === 0 && (
+                        <span className="ayuda">
+                          {esAdmin(usuario)
+                            ? 'Todavía no hay ninguno: dalos de alta con el botón Distribuidores de arriba.'
+                            : 'Todavía no hay ninguno dado de alta.'}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </>
