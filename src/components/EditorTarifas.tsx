@@ -129,7 +129,7 @@ export default function EditorTarifas({ usuario, tabla, onCambio, onCerrar, onRe
               Se guarda en la tabla <span className="num">tarifa_m2</span> y la usa todo el mundo al cotizar.
             </p>
           </div>
-          <button className="btn plano" onClick={onCerrar}>Cerrar</button>
+          <button className="btn cerrar" onClick={onCerrar}>Cerrar</button>
         </header>
 
         <div className="modal-cuerpo">

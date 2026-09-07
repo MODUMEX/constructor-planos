@@ -137,7 +137,7 @@ export default function Proyectos({ usuario, proyecto, onAbrir, onCambiarNumero,
               Se guardan en la nube. Cada revisión queda aparte, así que la A no se pierde cuando nace la B.
             </p>
           </div>
-          <button className="btn plano" onClick={onCerrar}>Cerrar</button>
+          <button className="btn cerrar" onClick={onCerrar}>Cerrar</button>
         </header>
 
         <div className="modal-cuerpo">

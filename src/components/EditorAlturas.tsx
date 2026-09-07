@@ -70,7 +70,7 @@ export default function EditorAlturas({ usuario, tabla, deLaNube, onCambio, onCe
               La pieza se fabrica a una sola altura: la resta por zoclo o por patas se hace en planta al cortar.
             </p>
           </div>
-          <button className="btn plano" onClick={onCerrar}>Cerrar</button>
+          <button className="btn cerrar" onClick={onCerrar}>Cerrar</button>
         </header>
 
         <div className="modal-cuerpo">

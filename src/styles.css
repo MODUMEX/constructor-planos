@@ -585,6 +585,16 @@ tfoot td { border-top: 1px solid var(--line); font-weight: 600; }
   border-bottom: 1px solid var(--line);
 }
 .modal-cab h2 { margin: 0 0 4px; font-size: 19px; letter-spacing: -.02em; }
+/* el título se lleva el ancho que sobra para que Cerrar quede en la esquina */
+.modal-cab > div:first-child { flex: 1; min-width: 0; }
+.btn.cerrar {
+  margin-left: auto;
+  background: transparent;
+  border-color: var(--bad);
+  color: var(--bad);
+  font-weight: 600;
+}
+.btn.cerrar:hover { background: var(--bad); border-color: var(--bad); color: #fff; }
 .modal-cuerpo { padding: 18px 22px; overflow-y: auto; }
 .modal-cuerpo h4 {
   margin: 0 0 10px;
