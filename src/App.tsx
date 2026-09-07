@@ -76,6 +76,8 @@ function configInicial(): Config {
     terminacion: 'ZOCLO',
     kap: false,
     orinales: 0,
+    llevaAccesible: false,
+    anchoOrinalCm: 60,
     mgAlturaCm: 120,
     tipologia: 'RECTA_MURO_IZQ',
   }
@@ -249,6 +251,8 @@ export default function App() {
   const config = area.config
   // la altura de cada pieza la manda el modelo, no el vendedor
   const alturas = alturasDe(config.modelo)
+  // los proyectos viejos no traen la pregunta: ahí manda la tipología, como antes
+  const llevaAccesible = config.llevaAccesible ?? config.tipologia === 'PMR'
 
   /** los colores de México no están en el catálogo, así que el render se busca por nombre */
   function conFoto(cfg: Config, cabina?: TipoCabina) {
@@ -994,7 +998,13 @@ export default function App() {
                       <button
                         key={t.id}
                         className={`tipo ${config.tipologia === t.id ? 'sel' : ''}`}
-                        onClick={() => { setConfig({ tipologia: t.id as TipologiaId }); setArea({ tramos: [] }) }}
+                        onClick={() => {
+                          // el cuarto accesible ES la tipología PMR: elegirla ya responde
+                          // que sí lleva accesible, sin tener que preguntarlo dos veces
+                          const tipologiaId = t.id as TipologiaId
+                          setConfig(tipologiaId === 'PMR' ? { tipologia: tipologiaId, llevaAccesible: true } : { tipologia: tipologiaId })
+                          setArea({ tramos: [] })
+                        }}
                         type="button"
                       >
                         <span className="lienzo"><PreviewTipologia id={t.id} /></span>
@@ -1034,22 +1044,58 @@ export default function App() {
                       <span className="ayuda">Es el ancho del panel divisor</span>
                     </div>
                     <div className="campo">
-                      <label>Ancho de la accesible (cm)</label>
-                      <input type="number" value={config.anchoAccesibleCm} onChange={(e) => setConfig({ anchoAccesibleCm: Number(e.target.value) })} />
-                      <span className="ayuda">Se respeta al modular</span>
-                    </div>
-                    <div className="campo">
-                      <label>Orinales</label>
-                      <input type="number" min={0} max={10} value={config.orinales} onChange={(e) => setConfig({ orinales: Number(e.target.value) })} />
-                      <span className="ayuda">{config.orinales > 1 ? `Lleva ${config.orinales - 1} divisores` : 'Sin divisores'}</span>
-                    </div>
-                    <div className="campo">
-                      <label>Alto del divisor de orinal (cm)</label>
-                      <select value={config.mgAlturaCm} onChange={(e) => setConfig({ mgAlturaCm: Number(e.target.value) })}>
-                        <option value={120}>120 · MG120</option>
-                        <option value={150}>150 · MG150</option>
+                      <label>¿Lleva cabina accesible?</label>
+                      <select value={llevaAccesible ? 'si' : 'no'} onChange={(e) => setConfig({ llevaAccesible: e.target.value === 'si' })}>
+                        <option value="no">No</option>
+                        <option value="si">Sí</option>
                       </select>
                     </div>
+                    {llevaAccesible && (
+                      <div className="campo">
+                        <label>Ancho de la accesible (cm)</label>
+                        <input type="number" value={config.anchoAccesibleCm} onChange={(e) => setConfig({ anchoAccesibleCm: Number(e.target.value) })} />
+                        <span className="ayuda">Se respeta al modular</span>
+                      </div>
+                    )}
+                    <div className="campo">
+                      <label>¿Lleva orinales?</label>
+                      <select
+                        value={config.orinales > 0 ? 'si' : 'no'}
+                        onChange={(e) => setConfig({ orinales: e.target.value === 'si' ? Math.max(1, config.orinales) : 0 })}
+                      >
+                        <option value="no">No</option>
+                        <option value="si">Sí</option>
+                      </select>
+                    </div>
+                    {config.orinales > 0 && (
+                      <>
+                        <div className="campo">
+                          <label>Cantidad de orinales</label>
+                          <select value={config.orinales} onChange={(e) => setConfig({ orinales: Number(e.target.value) })}>
+                            {CANTIDADES.map((n) => (
+                              <option key={n} value={n}>{n}</option>
+                            ))}
+                          </select>
+                          <span className="ayuda">{config.orinales > 1 ? `Lleva ${config.orinales - 1} divisores` : 'Sin divisores'}</span>
+                        </div>
+                        <div className="campo">
+                          <label>Ancho de cada orinal (cm)</label>
+                          <input
+                            type="number"
+                            value={config.anchoOrinalCm ?? 60}
+                            onChange={(e) => setConfig({ anchoOrinalCm: Number(e.target.value) })}
+                          />
+                          <span className="ayuda">Lo normal son 60</span>
+                        </div>
+                        <div className="campo">
+                          <label>Alto del divisor de orinal (cm)</label>
+                          <select value={config.mgAlturaCm} onChange={(e) => setConfig({ mgAlturaCm: Number(e.target.value) })}>
+                            <option value={120}>120 · MG120</option>
+                            <option value={150}>150 · MG150</option>
+                          </select>
+                        </div>
+                      </>
+                    )}
                     <div className="campo">
                       <label>Áreas iguales a crear</label>
                       <input type="number" min={1} max={12} value={copias} onChange={(e) => setCopias(Number(e.target.value))} />

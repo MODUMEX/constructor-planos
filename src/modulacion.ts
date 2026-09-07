@@ -70,10 +70,11 @@ export function modularConCatalogo(
   murosPilastra: number,
   extremoAbierto: boolean,
   fijar?: { pilInterna?: number; pilExtremo?: number; puerta?: number },
-  extra?: { accesible?: boolean; anchoAccesibleMinCm?: number; mingitorios?: number },
+  extra?: { accesible?: boolean; anchoAccesibleMinCm?: number; mingitorios?: number; anchoOrinalCm?: number },
 ): { cabinas: Cabina[]; pilastras: number[]; canaletaCm: number } | null {
   const conAcc = extra?.accesible === true
   const nMing = extra?.mingitorios ?? 0
+  const anchoOrinal = extra?.anchoOrinalCm && extra.anchoOrinalCm > 0 ? extra.anchoOrinalCm : 60
   // la accesible va primera y los orinales al final, como en el Constructor actual
   const normales = cantidad - (conAcc ? 1 : 0) - nMing
   if (normales < 0) return null
@@ -83,6 +84,7 @@ export function modularConCatalogo(
     puertas: normales,
     accesible: conAcc,
     mingitorios: nMing,
+    anchoOrinal: extra?.anchoOrinalCm,
     murosPilastra,
     extremoAbierto,
     puertaFija: fijar?.puerta,
@@ -109,7 +111,7 @@ export function modularConCatalogo(
     const esAcc = conAcc && i === 0
     const esOrinal = i >= cantidad - nMing
     const puerta = esAcc ? (m.anchoPuertaAccesible ?? m.anchoPuerta) : m.anchoPuerta
-    const cuerpo = esOrinal ? (m.anchoOrinal ?? 60) : puerta
+    const cuerpo = esOrinal ? (m.anchoOrinal ?? anchoOrinal) : puerta
     const c = nuevaCabina(izq + cuerpo + der, esAcc ? 'accesible' : esOrinal ? 'orinal' : 'normal')
     if (esOrinal) c.puerta = { ...c.puerta, tipo: 'ninguna' }
     else c.puerta.anchoCm = puerta
@@ -208,7 +210,10 @@ function orinales(cantidad: number): Cabina[] {
 
 export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad: number, config: Config): Tramo[] {
   const tipo = tipologia(tipologiaId)
-  const conAccesible = tipologiaId === 'PMR'
+  // Antes la accesible salía de la tipología. Ahora es una pregunta aparte: el
+  // vendedor dice si el área la lleva. Los proyectos viejos no traen el dato,
+  // así que ahí se sigue deduciendo de la tipología.
+  const conAccesible = config.llevaAccesible ?? tipologiaId === 'PMR'
   const soloOrinales = tipologiaId === 'ORINALES'
   return tipo.tramos.map((t, i) => {
     // el claro y la cantidad que dio el vendedor van al tramo principal;
@@ -219,7 +224,8 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
     // tira mide los orinales, las mamparas que los separan y las dos pilastras
     // de los extremos, que también son piezas de catálogo.
     const murosT = (t.muroInicio ? 1 : 0) + (t.muroFin ? 1 : 0)
-    const claroOrinales = cant * 60 + Math.max(0, cant - 1) * GRUESO_MG_CM + 2 * 10 + murosT
+    const anchoOrinal = config.anchoOrinalCm && config.anchoOrinalCm > 0 ? config.anchoOrinalCm : 60
+    const claroOrinales = cant * anchoOrinal + Math.max(0, cant - 1) * GRUESO_MG_CM + 2 * 10 + murosT
     const claroTramo = soloOrinales ? claroOrinales : esPrincipal ? claroCm : LARGO_SECUNDARIO_CM
     const base = {
       id: nuevoId('tramo'),
@@ -235,6 +241,7 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
     const conCatalogo = modularConCatalogo(claroTramo, cant, muros, muros < 2, undefined, {
       accesible: conAccesible && esPrincipal,
       mingitorios: soloOrinales ? cant : 0,
+      anchoOrinalCm: config.anchoOrinalCm,
     })
     if (!conCatalogo) {
       return {

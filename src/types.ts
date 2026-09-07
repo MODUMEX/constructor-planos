@@ -105,7 +105,12 @@ export interface Config {
   espesorMm: number
   terminacion: Terminacion
   kap: boolean
+  /** si el área lleva cabina accesible. Los proyectos viejos no lo traen: ahí
+   *  se deduce de la tipología, que es como se decidía antes. */
+  llevaAccesible?: boolean
   orinales: number
+  /** ancho de cada orinal, en cm; los proyectos viejos van con 60 */
+  anchoOrinalCm?: number
   mgAlturaCm: number
   tipologia: TipologiaId
 }

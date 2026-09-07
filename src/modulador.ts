@@ -73,8 +73,10 @@ export interface OpcionesModulacion {
   pilInternaFija?: number
   /** lo mismo para las pilastras de los extremos */
   pilExtremoFija?: number
-  /** orinales de 60 cm; entre dos va una mampara MG, no una pilastra */
+  /** orinales; entre dos va una mampara MG, no una pilastra */
   mingitorios?: number
+  /** ancho de cada orinal, en cm; por omisión los 60 de siempre */
+  anchoOrinal?: number
   /** una cabina accesible: es una cabina con puerta ancha, no otra geometría */
   accesible?: boolean
 }
@@ -103,8 +105,9 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
   // los orinales no llevan puerta, así que no suman holgura de bisagra
   const objetivo = calcularClaroAjustado(o.claroCm, o.murosPilastra, nEst + nAcc)
   const dosMuros = o.murosPilastra >= 2
+  const anchoBaseOrinal = o.anchoOrinal && o.anchoOrinal > 0 ? o.anchoOrinal : ANCHO_ORINAL
   const grosorMG = Math.max(0, nMing - 1) * GRUESO_MG
-  const fijoMG = nMing * ANCHO_ORINAL + grosorMG
+  const fijoMG = nMing * anchoBaseOrinal + grosorMG
 
   const puertas = o.puertaFija ? [o.puertaFija] : ANCHOS_PUERTA
   const puertasAcc = nAcc > 0 ? ANCHOS_PUERTA.filter((a) => a >= PUERTA_ACCESIBLE_MIN) : [0]
@@ -165,12 +168,12 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
 
   // Con orinales, el sobrante NO va a canaleta: se reparte ensanchandolos, que es
   // lo que hace el Constructor actual. La canaleta queda para cuando no los hay.
-  let anchoOrinal = ANCHO_ORINAL
+  let anchoOrinal = anchoBaseOrinal
   let ajusteFinal = ajuste
   let mensajeFinal = mensaje
   let canaletaFinal = canaleta
   if (nMing > 0 && diferencia > 0.5) {
-    anchoOrinal = ANCHO_ORINAL + diferencia / nMing
+    anchoOrinal = anchoBaseOrinal + diferencia / nMing
     ajusteFinal = "exacto"
     mensajeFinal = `Calza; los ${abs.toFixed(1)} cm de sobra se reparten entre los ${nMing} orinales`
     canaletaFinal = null
