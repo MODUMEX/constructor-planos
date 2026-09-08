@@ -1,8 +1,8 @@
 import { useMemo, useRef, useState } from 'react'
-import type { Cabina, Config, Tramo } from '../types'
-import { puertasPosibles, tipologia } from '../catalog'
+import type { Cabina, Config, Pais, Tramo } from '../types'
+import { ANCHOS_PILASTRA, puertasPosibles, tipologia } from '../catalog'
 import { anchoTotal, minimoDe, moverDivisor, nuevaCabina, puertaSugerida, snap } from '../modulacion'
-import { medidaCercana, PILASTRAS_EXTREMO, PILASTRAS_INTERNAS } from '../modulador'
+import { medidaCercana, PILASTRAS_INTERNAS } from '../modulador'
 import { Grupo, Item, Menu, Raya } from './Menu'
 import { cajaDelPlano, ESPESOR_MURO, marcosDe, profundidadDeTramo, pt, SOBRA_MURO_CM, type Marco } from '../geometria'
 import { ALTO_ORINAL_CM, ALTO_REGADERA_CM, ALTO_WC_CM, ORINAL, REGADERA, WC } from '../assets/sanitarios'
@@ -25,6 +25,8 @@ export function formatear(cm: number, unidad: 'cm' | 'in'): string {
 interface Props {
   tramos: Tramo[]
   config: Config
+  /** dónde se fabrica: define qué medidas de puerta existen */
+  pais: Pais
   unidad: 'cm' | 'in'
   verInodoros: boolean
   verCotas: boolean
@@ -43,6 +45,7 @@ type MenuEstado =
 export default function EditorPlano({
   tramos,
   config,
+  pais,
   unidad,
   verInodoros,
   verCotas,
@@ -149,7 +152,11 @@ export default function EditorPlano({
       const dy = (e.clientY - p.y0) / p.escala
       // arrastrar hacia afuera engorda la pilastra por los dos lados
       const deseado = p.ancho0 + (dx * p.ax + dy * p.ay) * 2
-      const opciones = p.extremo ? PILASTRAS_EXTREMO : PILASTRAS_INTERNAS
+      // A mano se puede llegar a CUALQUIER pilastra del catálogo en los extremos.
+      // El buscador automático sigue prefiriendo las delgadas —que es lo normal
+      // contra un muro—, pero hay planos que cierran con una ancha de relleno,
+      // como los 55 del extremo derecho de algunos baños ya fabricados.
+      const opciones = p.extremo ? ANCHOS_PILASTRA : PILASTRAS_INTERNAS
       onPilastra(p.tramoId, p.indice, medidaCercana(opciones, deseado))
       return
     }
@@ -607,7 +614,7 @@ export default function EditorPlano({
           >
             <Grupo>Ancho de puerta</Grupo>
             <div className="anchos">
-              {puertasPosibles(cab.anchoCm).map(({ ancho, cabe }) => (
+              {puertasPosibles(cab.anchoCm, pais).map(({ ancho, cabe }) => (
                 <button
                   key={ancho}
                   className={cab.puerta.anchoCm === ancho ? 'on' : ''}

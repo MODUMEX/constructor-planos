@@ -266,7 +266,19 @@ export const CERROJOS = [
  *
  * Ojo: antes esta app ofrecía puertas de 65, 80 y 95 cm, que no se fabrican.
  */
-export const ANCHOS_PUERTA = [55, 60, 62, 64, 70, 75, 85, 90, 92, 94, 100]
+export const ANCHOS_PUERTA = [55, 60, 70, 75, 85, 90, 100]
+
+/**
+ * Puertas que solo fabrica la planta de Costa Rica. En México no existen, así
+ * que ahí no se pueden ofrecer ni las puede elegir la modulación.
+ */
+export const ANCHOS_PUERTA_CR = [62, 64, 92, 94]
+
+/** las puertas que se pueden pedir según dónde se fabrica */
+export function anchosPuerta(pais: Pais = 'CR'): number[] {
+  const todas = pais === 'CR' ? [...ANCHOS_PUERTA, ...ANCHOS_PUERTA_CR] : ANCHOS_PUERTA
+  return [...todas].sort((a, b) => a - b)
+}
 
 /** anchos de pilastra (familia PI) */
 export const ANCHOS_PILASTRA = [10, 12, 15, 17, 19, 24, 30, 35, 40, 45, 50, 55, 60, 70, 85, 90, 100, 120]
@@ -300,9 +312,9 @@ export function medidaQueCabe(opciones: number[], max: number): number | null {
 /** una puerta necesita este margen contra el ancho de la cabina */
 export const MARGEN_PUERTA_CM = 8
 
-export function puertasPosibles(anchoCabinaCm: number): { ancho: number; cabe: boolean }[] {
+export function puertasPosibles(anchoCabinaCm: number, pais: Pais = 'CR'): { ancho: number; cabe: boolean }[] {
   const max = anchoCabinaCm - MARGEN_PUERTA_CM
-  return ANCHOS_PUERTA.map((ancho) => ({ ancho, cabe: ancho <= max }))
+  return anchosPuerta(pais).map((ancho) => ({ ancho, cabe: ancho <= max }))
 }
 
 export interface Tipologia {

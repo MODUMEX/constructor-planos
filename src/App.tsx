@@ -9,7 +9,7 @@ import { csvABytes, FILTRO_CSV, FILTRO_PDF, guardarArchivo } from './exportar/gu
 import { esAdmin, IVA_CR, type Usuario } from './auth'
 import type { Area, Cabina, Config, Pais, Proyecto, TipoCabina, TipologiaId } from './types'
 import {
-  ACABADOS, alturasDe, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, MODELOS,
+  ACABADOS, alturasDe, ANCHOS_PANEL, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, MODELOS,
   PAISES, etiquetaTier, nombreHerraje, nombreModelo, tierDeColor, TIPOLOGIAS, tipologia,
 } from './catalog'
 import VistaRender from './components/VistaRender'
@@ -358,7 +358,7 @@ export default function App() {
   }
 
   function remodular(nuevoClaro = claroCm, nuevaCantidad = cantidad) {
-    const tramos = crearTramos(config.tipologia, nuevoClaro, nuevaCantidad, config)
+    const tramos = crearTramos(config.tipologia, nuevoClaro, nuevaCantidad, config, proyecto.paisFabricacion)
     setArea({ tramos })
   }
 
@@ -381,10 +381,14 @@ export default function App() {
     if (!t || t.cabinas.length === 0) return
     const extremo = indice === 0 || indice === t.cabinas.length
     const muros = (t.muroInicio ? 1 : 0) + (t.muroFin ? 1 : 0)
-    const r = modularConCatalogo(t.claroCm, t.cabinas.length, muros, muros < 2, {
-      pilInterna: extremo ? undefined : anchoCm,
-      pilExtremo: extremo ? anchoCm : undefined,
-    })
+    const r = modularConCatalogo(
+      t.claroCm,
+      t.cabinas.length,
+      muros,
+      muros < 2,
+      { pilInterna: extremo ? undefined : anchoCm, pilExtremo: extremo ? anchoCm : undefined },
+      { accesible: llevaAccesible, anchoOrinalCm: config.anchoOrinalCm, pais: proyecto.paisFabricacion },
+    )
     if (!r) return
     setArea({
       tramos: area.tramos.map((x) =>
@@ -422,18 +426,6 @@ export default function App() {
     setVerDuplicar(false)
   }
 
-  function siguienteArea() {
-    const nueva: Area = {
-      id: nuevoId('area'),
-      nombre: `Área ${proyecto.areas.length + 1}`,
-      piso: area.piso,
-      config: { ...config },
-      tramos: crearTramos(config.tipologia, claroCm, cantidad, config),
-    }
-    setProyecto((p) => ({ ...p, areas: [...p.areas, nueva] }))
-    setActiva(proyecto.areas.length)
-    setPaso(6)
-  }
 
   // ---------- cotización ----------
   // los precios salen ya en la moneda elegida: la tabla de tarifas tiene
@@ -673,7 +665,6 @@ export default function App() {
                 <div className="div" />
                 <span className="chip on">Arrastrá los paneles · clic derecho en una pieza</span>
                 <div className="sep" style={{ flex: 1 }} />
-                <button className="btn chico" onClick={siguienteArea}>+ Siguiente área, misma configuración</button>
               </div>
 
               {tramosConProblema.length > 0 && (
@@ -696,6 +687,7 @@ export default function App() {
                   <EditorPlano
                     tramos={area.tramos}
                     config={config}
+                    pais={proyecto.paisFabricacion}
                     unidad={unidad}
                     verInodoros={verInodoros}
                     verCotas={verCotas}
@@ -1096,8 +1088,12 @@ export default function App() {
                     </div>
                     <div className="campo">
                       <label>Profundidad de cabina (cm)</label>
-                      <input type="number" value={config.profundidadCm} onChange={(e) => setConfig({ profundidadCm: Number(e.target.value) })} />
-                      <span className="ayuda">Es el ancho del panel divisor</span>
+                      <select value={config.profundidadCm} onChange={(e) => setConfig({ profundidadCm: Number(e.target.value) })}>
+                        {ANCHOS_PANEL.map((a) => (
+                          <option key={a} value={a}>{a}</option>
+                        ))}
+                      </select>
+                      <span className="ayuda">Es el ancho del panel divisor: solo las medidas que se fabrican</span>
                     </div>
                     <div className="campo">
                       <label>¿Lleva cabina accesible?</label>

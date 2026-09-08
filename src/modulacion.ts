@@ -1,5 +1,5 @@
 import {
-  GRUESO_PILASTRA, MIN_ACCESIBLE_CM, MIN_CABINA_CM, SNAP_CM, ANCHOS_PUERTA, MARGEN_PUERTA_CM,
+  GRUESO_PILASTRA, MIN_ACCESIBLE_CM, MIN_CABINA_CM, SNAP_CM, anchosPuerta, MARGEN_PUERTA_CM,
   LARGO_SECUNDARIO_CM,
 } from './catalog'
 import type { Cabina, Config, Moneda, Pais, Tramo, TipologiaId, RenglonBOM } from './types'
@@ -27,10 +27,11 @@ export function minimoDe(cabina: Cabina): number {
 }
 
 /** ancho de puerta más grande que entra en una cabina de este ancho */
-export function puertaSugerida(anchoCm: number): number {
+export function puertaSugerida(anchoCm: number, pais: Pais = 'CR'): number {
+  const lista = anchosPuerta(pais)
   const max = anchoCm - MARGEN_PUERTA_CM
-  const posibles = ANCHOS_PUERTA.filter((a) => a <= max)
-  return posibles.length ? posibles[posibles.length - 1] : ANCHOS_PUERTA[0]
+  const posibles = lista.filter((a) => a <= max)
+  return posibles.length ? posibles[posibles.length - 1] : lista[0]
 }
 
 export function nuevaCabina(anchoCm: number, tipo: Cabina['tipo'] = 'normal'): Cabina {
@@ -70,7 +71,7 @@ export function modularConCatalogo(
   murosPilastra: number,
   extremoAbierto: boolean,
   fijar?: { pilInterna?: number; pilExtremo?: number; puerta?: number },
-  extra?: { accesible?: boolean; anchoAccesibleMinCm?: number; mingitorios?: number; anchoOrinalCm?: number },
+  extra?: { accesible?: boolean; anchoAccesibleMinCm?: number; mingitorios?: number; anchoOrinalCm?: number; pais?: Pais },
 ): { cabinas: Cabina[]; pilastras: number[]; canaletaCm: number; ajuste: Tramo['ajuste']; mensaje: string } | null {
   const conAcc = extra?.accesible === true
   const nMing = extra?.mingitorios ?? 0
@@ -85,6 +86,7 @@ export function modularConCatalogo(
     accesible: conAcc,
     mingitorios: nMing,
     anchoOrinal: extra?.anchoOrinalCm,
+    catalogoPuertas: anchosPuerta(extra?.pais ?? 'CR'),
     murosPilastra,
     extremoAbierto,
     puertaFija: fijar?.puerta,
@@ -208,7 +210,7 @@ function orinales(cantidad: number): Cabina[] {
   })
 }
 
-export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad: number, config: Config): Tramo[] {
+export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad: number, config: Config, pais: Pais = 'CR'): Tramo[] {
   const tipo = tipologia(tipologiaId)
   // Antes la accesible salía de la tipología. Ahora es una pregunta aparte: el
   // vendedor dice si el área la lleva. Los proyectos viejos no traen el dato,
@@ -242,6 +244,7 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
       accesible: conAccesible && esPrincipal,
       mingitorios: soloOrinales ? cant : 0,
       anchoOrinalCm: config.anchoOrinalCm,
+      pais,
     })
     if (!conCatalogo) {
       return {

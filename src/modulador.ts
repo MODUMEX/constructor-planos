@@ -73,6 +73,8 @@ export interface OpcionesModulacion {
   pilInternaFija?: number
   /** lo mismo para las pilastras de los extremos */
   pilExtremoFija?: number
+  /** las medidas de puerta que se pueden usar; por omisión, las de catálogo */
+  catalogoPuertas?: number[]
   /** orinales; entre dos va una mampara MG, no una pilastra */
   mingitorios?: number
   /** ancho de cada orinal, en cm; por omisión los 60 de siempre */
@@ -109,8 +111,9 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
   const grosorMG = Math.max(0, nMing - 1) * GRUESO_MG
   const fijoMG = nMing * anchoBaseOrinal + grosorMG
 
-  const puertas = o.puertaFija ? [o.puertaFija] : ANCHOS_PUERTA
-  const puertasAcc = nAcc > 0 ? ANCHOS_PUERTA.filter((a) => a >= PUERTA_ACCESIBLE_MIN) : [0]
+  const deCatalogo = o.catalogoPuertas && o.catalogoPuertas.length ? o.catalogoPuertas : ANCHOS_PUERTA
+  const puertas = o.puertaFija ? [o.puertaFija] : deCatalogo
+  const puertasAcc = nAcc > 0 ? deCatalogo.filter((a) => a >= PUERTA_ACCESIBLE_MIN) : [0]
   const opInternas = internas > 0 ? (o.pilInternaFija ? [o.pilInternaFija] : PILASTRAS_INTERNAS) : [0]
   const opExtremos = o.pilExtremoFija ? [o.pilExtremoFija] : PILASTRAS_EXTREMO
 
