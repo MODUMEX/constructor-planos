@@ -116,6 +116,26 @@ export function medidaCercana(opciones: number[], cm: number): number {
   return opciones.reduce((a, b) => (Math.abs(b - cm) < Math.abs(a - cm) ? b : a), opciones[0])
 }
 
+/**
+ * Cuánto puede QUEDAR CORTA la tira sin que se note: el herraje de cada
+ * pilastra contra muro se come medio centímetro, y un extremo abierto —el que
+ * cierra con panel— tiene 5 cm de juego.
+ */
+function holguraHueco(extremoAbierto: boolean | undefined, murosPilastra: number): number {
+  return extremoAbierto ? 5 : 0.5 * murosPilastra
+}
+
+/**
+ * Si la tira cabe en el claro. Es asimétrico a propósito: entre dos muros el
+ * claro es el que hay y las piezas NO se pueden pasar ni un centímetro —no hay
+ * de dónde recortar—, mientras que quedarse corto lo rellena la canaleta. Con
+ * un extremo abierto sí hay 5 cm de juego para los dos lados.
+ */
+function cabe(diferencia: number, extremoAbierto: boolean | undefined, murosPilastra: number): boolean {
+  if (diferencia >= 0) return diferencia <= holguraHueco(extremoAbierto, murosPilastra)
+  return -diferencia <= (extremoAbierto ? 5 : 0)
+}
+
 export function modularTira(o: OpcionesModulacion): Modulacion | null {
   const nEst = o.puertas
   const nAcc = o.accesible ? 1 : 0
@@ -142,13 +162,19 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
         ? [o.puertaAccesibleFija]
         : accDeCatalogo
       : [0]
-  const opInternas = internas > 0 ? (o.pilInternaFija ? [o.pilInternaFija] : PILASTRAS_INTERNAS) : [0]
-  const opExtremos = o.pilExtremoFija ? [o.pilExtremoFija] : PILASTRAS_EXTREMO
+  // Si el vendedor movió UNA pilastra, solo esa queda clavada: las demás se
+  // buscan libres. Forzar toda la clase era lo que emparejaba la tira entera.
+  const unaClavada = o.pilastraFijaIndice !== undefined
+  const opInternas =
+    internas > 0 ? (o.pilInternaFija && !unaClavada ? [o.pilInternaFija] : PILASTRAS_INTERNAS) : [0]
+  const opExtremos = o.pilExtremoFija && !unaClavada ? [o.pilExtremoFija] : PILASTRAS_EXTREMO
   const objetivoAcc = nAcc > 0 ? (o.anchoAccesibleCm ?? 0) : 0
 
-  let mejor:
-    | { ap: number; acc: number; api: number; ae1: number; ae2: number; total: number; score: number; anchoAcc: number }
-    | null = null
+  type Candidato =
+    { ap: number; acc: number; api: number; ae1: number; ae2: number; total: number; score: number; anchoAcc: number }
+  let mejor: Candidato | null = null
+  // el mejor de los que NO se pasan del claro: entre muros es el único válido
+  let mejorCabe: Candidato | null = null
   for (const acc of puertasAcc.length ? puertasAcc : [0]) {
     for (const ap of nEst > 0 ? puertas : [0]) {
       for (const api of opInternas) {
@@ -164,17 +190,22 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
               (nEst > 0 ? Math.abs(ap - PUERTA_PREFERIDA) * PENALIZA_PUERTA : 0) +
               (dosMuros && total > objetivo ? (total - objetivo) * PENALIZA_PASARSE : 0) +
               (nAcc > 0 && objetivoAcc > 0 ? Math.max(0, objetivoAcc - anchoAcc) * PENALIZA_ACCESIBLE : 0)
-            if (!mejor || score < mejor.score) mejor = { ap, acc, api, ae1, ae2, total, score, anchoAcc }
+            const cand = { ap, acc, api, ae1, ae2, total, score, anchoAcc }
+            if (!mejor || score < mejor.score) mejor = cand
+            if (total <= objetivo + (o.extremoAbierto ? 5 : 0) && (!mejorCabe || score < mejorCabe.score)) {
+              mejorCabe = cand
+            }
           }
         }
       }
     }
   }
+  // Entre dos muros el claro es el que hay: se prefiere SIEMPRE una tira que
+  // quepa, aunque cierre con canaleta, antes que una más pareja que se pase.
+  // Solo si ninguna cabe se devuelve la pasada, para poder avisarlo.
+  if (mejorCabe) mejor = mejorCabe
   if (!mejor) return null
 
-  // La tolerancia: el herraje de cada pilastra a muro absorbe medio centímetro,
-  // y un extremo abierto (L o E) se come hasta 5 cm sin canaleta.
-  const tolerancia = o.extremoAbierto ? 5 : 0.5 * o.murosPilastra
 
   // Las pilastras no tienen que ser todas iguales. Si la tira ya cierra con
   // internas parejas se deja así —es como sale el despiece de planta—, pero si
@@ -192,19 +223,28 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
     }
   }
   if (nAcc > 0 && objetivoAcc > 0 && clavadas[0] === null) clavadas[0] = mejor.ae1
-  const uniformeCalza = Math.abs(objetivo - mejor.total) <= tolerancia
+  // Con una pilastra clavada a mano el reparto manda: es la única forma de que
+  // las otras se acomoden en vez de copiarle la medida.
+  const uniformeCalza = !unaClavada && cabe(objetivo - mejor.total, o.extremoAbierto, o.murosPilastra)
   const repartidas = uniformeCalza
     ? null
     : repartirPilastras(objetivo - cuerpos, internas, PILASTRAS_INTERNAS, PILASTRAS_EXTREMO, clavadas)
-  const pilastras = repartidas ?? [mejor.ae1, ...Array(internas).fill(mejor.api), mejor.ae2]
+  const pilastras = repartidas ?? (() => {
+    // sin reparto posible al menos se respeta la que ella movió
+    const base = [mejor.ae1, ...Array(internas).fill(mejor.api), mejor.ae2]
+    for (let i = 0; i < base.length; i++) if (clavadas[i]) base[i] = clavadas[i]!
+    return base
+  })()
 
-  const totalReal = repartidas ? cuerpos + repartidas.reduce((x, y) => x + y, 0) : mejor.total
+  // El total sale SIEMPRE de las pilastras que quedaron: el respaldo respeta la
+  // que ella movió, así que el total del buscador ya no sirve.
+  const totalReal = cuerpos + pilastras.reduce((x, y) => x + y, 0)
   const diferencia = objetivo - totalReal
   const abs = Math.abs(diferencia)
 
   let ajuste: TipoAjuste
   let mensaje: string
-  if (abs <= tolerancia) {
+  if (cabe(diferencia, o.extremoAbierto, o.murosPilastra)) {
     ajuste = 'exacto'
     mensaje = abs > 0.5 ? `Calza; ${abs.toFixed(1)} cm los absorbe la instalación` : 'Calza exacto'
   } else if (diferencia > 0 && abs <= CANALETA_MAX_CM) {
@@ -306,24 +346,31 @@ export function ajustarPilastras(o: OpcionesPilastras): Pilastreo | null {
   const dosMuros = o.murosPilastra >= 2
 
   const opInternas = internas > 0 ? PILASTRAS_INTERNAS : [0]
-  let mejor: { api: number; ae1: number; ae2: number; total: number; score: number } | null = null
+  type Candidato = { api: number; ae1: number; ae2: number; total: number; score: number }
+  let mejor: Candidato | null = null
+  // el mejor de los que NO se pasan del claro: entre muros es el único válido
+  let mejorCabe: Candidato | null = null
   for (const api of opInternas) {
     for (const ae1 of PILASTRAS_EXTREMO) {
       for (const ae2 of PILASTRAS_EXTREMO) {
         const total = cuerpos + internas * api + ae1 + ae2
         const dif = objetivo - total
         const score = Math.abs(dif) + (dosMuros && total > objetivo ? (total - objetivo) * PENALIZA_PASARSE : 0)
-        if (!mejor || score < mejor.score) mejor = { api, ae1, ae2, total, score }
+        const cand = { api, ae1, ae2, total, score }
+        if (!mejor || score < mejor.score) mejor = cand
+        if (total <= objetivo + (o.extremoAbierto ? 5 : 0) && (!mejorCabe || score < mejorCabe.score)) {
+          mejorCabe = cand
+        }
       }
     }
   }
+  if (mejorCabe) mejor = mejorCabe
   if (!mejor) return null
 
-  const tolerancia = o.extremoAbierto ? 5 : 0.5 * o.murosPilastra
 
   // Si con internas parejas no cierra, se mezclan medidas antes de recurrir a
   // la canaleta: las pilastras no tienen por qué medir todas lo mismo.
-  if (Math.abs(objetivo - mejor.total) > tolerancia) {
+  if (!cabe(objetivo - mejor.total, o.extremoAbierto, o.murosPilastra)) {
     const mezcla = repartirPilastras(
       objetivo - cuerpos, internas, PILASTRAS_INTERNAS, PILASTRAS_EXTREMO, o.fijas,
     )
@@ -331,7 +378,7 @@ export function ajustarPilastras(o: OpcionesPilastras): Pilastreo | null {
       const total = cuerpos + mezcla.reduce((x, y) => x + y, 0)
       const dif = objetivo - total
       const d = Math.abs(dif)
-      if (d <= tolerancia) {
+      if (cabe(dif, o.extremoAbierto, o.murosPilastra)) {
         return {
           pilastras: mezcla,
           total,
@@ -350,7 +397,7 @@ export function ajustarPilastras(o: OpcionesPilastras): Pilastreo | null {
 
   let ajuste: TipoAjuste
   let mensaje: string
-  if (abs <= tolerancia) {
+  if (cabe(diferencia, o.extremoAbierto, o.murosPilastra)) {
     ajuste = 'exacto'
     mensaje = abs > 0.5 ? `Calza; ${abs.toFixed(1)} cm los absorbe la instalación` : 'Calza exacto'
   } else if (diferencia > 0 && abs <= CANALETA_MAX_CM) {
@@ -411,7 +458,9 @@ export function repartirPilastras(
 ): number[] | null {
   const posiciones = internas + 2
   if (posiciones < 2) return null
-  const objetivo = Math.round(totalCm)
+  // hacia ABAJO, nunca hacia arriba: media pilastra de más no cabe entre muros,
+  // y ese medio centímetro corto lo absorbe el herraje.
+  const objetivo = Math.floor(totalCm + 1e-9)
   if (objetivo <= 0) return null
 
   // Se va abriendo la mano: primero se intenta con las medidas más parecidas
@@ -425,10 +474,17 @@ export function repartirPilastras(
   const internasOrden = [...opcionesInternas].sort((a, b) => Math.abs(a - centro) - Math.abs(b - centro))
   const extremosOrden = [...opcionesExtremo].sort((a, b) => a - b)
 
-  for (let apertura = 1; apertura <= internasOrden.length; apertura++) {
-    const permitidas = internasOrden.slice(0, apertura)
-    const salida = armar(objetivo, posiciones, permitidas, extremosOrden, centro, fijas)
-    if (salida) return salida
+  // Primero la suma exacta. Si el catálogo no da para clavarla —pasa cuando el
+  // vendedor fija una pilastra chica en el medio— se admite quedarse corto lo
+  // que rellena una canaleta, antes que devolver nada y dejar un hueco enorme.
+  for (let falta = 0; falta <= CANALETA_MAX_CM; falta++) {
+    const meta = objetivo - falta
+    if (meta <= 0) break
+    for (let apertura = 1; apertura <= internasOrden.length; apertura++) {
+      const permitidas = internasOrden.slice(0, apertura)
+      const salida = armar(meta, posiciones, permitidas, extremosOrden, centro, fijas)
+      if (salida) return salida
+    }
   }
   return null
 }

@@ -164,6 +164,8 @@ export default function App() {
   const [distribuidores, setDistribuidores] = useState<Distribuidor[]>([])
   const [verDistribuidores, setVerDistribuidores] = useState(false)
   const [verDuplicar, setVerDuplicar] = useState(false)
+  // por qué se rechazó el último cambio de pilastra, para poder decírselo
+  const [bloqueo, setBloqueo] = useState<string | null>(null)
   const [verProyectos, setVerProyectos] = useState(false)
   const [version, setVersion] = useState(VERSION_COMPILADA)
   const [actualizando, setActualizando] = useState<FaseActualizacion | null>(null)
@@ -456,6 +458,16 @@ export default function App() {
       { accesible: llevaAccesible, anchoAccesibleMinCm: config.anchoAccesibleCm, anchoOrinalCm: config.anchoOrinalCm, pais: proyecto.paisFabricacion },
     )
     if (!r) return
+
+    // El claro no se mueve: es la medida del sanitario y la modulación se le
+    // adapta. Si con esa pilastra las piezas se pasan, el cambio NO se aplica.
+    // La excepción es una tira que ya venía pasada: ahí hay que dejarla tocar
+    // las piezas para poder arreglarla.
+    if (r.ajuste === 'falta' && t.ajuste !== 'falta') {
+      setBloqueo(`Esa pilastra no cabe en el claro de ${t.claroCm} cm. ${r.mensaje}`)
+      return
+    }
+    setBloqueo(null)
     setArea({
       tramos: area.tramos.map((x) =>
         x.id === tramoId
@@ -759,6 +771,13 @@ export default function App() {
                 <span className="chip on">Arrastrá los paneles · clic derecho en una pieza</span>
                 <div className="sep" style={{ flex: 1 }} />
               </div>
+
+              {bloqueo && (
+                <div className="aviso-caja" style={{ margin: '0 0 12px' }}>
+                  <b>El claro manda: ese cambio no se aplicó</b>
+                  <span>{bloqueo}</span>
+                </div>
+              )}
 
               {tramosConProblema.length > 0 && (
                 <div className={`aviso-caja ${tramosConProblema.some((t) => t.ajuste === 'canaleta') && !tramosConProblema.some((t) => t.ajuste !== 'canaleta') ? 'ok' : ''}`} style={{ margin: '0 0 12px' }}>
