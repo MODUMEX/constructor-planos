@@ -6,7 +6,7 @@ import { anchoTotal } from './modulacion'
 export const ESPESOR_MURO = 12
 
 /** cuánto sobresale el muro de fondo del último panel o pilastra, en cm */
-export const SOBRA_MURO_CM = 1
+export const SOBRA_MURO_CM = 8
 
 /** fondo de una mampara de orinal: no llega hasta el frente de una cabina */
 export const PROF_ORINAL_CM = 60

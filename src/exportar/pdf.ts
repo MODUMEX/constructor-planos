@@ -194,7 +194,7 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
         doc.setLineDashPattern([], 0)
 
         doc.setDrawColor(MARCA[0], MARCA[1], MARCA[2])
-        doc.setLineWidth(0.7)
+        doc.setLineWidth(0.45)
         doc.line(pxx, pyy, exx, eyy)
       }
     })

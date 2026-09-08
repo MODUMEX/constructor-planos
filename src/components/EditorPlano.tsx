@@ -10,6 +10,13 @@ import { ALTO_ORINAL_CM, ALTO_REGADERA_CM, ALTO_WC_CM, ORINAL, REGADERA, WC } fr
 /** medio alto de la zona invisible para agarrar una pilastra, en cm de plano */
 const AGARRE_CM = 9
 
+/**
+ * Lo más delgada que se dibuja una pieza, en píxeles. El grueso de verdad son
+ * 1,27 cm, que a la escala del plano no llega ni a un píxel; antes el piso era
+ * de 3 y las piezas se veían mucho más gordas de lo que son.
+ */
+const MIN_PIEZA_PX = 1.5
+
 export function formatear(cm: number, unidad: 'cm' | 'in'): string {
   if (unidad === 'cm') return `${Number.isInteger(cm) ? cm : cm.toFixed(1)}`
   const pulg = cm / 2.54
@@ -279,8 +286,8 @@ export default function EditorPlano({
               <rect
                 x={Math.min(muroA.x, muroB.x)}
                 y={Math.min(muroA.y, muroB.y)}
-                width={horizontal ? largo : ESPESOR_MURO}
-                height={horizontal ? ESPESOR_MURO : largo}
+                width={horizontal ? Math.abs(muroB.x - muroA.x) : ESPESOR_MURO}
+                height={horizontal ? ESPESOR_MURO : Math.abs(muroB.y - muroA.y)}
                 fill="url(#hatch)"
                 stroke="#5c6a7a"
                 strokeWidth={1.2}
@@ -420,11 +427,11 @@ export default function EditorPlano({
                           <line
                             x1={pivote.x} y1={pivote.y} x2={extremo.x} y2={extremo.y}
                             stroke={cab.puerta.tipo === 'cortina' ? '#7c8ea1' : '#2a4c8f'}
-                            strokeWidth={4.5}
+                            strokeWidth={2.6}
                             strokeDasharray={cab.puerta.tipo === 'cortina' ? '6 4' : undefined}
                             strokeLinecap="round"
                           />
-                          <circle cx={pivote.x} cy={pivote.y} r={3.8} fill="#2a4c8f" />
+                          <circle cx={pivote.x} cy={pivote.y} r={2.6} fill="#2a4c8f" />
                         </g>
                       )
                     })()}
@@ -438,7 +445,7 @@ export default function EditorPlano({
                         <g>
                           <rect
                             x={Math.min(a.x, b.x)} y={Math.min(a.y, b.y)}
-                            width={Math.max(Math.abs(b.x - a.x), 3)} height={Math.max(Math.abs(b.y - a.y), 3)}
+                            width={Math.max(Math.abs(b.x - a.x), MIN_PIEZA_PX)} height={Math.max(Math.abs(b.y - a.y), MIN_PIEZA_PX)}
                             fill={activo ? '#2e6fd9' : '#22303f'}
                           />
                           {/* zona de agarre, más ancha que la pieza */}
@@ -482,7 +489,7 @@ export default function EditorPlano({
                       return (
                         <rect
                           x={Math.min(a.x, b.x)} y={Math.min(a.y, b.y)}
-                          width={Math.max(Math.abs(b.x - a.x), 3)} height={Math.max(Math.abs(b.y - a.y), 3)}
+                          width={Math.max(Math.abs(b.x - a.x), MIN_PIEZA_PX)} height={Math.max(Math.abs(b.y - a.y), MIN_PIEZA_PX)}
                           fill="#22303f" pointerEvents="none"
                         />
                       )
@@ -493,7 +500,7 @@ export default function EditorPlano({
                       return (
                         <rect
                           x={Math.min(a.x, b.x)} y={Math.min(a.y, b.y)}
-                          width={Math.max(Math.abs(b.x - a.x), 3)} height={Math.max(Math.abs(b.y - a.y), 3)}
+                          width={Math.max(Math.abs(b.x - a.x), MIN_PIEZA_PX)} height={Math.max(Math.abs(b.y - a.y), MIN_PIEZA_PX)}
                           fill="#22303f" pointerEvents="none"
                         />
                       )
@@ -559,8 +566,8 @@ export default function EditorPlano({
                         <g key={k}>
                           <rect
                             x={Math.min(a.x, b.x)} y={Math.min(a.y, b.y)}
-                            width={Math.max(Math.abs(b.x - a.x), 3)} height={Math.max(Math.abs(b.y - a.y), 3)}
-                            fill={activa ? '#2e6fd9' : '#3c4e63'} stroke="#5f7590" strokeWidth={0.8}
+                            width={Math.max(Math.abs(b.x - a.x), MIN_PIEZA_PX)} height={Math.max(Math.abs(b.y - a.y), MIN_PIEZA_PX)}
+                            fill={activa ? '#2e6fd9' : '#3c4e63'} stroke="#5f7590" strokeWidth={0.5}
                             pointerEvents="none"
                           />
                           <rect
