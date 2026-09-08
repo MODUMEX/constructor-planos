@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import type { Cabina, Config, Pais, Tramo } from '../types'
 import { ANCHOS_PILASTRA, puertasPosibles, tipologia } from '../catalog'
-import { anchoTotal, minimoDe, nuevaCabina, puertaSugerida, snap } from '../modulacion'
+import { anchoTotal, minimoDe, moverPanelEnPilastra, nuevaCabina, puertaSugerida, snap } from '../modulacion'
 import { medidaCercana, PILASTRAS_INTERNAS, PUERTA_ACCESIBLE_MIN } from '../modulador'
 import { Grupo, Item, Menu, Raya } from './Menu'
 import { cajaDelPlano, ESPESOR_MURO, marcosDe, profundidadDeTramo, pt, SOBRA_MURO_CM, type Marco } from '../geometria'
@@ -175,17 +175,14 @@ export default function EditorPlano({
     const dx = (e.clientX - a.x0) / a.escala
     const dy = (e.clientY - a.y0) / a.escala
     const deltaCm = dx * a.ax + dy * a.ay
-    // Arrastrar el panel agranda o achica la cabina de la izquierda: se le busca
-    // la medida de puerta de catálogo más cercana a lo que se pide y las
-    // pilastras se reacomodan solas para que la tira siga cerrando.
-    const cab = a.cabinas[a.indice]
-    if (!cab || cab.tipo === 'orinal') return
-    const lista = puertasPosibles(Infinity, pais)
-      .map((p) => p.ancho)
-      .filter((x) => (cab.tipo === 'accesible' ? x >= PUERTA_ACCESIBLE_MIN : true))
-    const deseada = cab.puerta.anchoCm + deltaCm
-    const elegida = medidaCercana(lista, deseada)
-    if (elegida !== cab.puerta.anchoCm) onPuerta(a.tramoId, a.indice, elegida)
+    // Arrastrar el panel lo corre SOBRE su pilastra: centrado o un poco hacia
+    // un lado. No cambia la puerta ni la pilastra, que son las piezas que se
+    // fabrican; solo cambia el claro libre de las dos cabinas vecinas.
+    const t = tramoPorId(a.tramoId)
+    onCabinas(
+      a.tramoId,
+      moverPanelEnPilastra(a.cabinas, t?.pilastras, a.indice, deltaCm, config.anchoPilastraCm, grueso),
+    )
   }
 
   function terminarArrastre(e: React.PointerEvent) {
@@ -217,11 +214,11 @@ export default function EditorPlano({
     const izq = t.cabinas[indice]
     const der = t.cabinas[indice + 1]
     if (!izq || !der) return
-    // centrar es darle a las dos la misma puerta: la más cercana al promedio
-    const lista = puertasPosibles(Infinity, pais).map((p) => p.ancho)
-    const media = medidaCercana(lista, (izq.puerta.anchoCm + der.puerta.anchoCm) / 2)
-    if (media !== izq.puerta.anchoCm) onPuerta(tramoId, indice, media)
-    if (media !== der.puerta.anchoCm) onPuerta(tramoId, indice + 1, media)
+    // centrarlo es dejarlo sin corrimiento, justo en el eje de su pilastra
+    onCabinas(
+      tramoId,
+      moverPanelEnPilastra(t.cabinas, t.pilastras, indice, 0, config.anchoPilastraCm, grueso, 0),
+    )
   }
 
   function agregarCabina(tramoId: string, indice: number) {
