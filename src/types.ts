@@ -122,9 +122,10 @@ export interface Config {
   profundidadCm: number
   anchoAccesibleCm: number
   /**
-   * La medida de puerta que pidió el cliente, en cm. La modulación gira en
-   * torno a ella: si está puesta, las puertas NO se tocan y lo único que el
-   * buscador mueve son las pilastras. Sin ella, elige también la puerta.
+   * La medida de puerta que pidió el cliente, en cm. No se captura en un campo
+   * aparte: queda pedida cuando se elige una medida en el menú del plano. La
+   * modulación gira en torno a ella: si está puesta, las puertas NO se tocan y
+   * lo único que el buscador mueve son las pilastras.
    */
   puertaCm?: number
   anchoPilastraCm: number

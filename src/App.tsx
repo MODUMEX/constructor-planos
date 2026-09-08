@@ -9,7 +9,7 @@ import { csvABytes, FILTRO_CSV, FILTRO_PDF, guardarArchivo } from './exportar/gu
 import { esAdmin, IVA_CR, type Usuario } from './auth'
 import type { Area, Cabina, Config, Pais, Proyecto, TipoCabina, TipologiaId } from './types'
 import {
-  ACABADOS, alturasDe, anchosPanel, anchosPuerta, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, mgMedidas, MODELOS,
+  ACABADOS, alturasDe, anchosPanel, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, mgMedidas, MODELOS,
   PAISES, etiquetaTier, nombreHerraje, nombreModelo, tierDeColor, TIPOLOGIAS, tipologia, tipologiaEspejo,
 } from './catalog'
 import VistaRender from './components/VistaRender'
@@ -396,6 +396,11 @@ export default function App() {
   function onPuerta(tramoId: string, indice: number, anchoPuertaCm: number) {
     const t = area.tramos.find((x) => x.id === tramoId)
     if (!t) return
+    // La medida que se elige acá queda PEDIDA para el área: si después se vuelve
+    // a modular, esa es la puerta y lo que se mueve son las pilastras. La de la
+    // cabina accesible no cuenta, porque es más ancha por norma y no es la que
+    // el cliente pide para el resto del baño.
+    if (t.cabinas[indice]?.tipo === 'normal') setConfig({ puertaCm: anchoPuertaCm })
     const cabinas = t.cabinas.map((c, i) =>
       i === indice ? { ...c, puerta: { ...c.puerta, anchoCm: anchoPuertaCm } } : c,
     )
@@ -1163,23 +1168,6 @@ export default function App() {
                           <option key={n} value={n}>{n}</option>
                         ))}
                       </select>
-                    </div>
-                    <div className="campo">
-                      <label>Medida de puerta (cm)</label>
-                      <select
-                        value={config.puertaCm ?? ''}
-                        onChange={(e) => setConfig({ puertaCm: e.target.value ? Number(e.target.value) : undefined })}
-                      >
-                        <option value="">La elige la app</option>
-                        {anchosPuerta(proyecto.paisFabricacion).map((p) => (
-                          <option key={p} value={p}>{p}</option>
-                        ))}
-                      </select>
-                      <span className="ayuda">
-                        {config.puertaCm
-                          ? 'Las puertas quedan fijas: solo se mueven las pilastras'
-                          : 'Sin medida pedida, el buscador también elige la puerta'}
-                      </span>
                     </div>
                     <div className="campo">
                       <label>Profundidad de cabina (cm)</label>
