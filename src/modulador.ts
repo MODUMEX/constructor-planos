@@ -53,6 +53,8 @@ export interface Modulacion {
   anchoPuertaAccesible: number | null
   /** ancho de cada orinal: 60 cm mas lo que le toque del sobrante */
   anchoOrinal: number | null
+  /** ancho que le quedó a la cabina accesible, para poder avisar si no llega */
+  anchoCabinaAccesible: number | null
 }
 
 export interface OpcionesModulacion {
@@ -81,6 +83,12 @@ export interface OpcionesModulacion {
   anchoOrinal?: number
   /** una cabina accesible: es una cabina con puerta ancha, no otra geometría */
   accesible?: boolean
+  /**
+   * Ancho que debería tener la cabina accesible, en cm. No es una pieza: sale de
+   * su puerta más las pilastras que la rodean, así que el buscador lo persigue
+   * eligiendo pilastras más anchas, no estirando nada.
+   */
+  anchoAccesibleCm?: number
 }
 
 /** ancho de un orinal y grueso de la mampara que los separa, en cm */
@@ -88,6 +96,13 @@ const ANCHO_ORINAL = 60
 const GRUESO_MG = 1.27
 /** la puerta de una cabina accesible nunca baja de esta medida */
 const PUERTA_ACCESIBLE_MIN = 85
+/**
+ * Cuánto pesa quedarse corto en el ancho de la cabina accesible: es una medida
+ * de accesibilidad, no una preferencia, así que pesa más que el gusto por la
+ * puerta de 60. No es un número afinado: de 0,5 para arriba el buscador elige
+ * exactamente lo mismo, así que cualquier valor de ese orden sirve.
+ */
+const PENALIZA_ACCESIBLE = 1
 
 /** la medida de catálogo más cercana a `cm`, dentro de las opciones dadas */
 export function medidaCercana(opciones: number[], cm: number): number {
@@ -116,9 +131,10 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
   const puertasAcc = nAcc > 0 ? deCatalogo.filter((a) => a >= PUERTA_ACCESIBLE_MIN) : [0]
   const opInternas = internas > 0 ? (o.pilInternaFija ? [o.pilInternaFija] : PILASTRAS_INTERNAS) : [0]
   const opExtremos = o.pilExtremoFija ? [o.pilExtremoFija] : PILASTRAS_EXTREMO
+  const objetivoAcc = nAcc > 0 ? (o.anchoAccesibleCm ?? 0) : 0
 
   let mejor:
-    | { ap: number; acc: number; api: number; ae1: number; ae2: number; total: number; score: number }
+    | { ap: number; acc: number; api: number; ae1: number; ae2: number; total: number; score: number; anchoAcc: number }
     | null = null
   for (const acc of puertasAcc.length ? puertasAcc : [0]) {
     for (const ap of nEst > 0 ? puertas : [0]) {
@@ -127,11 +143,15 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
           for (const ae2 of opExtremos) {
             const total = nEst * ap + nAcc * acc + fijoMG + internas * api + ae1 + ae2
             const dif = objetivo - total
+            // la accesible va primera: se lleva su pilastra de extremo entera y
+            // la mitad de la interna que la separa de la cabina siguiente
+            const anchoAcc = nAcc > 0 ? ae1 + acc + (internas > 0 ? api / 2 : ae2) : 0
             const score =
               Math.abs(dif) +
               (nEst > 0 ? Math.abs(ap - PUERTA_PREFERIDA) * PENALIZA_PUERTA : 0) +
-              (dosMuros && total > objetivo ? (total - objetivo) * PENALIZA_PASARSE : 0)
-            if (!mejor || score < mejor.score) mejor = { ap, acc, api, ae1, ae2, total, score }
+              (dosMuros && total > objetivo ? (total - objetivo) * PENALIZA_PASARSE : 0) +
+              (nAcc > 0 && objetivoAcc > 0 ? Math.max(0, objetivoAcc - anchoAcc) * PENALIZA_ACCESIBLE : 0)
+            if (!mejor || score < mejor.score) mejor = { ap, acc, api, ae1, ae2, total, score, anchoAcc }
           }
         }
       }
@@ -198,5 +218,6 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
     canaleta: canaletaFinal,
     anchoPuertaAccesible: mejor.acc || null,
     anchoOrinal: nMing > 0 ? anchoOrinal : null,
+    anchoCabinaAccesible: nAcc > 0 ? mejor.anchoAcc : null,
   }
 }

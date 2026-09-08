@@ -72,7 +72,7 @@ export function modularConCatalogo(
   extremoAbierto: boolean,
   fijar?: { pilInterna?: number; pilExtremo?: number; puerta?: number },
   extra?: { accesible?: boolean; anchoAccesibleMinCm?: number; mingitorios?: number; anchoOrinalCm?: number; pais?: Pais },
-): { cabinas: Cabina[]; pilastras: number[]; canaletaCm: number; ajuste: Tramo['ajuste']; mensaje: string } | null {
+): { cabinas: Cabina[]; pilastras: number[]; canaletaCm: number; ajuste: Tramo['ajuste']; mensaje: string; avisoAccesible?: string } | null {
   const conAcc = extra?.accesible === true
   const nMing = extra?.mingitorios ?? 0
   const anchoOrinal = extra?.anchoOrinalCm && extra.anchoOrinalCm > 0 ? extra.anchoOrinalCm : 60
@@ -87,6 +87,7 @@ export function modularConCatalogo(
     mingitorios: nMing,
     anchoOrinal: extra?.anchoOrinalCm,
     catalogoPuertas: anchosPuerta(extra?.pais ?? 'CR'),
+    anchoAccesibleCm: extra?.anchoAccesibleMinCm,
     murosPilastra,
     extremoAbierto,
     puertaFija: fijar?.puerta,
@@ -120,13 +121,28 @@ export function modularConCatalogo(
     cabinas.push(c)
   }
 
-  // La cabina accesible tiene que salir al menos tan ancha como pide la
-  // configuración. Si el catálogo no da para eso, se devuelve null y quien
-  // llama cae en la modulación vieja: mejor eso que una accesible angosta.
+  // La cabina accesible se pide de un ancho concreto (150 cm por norma). El
+  // buscador lo persigue eligiendo pilastras más anchas a su lado, pero no
+  // siempre lo alcanza con las piezas que existen. ANTES eso devolvía null y
+  // la app se caía en la modulación vieja, que reparte anchos libres: el área
+  // entera terminaba SIN piezas de catálogo —cabinas de 86,5 cm y pilastras
+  // inventadas— y nadie se enteraba. Ahora se entrega la tira de catálogo y se
+  // avisa cuánto le faltó a la accesible.
   const minAcc = extra?.anchoAccesibleMinCm ?? MIN_ACCESIBLE_CM
-  if (conAcc && cabinas[0] && cabinas[0].anchoCm < minAcc) return null
+  const anchoAcc = conAcc && cabinas[0] ? cabinas[0].anchoCm : 0
+  const avisoAccesible =
+    conAcc && anchoAcc < minAcc - 0.5
+      ? `La cabina accesible queda de ${anchoAcc.toFixed(1)} cm y se pidió de ${minAcc}: faltan ${(minAcc - anchoAcc).toFixed(1)} cm. Con las piezas del catálogo no da; ampliá el claro o bajá una cabina.`
+      : undefined
 
-  return { cabinas, pilastras, canaletaCm: m.canaleta?.anchoCm ?? 0, ajuste: m.ajuste, mensaje: m.mensaje }
+  return {
+    cabinas,
+    pilastras,
+    canaletaCm: m.canaleta?.anchoCm ?? 0,
+    ajuste: m.ajuste,
+    mensaje: m.mensaje,
+    avisoAccesible,
+  }
 }
 
 /**
@@ -242,6 +258,7 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
     // ancha, así que sale del mismo buscador que las demás.
     const conCatalogo = modularConCatalogo(claroTramo, cant, muros, muros < 2, undefined, {
       accesible: conAccesible && esPrincipal,
+      anchoAccesibleMinCm: config.anchoAccesibleCm,
       mingitorios: soloOrinales ? cant : 0,
       anchoOrinalCm: config.anchoOrinalCm,
       pais,
@@ -261,6 +278,7 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
       canaletaCm: conCatalogo.canaletaCm,
       ajuste: conCatalogo.ajuste,
       mensaje: conCatalogo.mensaje,
+      avisoAccesible: conCatalogo.avisoAccesible,
     }
   })
 }

@@ -382,6 +382,17 @@ export const TIPOLOGIAS: Tipologia[] = [
   },
 ]
 
+/**
+ * La tipología que resulta de espejar: la recta con muro izquierdo pasa a ser
+ * la de muro derecho y al revés. Las demás son simétricas y se espejan sobre
+ * sí mismas, así que solo cambia el orden de las piezas.
+ */
+export function tipologiaEspejo(id: TipologiaId): TipologiaId {
+  if (id === 'RECTA_MURO_IZQ') return 'RECTA_MURO_DER'
+  if (id === 'RECTA_MURO_DER') return 'RECTA_MURO_IZQ'
+  return id
+}
+
 export function tipologia(id: TipologiaId): Tipologia {
   return TIPOLOGIAS.find((t) => t.id === id) ?? TIPOLOGIAS[0]
 }

@@ -10,7 +10,7 @@ import { esAdmin, IVA_CR, type Usuario } from './auth'
 import type { Area, Cabina, Config, Pais, Proyecto, TipoCabina, TipologiaId } from './types'
 import {
   ACABADOS, alturasDe, ANCHOS_PANEL, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, MODELOS,
-  PAISES, etiquetaTier, nombreHerraje, nombreModelo, tierDeColor, TIPOLOGIAS, tipologia,
+  PAISES, etiquetaTier, nombreHerraje, nombreModelo, tierDeColor, TIPOLOGIAS, tipologia, tipologiaEspejo,
 } from './catalog'
 import VistaRender from './components/VistaRender'
 import ColoresMexico from './components/ColoresMexico'
@@ -261,6 +261,7 @@ export default function App() {
    * cabinas en siete metros— se dibuja igual y nadie se entera hasta fabricar.
    */
   const tramosConProblema = area.tramos.filter((t) => t.ajuste && t.ajuste !== 'exacto')
+  const avisosAccesible = area.tramos.filter((t) => t.avisoAccesible)
 
   /** los colores de México no están en el catálogo, así que el render se busca por nombre */
   function conFoto(cfg: Config, cabina?: TipoCabina) {
@@ -387,16 +388,42 @@ export default function App() {
       muros,
       muros < 2,
       { pilInterna: extremo ? undefined : anchoCm, pilExtremo: extremo ? anchoCm : undefined },
-      { accesible: llevaAccesible, anchoOrinalCm: config.anchoOrinalCm, pais: proyecto.paisFabricacion },
+      { accesible: llevaAccesible, anchoAccesibleMinCm: config.anchoAccesibleCm, anchoOrinalCm: config.anchoOrinalCm, pais: proyecto.paisFabricacion },
     )
     if (!r) return
     setArea({
       tramos: area.tramos.map((x) =>
         x.id === tramoId
-          ? { ...x, cabinas: r.cabinas, pilastras: r.pilastras, canaletaCm: r.canaletaCm, ajuste: r.ajuste, mensaje: r.mensaje }
+          ? { ...x, cabinas: r.cabinas, pilastras: r.pilastras, canaletaCm: r.canaletaCm, ajuste: r.ajuste, mensaje: r.mensaje, avisoAccesible: r.avisoAccesible }
           : x,
       ),
     })
+  }
+
+  /**
+   * Voltea el área como en un espejo: la última cabina pasa a ser la primera,
+   * las puertas cambian de mano y los muros se intercambian. Es lo que hace
+   * falta cuando el mismo baño va a la izquierda en un piso y a la derecha en
+   * otro, o cuando la cabina accesible tiene que quedar del otro lado.
+   *
+   * No re-modula: las piezas son las mismas, solo cambian de orden. Así no se
+   * pierde ningún ajuste hecho a mano sobre el plano.
+   */
+  function invertirArea() {
+    setArea({
+      tramos: area.tramos.map((t) => ({
+        ...t,
+        muroInicio: t.muroFin,
+        muroFin: t.muroInicio,
+        pilastras: t.pilastras ? [...t.pilastras].reverse() : undefined,
+        cabinas: [...t.cabinas].reverse().map((c) => ({
+          ...c,
+          puerta: { ...c.puerta, mano: c.puerta.mano === 'der' ? 'izq' : 'der' },
+        })),
+      })),
+    })
+    const espejo = tipologiaEspejo(config.tipologia)
+    if (espejo !== config.tipologia) setConfig({ tipologia: espejo })
   }
 
   /**
@@ -644,6 +671,7 @@ export default function App() {
             <>
               <div className="herramientas">
                 <button className="btn chico" onClick={() => remodular()}>Volver a modular</button>
+                <button className="btn chico" onClick={invertirArea} title="Voltea el área como en un espejo">⇄ Invertir</button>
                 <div className="div" />
                 <label className="toggle">
                   <input type="checkbox" checked={unidad === 'in'} onChange={(e) => setUnidad(e.target.checked ? 'in' : 'cm')} />
@@ -678,6 +706,15 @@ export default function App() {
                   </b>
                   {tramosConProblema.map((t) => (
                     <span key={t.id}>{t.nombre}: {t.mensaje}</span>
+                  ))}
+                </div>
+              )}
+
+              {avisosAccesible.length > 0 && (
+                <div className="aviso-caja" style={{ margin: '0 0 12px' }}>
+                  <b>La cabina accesible no llega a su ancho</b>
+                  {avisosAccesible.map((t) => (
+                    <span key={t.id}>{t.avisoAccesible}</span>
                   ))}
                 </div>
               )}

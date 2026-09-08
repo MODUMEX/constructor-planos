@@ -81,6 +81,8 @@ export interface Tramo {
   ajuste?: 'exacto' | 'canaleta' | 'sobra' | 'falta'
   /** lo mismo, explicado para el vendedor */
   mensaje?: string
+  /** cuando la cabina accesible no llegó al ancho pedido, por qué */
+  avisoAccesible?: string
 }
 
 export type TipologiaId =
