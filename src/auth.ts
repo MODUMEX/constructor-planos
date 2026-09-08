@@ -10,6 +10,8 @@ export interface Usuario {
   /** IVA del distribuidor; si no trae, se usa el 13 % de Costa Rica */
   ivaPorcentaje: number
   distribuidorId: string | null
+  /** el nombre de su distribuidor: es el que va al cajetín, sin poder elegir otro */
+  distribuidorNombre?: string
   /** true cuando la sesión vino de Supabase y no de una cuenta local */
   deLaNube: boolean
   /** token de la sesión, para leer tarifas y demás tablas */
@@ -41,6 +43,7 @@ interface Perfil {
 }
 
 interface Distribuidor {
+  nombre: string | null
   descuento: number | null
   iva: number | null
 }
@@ -85,15 +88,17 @@ async function entrarPorSupabase(email: string, clave: string): Promise<Usuario>
   const rol = (perfil.rol as Rol) || 'Distribuidor'
   let descuento = 0
   let ivaPorcentaje = IVA_CR
+  let distribuidorNombre: string | undefined
 
   // el descuento y el IVA son del distribuidor, no del usuario
   if (perfil.distribuidor_id) {
     try {
       const dist = await pedir<Distribuidor>(
-        `distribuidor?distribuidor_id=eq.${perfil.distribuidor_id}&select=descuento,iva`,
+        `distribuidor?distribuidor_id=eq.${perfil.distribuidor_id}&select=nombre,descuento,iva`,
         token,
       )
       if (dist[0]) {
+        distribuidorNombre = dist[0].nombre ?? undefined
         descuento = Number(dist[0].descuento ?? 0)
         if (dist[0].iva != null) ivaPorcentaje = Number(dist[0].iva)
       }
@@ -107,6 +112,7 @@ async function entrarPorSupabase(email: string, clave: string): Promise<Usuario>
     email: sesion.user?.email ?? email,
     nombre: perfil.nombre || sesion.user?.email || email,
     rol,
+    distribuidorNombre,
     descuento,
     ivaPorcentaje,
     distribuidorId: perfil.distribuidor_id,

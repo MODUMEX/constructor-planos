@@ -8,6 +8,11 @@ import type { Usuario } from './auth'
  * Quién ve y quién puede dar de alta lo decide la base con sus políticas RLS:
  * Super Admin, Administrador y Vendedor ven y editan todos; un Distribuidor ve
  * solo el suyo y no puede crear.
+ *
+ * Dar de alta NO escribe la tabla directo: llama a la Edge Function
+ * `gestion-usuarios`, que además de la ficha crea la CUENTA de acceso del
+ * distribuidor (correo + contraseña, rol Distribuidor). Eso necesita la llave
+ * secreta de Supabase, que vive en el servidor y nunca en el navegador.
  */
 
 const URL_SUPABASE = import.meta.env.VITE_SUPABASE_URL as string | undefined
@@ -15,6 +20,12 @@ const LLAVE_SUPABASE = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefi
 
 export const REGIONES = ['Costa Rica', 'LATAM', 'México'] as const
 export type Region = (typeof REGIONES)[number]
+
+/** lo que se manda al dar de alta o editar: la ficha más el acceso */
+export interface DatosDistribuidor extends Partial<Distribuidor> {
+  /** contraseña de la cuenta del distribuidor; obligatoria al darlo de alta */
+  password?: string
+}
 
 export interface Distribuidor {
   distribuidorId: number
@@ -56,18 +67,6 @@ function deFila(f: Fila): Distribuidor {
     ubicacion: f.ubicacion ?? '',
     region: (REGIONES as readonly string[]).includes(f.region ?? '') ? (f.region as Region) : null,
     activo: f.activo !== false,
-  }
-}
-
-function aFila(d: Partial<Distribuidor>) {
-  return {
-    nombre: (d.nombre ?? '').trim(),
-    contacto: (d.contacto ?? '').trim() || null,
-    email: (d.email ?? '').trim() || null,
-    telefono: (d.telefono ?? '').trim() || null,
-    ubicacion: (d.ubicacion ?? '').trim() || null,
-    region: d.region ?? null,
-    activo: d.activo !== false,
   }
 }
 
@@ -116,43 +115,104 @@ export async function listarDistribuidores(usuario: Usuario | null): Promise<Res
   }
 }
 
-export async function crearDistribuidor(usuario: Usuario | null, d: Partial<Distribuidor>): Promise<Resultado<Distribuidor>> {
+/** llama a la Edge Function que tiene la llave secreta */
+async function llamarGestion(usuario: Usuario | null, cuerpo: Record<string, unknown>): Promise<Resultado<{ distribuidor_id?: number }>> {
   if (!URL_SUPABASE || !LLAVE_SUPABASE) return { ok: false, mensaje: 'Sin Supabase configurado.' }
   const falta = sesionValida(usuario)
   if (falta) return { ok: false, mensaje: falta }
-  if (!(d.nombre ?? '').trim()) return { ok: false, mensaje: 'El nombre no puede ir en blanco.' }
   try {
-    const r = await fetch(`${URL_SUPABASE}/rest/v1/distribuidor?select=${COLUMNAS}`, {
+    const r = await fetch(`${URL_SUPABASE}/functions/v1/gestion-usuarios`, {
       method: 'POST',
-      headers: cabeceras(usuario!.token!, { Prefer: 'return=representation' }),
-      body: JSON.stringify([aFila(d)]),
+      headers: cabeceras(usuario!.token!),
+      body: JSON.stringify(cuerpo),
     })
-    if (!r.ok) return { ok: false, mensaje: await detalle(r) }
-    const filas = (await r.json()) as Fila[]
-    return { ok: true, dato: deFila(filas[0]), mensaje: 'Distribuidor dado de alta.' }
+    const cuerpoRta = (await r.json().catch(() => ({}))) as { error?: string; distribuidor_id?: number }
+    if (!r.ok) {
+      if (r.status === 404) {
+        return {
+          ok: false,
+          mensaje:
+            'Falta desplegar la Edge Function gestion-usuarios en Supabase: es la que crea la cuenta del distribuidor.',
+        }
+      }
+      return { ok: false, mensaje: cuerpoRta.error ?? `Supabase respondió ${r.status}.` }
+    }
+    return { ok: true, dato: cuerpoRta, mensaje: 'Listo.' }
   } catch (e) {
-    return { ok: false, mensaje: e instanceof Error ? e.message : 'No se pudo guardar.' }
+    return { ok: false, mensaje: e instanceof Error ? e.message : 'No se pudo completar.' }
   }
 }
 
-export async function guardarDistribuidor(usuario: Usuario | null, d: Distribuidor): Promise<Resultado<Distribuidor>> {
-  if (!URL_SUPABASE || !LLAVE_SUPABASE) return { ok: false, mensaje: 'Sin Supabase configurado.' }
-  const falta = sesionValida(usuario)
-  if (falta) return { ok: false, mensaje: falta }
-  if (!d.nombre.trim()) return { ok: false, mensaje: 'El nombre no puede ir en blanco.' }
-  try {
-    const r = await fetch(
-      `${URL_SUPABASE}/rest/v1/distribuidor?distribuidor_id=eq.${d.distribuidorId}&select=${COLUMNAS}`,
-      {
-        method: 'PATCH',
-        headers: cabeceras(usuario!.token!, { Prefer: 'return=representation' }),
-        body: JSON.stringify(aFila(d)),
-      },
-    )
-    if (!r.ok) return { ok: false, mensaje: await detalle(r) }
-    const filas = (await r.json()) as Fila[]
-    return { ok: true, dato: deFila(filas[0]), mensaje: 'Cambios guardados.' }
-  } catch (e) {
-    return { ok: false, mensaje: e instanceof Error ? e.message : 'No se pudo guardar.' }
+/**
+ * Da de alta la ficha del distribuidor Y su cuenta de acceso. El correo y la
+ * contraseña son obligatorios: son con lo que el distribuidor entra a la app.
+ */
+export async function crearDistribuidor(usuario: Usuario | null, d: DatosDistribuidor): Promise<Resultado<Distribuidor>> {
+  if (!(d.nombre ?? '').trim()) return { ok: false, mensaje: 'El nombre no puede ir en blanco.' }
+  if (!(d.email ?? '').trim()) return { ok: false, mensaje: 'El correo es el usuario con el que entra: no puede ir en blanco.' }
+  if ((d.password ?? '').length < 6) return { ok: false, mensaje: 'La contraseña tiene que tener al menos 6 caracteres.' }
+
+  const r = await llamarGestion(usuario, {
+    accion: 'crear_distribuidor',
+    nombre: (d.nombre ?? '').trim(),
+    contacto: (d.contacto ?? '').trim() || null,
+    email: (d.email ?? '').trim(),
+    telefono: (d.telefono ?? '').trim() || null,
+    ubicacion: (d.ubicacion ?? '').trim() || null,
+    region: d.region ?? null,
+    activo: d.activo !== false,
+    password: d.password,
+  })
+  if (!r.ok) return { ok: false, mensaje: r.mensaje }
+  return {
+    ok: true,
+    dato: {
+      distribuidorId: Number(r.dato?.distribuidor_id ?? 0),
+      nombre: (d.nombre ?? '').trim(),
+      contacto: (d.contacto ?? '').trim(),
+      email: (d.email ?? '').trim(),
+      telefono: (d.telefono ?? '').trim(),
+      ubicacion: (d.ubicacion ?? '').trim(),
+      region: d.region ?? null,
+      activo: d.activo !== false,
+    },
+    mensaje: 'Distribuidor dado de alta con su cuenta de acceso.',
+  }
+}
+
+/**
+ * Guarda los cambios de la ficha. Si se escribe una contraseña nueva, también
+ * se le cambia a su cuenta de acceso; si se deja en blanco, la de siempre.
+ */
+export async function guardarDistribuidor(usuario: Usuario | null, d: DatosDistribuidor & { distribuidorId: number }): Promise<Resultado<Distribuidor>> {
+  if (!(d.nombre ?? '').trim()) return { ok: false, mensaje: 'El nombre no puede ir en blanco.' }
+  if (d.password && d.password.length < 6) return { ok: false, mensaje: 'La contraseña tiene que tener al menos 6 caracteres.' }
+
+  const r = await llamarGestion(usuario, {
+    accion: 'actualizar_distribuidor',
+    distribuidor_id: d.distribuidorId,
+    nombre: (d.nombre ?? '').trim(),
+    contacto: (d.contacto ?? '').trim() || null,
+    email: (d.email ?? '').trim() || undefined,
+    telefono: (d.telefono ?? '').trim() || null,
+    ubicacion: (d.ubicacion ?? '').trim() || null,
+    region: d.region ?? null,
+    activo: d.activo !== false,
+    ...(d.password ? { password: d.password } : {}),
+  })
+  if (!r.ok) return { ok: false, mensaje: r.mensaje }
+  return {
+    ok: true,
+    dato: {
+      distribuidorId: d.distribuidorId,
+      nombre: (d.nombre ?? '').trim(),
+      contacto: (d.contacto ?? '').trim(),
+      email: (d.email ?? '').trim(),
+      telefono: (d.telefono ?? '').trim(),
+      ubicacion: (d.ubicacion ?? '').trim(),
+      region: d.region ?? null,
+      activo: d.activo !== false,
+    },
+    mensaje: d.password ? 'Cambios guardados, incluida la contraseña.' : 'Cambios guardados.',
   }
 }

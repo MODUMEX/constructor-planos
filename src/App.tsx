@@ -216,6 +216,12 @@ export default function App() {
     }
   }, [usuario?.token])
 
+  // Un distribuidor no elige: sus planos salen a su nombre, así que se pone solo
+  useEffect(() => {
+    if (usuario?.rol !== 'Distribuidor' || !usuario.distribuidorNombre) return
+    setProyecto((p) => (p.distribuidor === usuario.distribuidorNombre ? p : { ...p, distribuidor: usuario.distribuidorNombre! }))
+  }, [usuario?.rol, usuario?.distribuidorNombre])
+
   // la lista de distribuidores se trae una vez al entrar: el vendedor elige de
   // ahí en vez de escribir el nombre a mano en el cajetín
   useEffect(() => {
@@ -896,6 +902,10 @@ export default function App() {
                     </div>
                     <div className="campo">
                       <label>Distribuidor</label>
+                      {usuario.rol === 'Distribuidor' ? (
+                        // un distribuidor no elige: sus planos salen a su nombre
+                        <div className="fijo">{proyecto.distribuidor || usuario.distribuidorNombre || '—'}</div>
+                      ) : (
                       <select value={proyecto.distribuidor} onChange={(e) => setProyecto({ ...proyecto, distribuidor: e.target.value })}>
                         <option value="">—</option>
                         {/* uno que ya no esté activo sigue apareciendo si el proyecto es suyo,
@@ -910,7 +920,8 @@ export default function App() {
                             <option value={proyecto.distribuidor}>{proyecto.distribuidor}</option>
                           )}
                       </select>
-                      {distribuidores.length === 0 && (
+                      )}
+                      {usuario.rol !== 'Distribuidor' && distribuidores.length === 0 && (
                         <span className="ayuda">
                           {esAdmin(usuario)
                             ? 'Todavía no hay ninguno: dalos de alta con el botón Distribuidores de arriba.'

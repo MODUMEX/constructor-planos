@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   crearDistribuidor, guardarDistribuidor, REGIONES,
-  type Distribuidor, type Region,
+  type DatosDistribuidor, type Distribuidor, type Region,
 } from '../distribuidores'
 import type { Usuario } from '../auth'
 
@@ -10,13 +10,18 @@ import type { Usuario } from '../auth'
  * pantalla de administración: el vendedor no escribe el nombre en el cajetín,
  * lo elige de acá.
  *
+ * Dar de alta crea DOS cosas: la ficha de la empresa y la cuenta con la que el
+ * distribuidor entra a la app, con rol restringido. Por eso el correo y la
+ * contraseña son obligatorios al crearlo; al editar, la contraseña solo se toca
+ * si se escribe una nueva.
+ *
  * Un distribuidor no se borra, se desactiva: los planos viejos siguen llevando
  * su nombre y perderlo dejaría cajetines huérfanos. Los desactivados no salen
  * en el selector del proyecto, pero siguen en esta lista.
  */
 
-const VACIO: Partial<Distribuidor> = {
-  nombre: '', contacto: '', email: '', telefono: '', ubicacion: '', region: 'Costa Rica', activo: true,
+const VACIO: DatosDistribuidor = {
+  nombre: '', contacto: '', email: '', telefono: '', ubicacion: '', region: 'Costa Rica', activo: true, password: '',
 }
 
 interface Props {
@@ -27,13 +32,13 @@ interface Props {
 }
 
 export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Props) {
-  const [edita, setEdita] = useState<Partial<Distribuidor> | null>(null)
+  const [edita, setEdita] = useState<DatosDistribuidor | null>(null)
   const [guardando, setGuardando] = useState(false)
   const [aviso, setAviso] = useState<{ ok: boolean; mensaje: string } | null>(null)
 
   const esNuevo = edita !== null && edita.distribuidorId === undefined
 
-  function campo(k: keyof Distribuidor, v: string | boolean | Region | null) {
+  function campo(k: keyof DatosDistribuidor, v: string | boolean | Region | null) {
     setEdita((d) => (d ? { ...d, [k]: v } : d))
     setAviso(null)
   }
@@ -43,7 +48,7 @@ export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Pr
     setGuardando(true)
     const r = esNuevo
       ? await crearDistribuidor(usuario, edita)
-      : await guardarDistribuidor(usuario, edita as Distribuidor)
+      : await guardarDistribuidor(usuario, edita as DatosDistribuidor & { distribuidorId: number })
     setGuardando(false)
     setAviso({ ok: r.ok, mensaje: r.mensaje })
     if (!r.ok || !r.dato) return
@@ -85,7 +90,21 @@ export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Pr
                 </div>
                 <div className="campo">
                   <label>Correo</label>
-                  <input value={edita.email ?? ''} onChange={(e) => campo('email', e.target.value)} />
+                  <input value={edita.email ?? ''} onChange={(e) => campo('email', e.target.value)} placeholder="distribuidor@empresa.com" />
+                  <span className="ayuda">Con este correo entra a la app</span>
+                </div>
+                <div className="campo">
+                  <label>Contraseña</label>
+                  <input
+                    type="password"
+                    value={edita.password ?? ''}
+                    onChange={(e) => campo('password', e.target.value)}
+                    placeholder={esNuevo ? 'Al menos 6 caracteres' : 'Dejala en blanco para no cambiarla'}
+                    autoComplete="new-password"
+                  />
+                  <span className="ayuda">
+                    {esNuevo ? 'Se le crea la cuenta con esta clave' : 'Solo se cambia si escribís una nueva'}
+                  </span>
                 </div>
                 <div className="campo">
                   <label>Teléfono</label>
