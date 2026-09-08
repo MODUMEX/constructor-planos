@@ -133,11 +133,9 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
       const esUltima = i === tramo.cabinas.length - 1
       const dibujarPanel = !esUltima || !tramo.muroFin
       if (dibujarPanel) {
-        // el panel puede ir corrido sobre su pilastra; la pilastra no se mueve
-        const corrido = tramo.desplazaPanel?.[i] ?? 0
         doc.setFillColor(TINTA, TINTA, TINTA)
-        const [ax, ay] = aHoja(e, pt(m, u1 + corrido - grueso / 2, 0))
-        const [bx, by] = aHoja(e, pt(m, u1 + corrido + grueso / 2, prof))
+        const [ax, ay] = aHoja(e, pt(m, u1 - grueso / 2, 0))
+        const [bx, by] = aHoja(e, pt(m, u1 + grueso / 2, prof))
         doc.rect(Math.min(ax, bx), Math.min(ay, by), Math.max(Math.abs(bx - ax), 0.5), Math.max(Math.abs(by - ay), 0.5), 'F')
       }
       if (i === 0 && !tramo.muroInicio) {

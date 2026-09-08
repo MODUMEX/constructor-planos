@@ -418,22 +418,6 @@ export default function App() {
     })
   }
 
-  /**
-   * Se arrastró un panel: se corre sobre su pilastra. El corrimiento se guarda
-   * en el tramo, NO en el ancho de las cabinas, porque de los anchos salen las
-   * posiciones de las pilastras y si se tocan se mueven ellas también.
-   */
-  function onDesplazarPanel(tramoId: string, indice: number, desplazaCm: number) {
-    setArea({
-      tramos: area.tramos.map((x) => {
-        if (x.id !== tramoId) return x
-        const lista = [...(x.desplazaPanel ?? Array(Math.max(0, x.cabinas.length - 1)).fill(0))]
-        lista[indice] = desplazaCm
-        return { ...x, desplazaPanel: lista }
-      }),
-    })
-  }
-
   function onCabinas(tramoId: string, cabinas: Cabina[]) {
     setArea({ tramos: area.tramos.map((t) => (t.id === tramoId ? { ...t, cabinas } : t)) })
   }
@@ -806,7 +790,6 @@ export default function App() {
                     onCabinas={onCabinas}
                     onPilastra={onPilastra}
                     onPuerta={onPuerta}
-                    onDesplazarPanel={onDesplazarPanel}
                   />
                 </div>
 

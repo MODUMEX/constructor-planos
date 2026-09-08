@@ -299,6 +299,20 @@ input, select { font: inherit; }
 }
 .campo input:focus, .campo select:focus { outline: 2px solid var(--focus); outline-offset: -1px; border-color: var(--focus); }
 .campo .ayuda { font-size: 12px; color: var(--text-3); }
+/* la cota de la cabina en el plano, escribible */
+.cota-editable {
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  text-align: center;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 17px;
+  color: #2c3d52;
+  padding: 1px 2px;
+}
+.cota-editable:hover { border-color: #9fb0c4; }
+.cota-editable:focus { outline: none; border-color: #2e6fd9; background: #fff; }
 /* dato que no se edita: lo decide el modelo o la línea */
 .campo .fijo {
   background: transparent;

@@ -44,8 +44,7 @@ interface Props {
   onPilastra: (tramoId: string, indice: number, anchoCm: number) => void
   /** al elegir una medida de puerta: manda la puerta y las pilastras se adaptan */
   onPuerta: (tramoId: string, indice: number, anchoPuertaCm: number) => void
-  /** al arrastrar un panel: se corre sobre su pilastra, sin tocar ninguna pieza */
-  onDesplazarPanel: (tramoId: string, indice: number, desplazaCm: number) => void
+
 }
 
 type MenuEstado =
@@ -65,11 +64,13 @@ export default function EditorPlano({
   onCabinas,
   onPilastra,
   onPuerta,
-  onDesplazarPanel,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [menu, setMenu] = useState<MenuEstado>(null)
   const [arrastrando, setArrastrando] = useState<string | null>(null)
+  // lo que se está escribiendo en una cota: se aplica al salir del campo o con
+  // Enter, no en cada tecla, para no remodular a media medida
+  const [cotaEnCurso, setCotaEnCurso] = useState<{ clave: string; texto: string } | null>(null)
   const arrastre = useRef<{
     tramoId: string
     indice: number
@@ -178,15 +179,13 @@ export default function EditorPlano({
     const dx = (e.clientX - a.x0) / a.escala
     const dy = (e.clientY - a.y0) / a.escala
     const deltaCm = dx * a.ax + dy * a.ay
-    // Arrastrar el panel lo corre SOBRE su pilastra: centrado o un poco hacia
-    // un lado. No cambia ninguna pieza —ni la puerta ni la pilastra— ni la
-    // posición de la pilastra: solo se mueve el panel dentro de su cara.
+    // El panel va siempre centrado en su pilastra, así que arrastrarlo es
+    // cambiar la MEDIDA de esa pilastra: se elige la de catálogo más cercana y
+    // el buscador reacomoda el resto sin tocar las puertas.
     const t = tramoPorId(a.tramoId)
-    const anchoPil = t?.pilastras?.[a.indice + 1] ?? config.anchoPilastraCm
-    const tope = Math.max(0, anchoPil / 2 - grueso / 2)
-    const previo = t?.desplazaPanel?.[a.indice] ?? 0
-    const corrido = Math.max(-tope, Math.min(tope, snap(previo + deltaCm)))
-    if (corrido !== previo) onDesplazarPanel(a.tramoId, a.indice, corrido)
+    const actual = t?.pilastras?.[a.indice + 1] ?? config.anchoPilastraCm
+    const elegida = medidaCercana(PILASTRAS_INTERNAS, actual + deltaCm * 2)
+    if (elegida !== actual) onPilastra(a.tramoId, a.indice + 1, elegida)
   }
 
   function terminarArrastre(e: React.PointerEvent) {
@@ -212,14 +211,49 @@ export default function EditorPlano({
     onCabinas(tramoId, t.cabinas.map((c, i) => (i === indice ? { ...c, puerta: { ...c.puerta, ...cambio } } : c)))
   }
 
+  /**
+   * El vendedor escribió el ancho que quiere para una cabina. El ancho no es
+   * una pieza: es la puerta más lo que le toca de las pilastras de cada lado.
+   * Como la puerta manda, lo que se ajusta es la PILASTRA vecina, y se elige la
+   * de catálogo que deje la cabina lo más cerca de lo pedido.
+   */
+  function pedirAncho(tramoId: string, indice: number, texto: string) {
+    const t = tramoPorId(tramoId)
+    const cab = t?.cabinas[indice]
+    if (!t || !cab) return
+    const pedido = Number(String(texto).replace(',', '.'))
+    if (!Number.isFinite(pedido) || pedido <= 0) return
+
+    const n = t.cabinas.length
+    if (n < 2) return
+    const anchoPil = (j: number) => t.pilastras?.[j] ?? config.anchoPilastraCm
+    const cuerpo = cab.tipo === 'orinal' ? cab.anchoCm : cab.puerta.anchoCm
+
+    // Todas las pilastras internas comparten medida, así que:
+    //  · una cabina del medio tiene media pilastra a cada lado → ancho = pilastra + puerta
+    //  · la primera y la última llevan su pilastra de extremo entera más media interna
+    const primera = indice === 0
+    const ultima = indice === n - 1
+    const necesaria = primera
+      ? (pedido - cuerpo - anchoPil(0)) * 2
+      : ultima
+        ? (pedido - cuerpo - anchoPil(n)) * 2
+        : pedido - cuerpo
+
+    const jMover = primera ? 1 : ultima ? n - 1 : indice + 1
+    const elegida = medidaCercana(PILASTRAS_INTERNAS, necesaria)
+    if (elegida !== anchoPil(jMover)) onPilastra(tramoId, jMover, elegida)
+  }
   function centrarPanel(tramoId: string, indice: number) {
     const t = tramoPorId(tramoId)
     if (!t) return
     const izq = t.cabinas[indice]
     const der = t.cabinas[indice + 1]
     if (!izq || !der) return
-    // centrarlo es dejarlo sin corrimiento, justo en el eje de su pilastra
-    onDesplazarPanel(tramoId, indice, 0)
+    // el panel siempre va centrado en su pilastra: centrar es repartir el claro
+    // parejo entre las dos cabinas, dándole a la pilastra la medida que cuadre
+    const media = medidaCercana(PILASTRAS_INTERNAS, (izq.anchoCm + der.anchoCm) / 2 - izq.puerta.anchoCm)
+    onPilastra(tramoId, indice + 1, media)
   }
 
   function agregarCabina(tramoId: string, indice: number) {
@@ -438,10 +472,8 @@ export default function EditorPlano({
 
                     {/* panel divisor a la derecha: esto es lo que se arrastra */}
                     {i < tramo.cabinas.length - 1 && (() => {
-                      // el corrimiento mueve SOLO el panel dentro de su pilastra
-                      const corrido = tramo.desplazaPanel?.[i] ?? 0
-                      const a = pt(m, u1 + corrido - grueso / 2, 0)
-                      const b = pt(m, u1 + corrido + grueso / 2, prof)
+                      const a = pt(m, u1 - grueso / 2, 0)
+                      const b = pt(m, u1 + grueso / 2, prof)
                       const activo = arrastrando === `${tramo.id}:${i}`
                       return (
                         <g>
@@ -519,15 +551,33 @@ export default function EditorPlano({
                           <line x1={ini.x} y1={ini.y} x2={fin.x} y2={fin.y} stroke="#4a5a72" strokeWidth={1} />
                           <line x1={ini.x} y1={ini.y - 4} x2={ini.x} y2={ini.y + 4} stroke="#4a5a72" strokeWidth={1} transform={horizontal ? undefined : `rotate(90 ${ini.x} ${ini.y})`} />
                           <line x1={fin.x} y1={fin.y - 4} x2={fin.x} y2={fin.y + 4} stroke="#4a5a72" strokeWidth={1} transform={horizontal ? undefined : `rotate(90 ${fin.x} ${fin.y})`} />
-                          <text
-                            x={c.x} y={c.y} textAnchor="middle" fontSize={17}
-                            fontFamily="ui-monospace, Consolas, monospace"
-                            fill={selecta ? '#15274b' : '#2c3d52'}
-                            fontWeight={selecta ? 700 : 400}
+                          {/* la cota se escribe: al cambiarla se busca la pilastra que deje
+                              la cabina de esa medida, sin tocar la puerta */}
+                          <foreignObject x={c.x - 46} y={c.y - 20} width={92} height={26}
                             transform={rot ? `rotate(${rot} ${c.x} ${c.y})` : undefined}
+                            pointerEvents="auto"
                           >
-                            {formatear(cab.anchoCm, unidad)}{unidad === 'cm' ? '' : ''}
-                          </text>
+                            <input
+                              className="cota-editable"
+                              value={
+                                cotaEnCurso?.clave === `${tramo.id}:${i}`
+                                  ? cotaEnCurso.texto
+                                  : formatear(cab.anchoCm, unidad)
+                              }
+                              style={{ fontWeight: selecta ? 700 : 400 }}
+                              title="Ancho de la cabina: escribí la medida y dale Enter"
+                              onFocus={() => onSeleccion(cab.id)}
+                              onChange={(ev) => setCotaEnCurso({ clave: `${tramo.id}:${i}`, texto: ev.target.value })}
+                              onBlur={() => {
+                                if (cotaEnCurso?.clave === `${tramo.id}:${i}`) pedirAncho(tramo.id, i, cotaEnCurso.texto)
+                                setCotaEnCurso(null)
+                              }}
+                              onKeyDown={(ev) => {
+                                if (ev.key === 'Enter') ev.currentTarget.blur()
+                                if (ev.key === 'Escape') { setCotaEnCurso(null); ev.currentTarget.blur() }
+                              }}
+                            />
+                          </foreignObject>
                         </g>
                       )
                     })()}
