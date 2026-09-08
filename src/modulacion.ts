@@ -446,11 +446,11 @@ export function bom(
   // el pedido las calcula el CIP, ya con el plano y la cotización hechos.
   if (config.orinales > 1) {
     renglones.push({
-      sku: `${codigoLinea}-MG60${config.mgAlturaCm}`,
-      descripcion: `Divisor de orinal 60 × ${config.mgAlturaCm} cm`,
+      sku: `${codigoLinea}-MG${config.mgAnchoCm ?? 60}${config.mgAlturaCm}`,
+      descripcion: `Divisor de orinal ${config.mgAnchoCm ?? 60} × ${config.mgAlturaCm} cm`,
       tipo: 'Divisor',
       cantidad: config.orinales - 1,
-      precioUnit: precioPieza({ familia: 'MG', anchoCm: 60, altoCm: config.mgAlturaCm }, opciones),
+      precioUnit: precioPieza({ familia: 'MG', anchoCm: config.mgAnchoCm ?? 60, altoCm: config.mgAlturaCm }, opciones),
       tarifaReal: true,
     })
   }

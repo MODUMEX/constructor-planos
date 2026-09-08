@@ -122,6 +122,8 @@ export interface Config {
   /** ancho de cada orinal, en cm; los proyectos viejos van con 60 */
   anchoOrinalCm?: number
   mgAlturaCm: number
+  /** ancho de la mampara de mingitorio; la ficha da 45 y 60, y los viejos van con 60 */
+  mgAnchoCm?: number
   tipologia: TipologiaId
 }
 

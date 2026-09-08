@@ -9,7 +9,7 @@ import { csvABytes, FILTRO_CSV, FILTRO_PDF, guardarArchivo } from './exportar/gu
 import { esAdmin, IVA_CR, type Usuario } from './auth'
 import type { Area, Cabina, Config, Pais, Proyecto, TipoCabina, TipologiaId } from './types'
 import {
-  ACABADOS, alturasDe, ANCHOS_PANEL, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, MODELOS,
+  ACABADOS, alturasDe, ANCHOS_PANEL, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, MG_MEDIDAS, MODELOS,
   PAISES, etiquetaTier, nombreHerraje, nombreModelo, tierDeColor, TIPOLOGIAS, tipologia, tipologiaEspejo,
 } from './catalog'
 import VistaRender from './components/VistaRender'
@@ -79,6 +79,7 @@ function configInicial(): Config {
     orinales: 0,
     llevaAccesible: false,
     anchoOrinalCm: 60,
+    mgAnchoCm: 60,
     mgAlturaCm: 120,
     tipologia: 'RECTA_MURO_IZQ',
   }
@@ -1177,11 +1178,21 @@ export default function App() {
                           <span className="ayuda">Lo normal son 60</span>
                         </div>
                         <div className="campo">
-                          <label>Alto del divisor de orinal (cm)</label>
-                          <select value={config.mgAlturaCm} onChange={(e) => setConfig({ mgAlturaCm: Number(e.target.value) })}>
-                            <option value={120}>120 · MG120</option>
-                            <option value={150}>150 · MG150</option>
+                          <label>Mampara del orinal (cm)</label>
+                          <select
+                            value={`${config.mgAnchoCm ?? 60}x${config.mgAlturaCm}`}
+                            onChange={(e) => {
+                              const [ancho, alto] = e.target.value.split('x').map(Number)
+                              setConfig({ mgAnchoCm: ancho, mgAlturaCm: alto })
+                            }}
+                          >
+                            {MG_MEDIDAS.map((m) => (
+                              <option key={`${m.anchoCm}x${m.altoCm}`} value={`${m.anchoCm}x${m.altoCm}`}>
+                                {m.anchoCm} × {m.altoCm}
+                              </option>
+                            ))}
                           </select>
+                          <span className="ayuda">Fondo × alto; la de 45 solo viene en 120</span>
                         </div>
                       </>
                     )}

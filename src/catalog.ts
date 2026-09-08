@@ -261,8 +261,10 @@ export const CERROJOS = [
 ]
 
 /**
- * Medidas que EXISTEN en el catálogo, en cm. Salieron de la tabla de piezas del
- * Constructor actual, que es la que fabrica: nada que no esté aquí se puede pedir.
+ * Medidas que EXISTEN en el catálogo, en cm. Cotejadas una por una contra la
+ * FICHA TÉCNICA LEEDER M1 de abril 2026 —"Modelos y medidas disponibles"— y
+ * contra la tabla de piezas del Constructor actual: coinciden. Nada que no esté
+ * aquí se puede pedir.
  *
  * Ojo: antes esta app ofrecía puertas de 65, 80 y 95 cm, que no se fabrican.
  */
@@ -291,6 +293,16 @@ export const ANCHOS_PANEL = [55, 60, 85, 90, 95, 100, 110, 120, 130, 135, 140, 1
  * la suma de las piezas queda CORTA, y como máximo 5 cm. Si el hueco es mayor
  * falta material; si las piezas se pasan, no cabe (la canaleta no recorta).
  */
+/**
+ * Mamparas de mingitorio (familia MG). La ficha da TRES medidas y no todas las
+ * combinaciones existen: la de 45 solo viene en 120 de alto.
+ */
+export const MG_MEDIDAS: { anchoCm: number; altoCm: number }[] = [
+  { anchoCm: 45, altoCm: 120 },
+  { anchoCm: 60, altoCm: 120 },
+  { anchoCm: 60, altoCm: 150 },
+]
+
 export const ANCHOS_CANALETA = [1, 2, 3, 4, 5]
 export const CANALETA_MAX_CM = 5
 

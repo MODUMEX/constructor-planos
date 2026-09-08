@@ -119,7 +119,7 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
       if (cab.tipo === 'orinal') {
         piezas.push({
           familia: 'MG',
-          anchoCm: 60,
+          anchoCm: config.mgAnchoCm ?? 60,
           altoCm: config.mgAlturaCm,
           subTipo: config.mgAlturaCm >= 150 ? 'MG150' : 'MG120',
           area,
@@ -190,7 +190,7 @@ export function piezasDeArea(area: Area): Pieza[] {
   for (let i = 0; i < divisores; i++) {
     piezas.push({
       familia: 'MG',
-      anchoCm: 60,
+      anchoCm: area.config.mgAnchoCm ?? 60,
       altoCm: area.config.mgAlturaCm,
       subTipo: area.config.mgAlturaCm >= 150 ? 'MG150' : 'MG120',
       area: area.nombre,
