@@ -296,24 +296,24 @@ export default function EditorPlano({
               {/* muros laterales del tramo */}
               {tramo.muroInicio && !conEsquina && (() => {
                 const a = pt(m, -ESPESOR_MURO, -ESPESOR_MURO)
-                const b = pt(m, 0, prof)
+                const b = pt(m, 0, prof + SOBRA_MURO_CM)
                 return (
                   <rect
                     x={Math.min(a.x, b.x)} y={Math.min(a.y, b.y)}
-                    width={horizontal ? ESPESOR_MURO : prof + ESPESOR_MURO}
-                    height={horizontal ? prof + ESPESOR_MURO : ESPESOR_MURO}
+                    width={horizontal ? ESPESOR_MURO : prof + ESPESOR_MURO + SOBRA_MURO_CM}
+                    height={horizontal ? prof + ESPESOR_MURO + SOBRA_MURO_CM : ESPESOR_MURO}
                     fill="url(#hatch)" stroke="#5c6a7a" strokeWidth={1.2}
                   />
                 )
               })()}
               {tramo.muroFin && !conEsquina && (() => {
                 const a = pt(m, largo, -ESPESOR_MURO)
-                const b = pt(m, largo + ESPESOR_MURO, prof)
+                const b = pt(m, largo + ESPESOR_MURO, prof + SOBRA_MURO_CM)
                 return (
                   <rect
                     x={Math.min(a.x, b.x)} y={Math.min(a.y, b.y)}
-                    width={horizontal ? ESPESOR_MURO : prof + ESPESOR_MURO}
-                    height={horizontal ? prof + ESPESOR_MURO : ESPESOR_MURO}
+                    width={horizontal ? ESPESOR_MURO : prof + ESPESOR_MURO + SOBRA_MURO_CM}
+                    height={horizontal ? prof + ESPESOR_MURO + SOBRA_MURO_CM : ESPESOR_MURO}
                     fill="url(#hatch)" stroke="#5c6a7a" strokeWidth={1.2}
                   />
                 )

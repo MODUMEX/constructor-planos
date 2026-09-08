@@ -87,9 +87,11 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
     const [mx2, my2] = aHoja(e, pt(m, largo + SOBRA_MURO_CM, 0))
     doc.rect(Math.min(mx, mx2), Math.min(my, my2), Math.abs(mx2 - mx) || ESPESOR_MURO * e.k, Math.abs(my2 - my) || ESPESOR_MURO * e.k, 'FD')
 
+    // los muros laterales se corren al frente lo mismo que el de fondo se pasa
+    // de las piezas, para que la pared no termine al ras de la cabina
     const muroLateral = (u0: number, u1: number) => {
       const [ax, ay] = aHoja(e, pt(m, u0, -ESPESOR_MURO))
-      const [bx, by] = aHoja(e, pt(m, u1, prof))
+      const [bx, by] = aHoja(e, pt(m, u1, prof + SOBRA_MURO_CM))
       doc.rect(Math.min(ax, bx), Math.min(ay, by), Math.abs(bx - ax), Math.abs(by - ay), 'FD')
     }
     if (tramo.muroInicio && !conEsquina) muroLateral(-ESPESOR_MURO, 0)
