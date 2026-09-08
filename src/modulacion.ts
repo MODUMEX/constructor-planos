@@ -4,7 +4,7 @@ import {
 } from './catalog'
 import type { Cabina, Config, Moneda, Pais, Tramo, TipologiaId, RenglonBOM } from './types'
 import { alturasDe, tipologia, tierDeColor } from './catalog'
-import { modularTira } from './modulador'
+import { ajustarPilastras, GRUESO_MG_PIEZA, modularTira } from './modulador'
 import { precioPieza, type TablaTarifas } from './tarifas'
 
 let seq = 0
@@ -22,7 +22,7 @@ export function snap(valor: number): number {
 
 export function minimoDe(cabina: Cabina): number {
   if (cabina.tipo === 'accesible') return MIN_ACCESIBLE_CM
-  if (cabina.tipo === 'ambulatoria') return 90
+  if (cabina.tipo === 'vacia') return MIN_CABINA_CM
   return MIN_CABINA_CM
 }
 
@@ -169,109 +169,64 @@ export function modular(claroCm: number, cantidad: number, anchoAccesibleCm = 0)
 }
 
 /**
- * Mueve el panel divisor que está a la derecha de la cabina `indice`.
- * Reparte el delta entre esa cabina y la siguiente: el claro total no cambia.
- * Devuelve las cabinas nuevas, o las mismas si el movimiento no es posible.
+ * Vuelve a repartir la tira cuando las PUERTAS ya están decididas: se quedan
+ * como están y se buscan las pilastras que hagan cerrar el claro. Es lo que
+ * corre al elegir una medida de puerta en el menú o al arrastrar un panel.
+ *
+ * Devuelve las cabinas con su ancho recalculado —puerta más lo que le toca de
+ * cada pilastra— y el aviso de cómo cerró, para poder mostrarlo en el plano.
  */
-export function moverDivisor(cabinas: Cabina[], indice: number, deltaCm: number): Cabina[] {
-  const izq = cabinas[indice]
-  const der = cabinas[indice + 1]
-  if (!izq || !der) return cabinas
-  const minIzq = minimoDe(izq)
-  const minDer = minimoDe(der)
-  let delta = snap(deltaCm)
-  if (izq.anchoCm + delta < minIzq) delta = minIzq - izq.anchoCm
-  if (der.anchoCm - delta < minDer) delta = der.anchoCm - minDer
-  delta = snap(delta)
-  if (delta === 0) return cabinas
-  return cabinas.map((c, i) => {
-    if (i === indice) return conAnchoNuevo(c, c.anchoCm + delta)
-    if (i === indice + 1) return conAnchoNuevo(c, c.anchoCm - delta)
-    return c
-  })
-}
-
-/**
- * Mueve el panel divisor que está a la derecha de la cabina `indice`, pero solo
- * a posiciones que se pueden ARMAR con piezas de catálogo.
- *
- * El ancho de una cabina es su puerta más lo que le toca de las pilastras de
- * cada lado. Al mover el divisor las pilastras no cambian, así que lo que se
- * reparte entre las dos cabinas es la suma de sus dos puertas, que es constante.
- * De ahí que las posiciones válidas sean pocas y concretas: los pares de puertas
- * de catálogo que suman ese total.
- *
- * Por eso una cabina de 80 cm entre pilastras de 24 no existe: pediría una
- * puerta de 56. Las que sí cierran ahí son 79 (puerta 55) y 84 (puerta 60), y el
- * arrastre salta entre esas, en vez de dibujar un ancho que no se fabrica.
- *
- * Si no hay ningún par posible —o si toca un orinal, que no lleva puerta— las
- * cabinas se devuelven como estaban.
- */
-export function moverDivisorConCatalogo(
+export function reajustarConPuertas(
   cabinas: Cabina[],
-  pilastras: number[] | undefined,
-  indice: number,
-  deltaCm: number,
-  anchoPilastraCm: number,
-  pais: Pais = 'CR',
-): Cabina[] {
+  claroCm: number,
+  murosPilastra: number,
+  extremoAbierto: boolean,
+): { cabinas: Cabina[]; pilastras: number[]; canaletaCm: number; ajuste: Tramo['ajuste']; mensaje: string } | null {
   const n = cabinas.length
-  const izqCab = cabinas[indice]
-  const derCab = cabinas[indice + 1]
-  if (!izqCab || !derCab) return cabinas
-  // un orinal no tiene puerta que estirar: su ancho es la pieza misma
-  if (izqCab.tipo === 'orinal' || derCab.tipo === 'orinal') return cabinas
+  if (n === 0) return null
 
-  const anchoPil = (j: number) => pilastras?.[j] ?? anchoPilastraCm
-  const parteIzq = (i: number) => (i === 0 ? anchoPil(0) : anchoPil(i) / 2)
-  const parteDer = (i: number) => (i === n - 1 ? anchoPil(n) : anchoPil(i + 1) / 2)
-
-  const marcoIzq = parteIzq(indice) + parteDer(indice)
-  const marcoDer = parteIzq(indice + 1) + parteDer(indice + 1)
-  // lo que hay para repartir entre las dos puertas
-  const suma = izqCab.anchoCm + derCab.anchoCm - marcoIzq - marcoDer
-
-  const lista = anchosPuerta(pais)
-  const posiblesDe = (c: Cabina) =>
-    c.tipo === 'accesible' ? lista.filter((a) => a >= 85) : lista
-  const puertasIzq = posiblesDe(izqCab)
-  const puertasDer = posiblesDe(derCab)
-
-  const deseado = izqCab.anchoCm + deltaCm
-  let mejor: { dIzq: number; dDer: number; ancho: number } | null = null
-  for (const dIzq of puertasIzq) {
-    const dDer = suma - dIzq
-    if (!puertasDer.includes(dDer)) continue
-    const ancho = marcoIzq + dIzq
-    if (ancho < minimoDe(izqCab)) continue
-    if (marcoDer + dDer < minimoDe(derCab)) continue
-    if (!mejor || Math.abs(ancho - deseado) < Math.abs(mejor.ancho - deseado)) {
-      mejor = { dIzq, dDer, ancho }
-    }
+  const cuerpos = cabinas.map((c) => (c.tipo === 'orinal' ? c.anchoCm : c.puerta.anchoCm))
+  const conPuerta = cabinas.filter((c) => c.tipo !== 'orinal').length
+  // entre dos orinales va mampara, no pilastra
+  let internas = 0
+  let grosorMG = 0
+  for (let i = 0; i < n - 1; i++) {
+    if (cabinas[i].tipo === 'orinal' && cabinas[i + 1].tipo === 'orinal') grosorMG += GRUESO_MG_PIEZA
+    else internas += 1
   }
-  if (!mejor) return cabinas
-  if (mejor.dIzq === izqCab.puerta.anchoCm) return cabinas
 
-  const elegido = mejor
-  return cabinas.map((c, i) => {
-    if (i === indice) {
-      return { ...c, anchoCm: marcoIzq + elegido.dIzq, puerta: { ...c.puerta, anchoCm: elegido.dIzq } }
-    }
-    if (i === indice + 1) {
-      return { ...c, anchoCm: marcoDer + elegido.dDer, puerta: { ...c.puerta, anchoCm: elegido.dDer } }
-    }
-    return c
+  const r = ajustarPilastras({
+    claroCm,
+    cuerpos: [...cuerpos, grosorMG],
+    conPuerta,
+    internas,
+    murosPilastra,
+    extremoAbierto,
   })
-}
+  if (!r) return null
 
-function conAnchoNuevo(c: Cabina, anchoCm: number): Cabina {
-  const ancho = snap(anchoCm)
-  const puertaCabe = c.puerta.anchoCm <= ancho - MARGEN_PUERTA_CM
+  // la lista lleva una entrada por frontera: donde va mampara, su grueso
+  const pilastras: number[] = [r.pilastras[0]]
+  let k = 1
+  for (let i = 0; i < n - 1; i++) {
+    const entreOrinales = cabinas[i].tipo === 'orinal' && cabinas[i + 1].tipo === 'orinal'
+    pilastras.push(entreOrinales ? GRUESO_MG_PIEZA : r.pilastras[k++])
+  }
+  pilastras.push(r.pilastras[r.pilastras.length - 1])
+
+  const nuevas = cabinas.map((c, i) => {
+    const izq = i === 0 ? pilastras[0] : pilastras[i] / 2
+    const der = i === n - 1 ? pilastras[n] : pilastras[i + 1] / 2
+    const cuerpo = c.tipo === 'orinal' ? c.anchoCm : c.puerta.anchoCm
+    return { ...c, anchoCm: izq + cuerpo + der }
+  })
+
   return {
-    ...c,
-    anchoCm: ancho,
-    puerta: puertaCabe ? c.puerta : { ...c.puerta, anchoCm: puertaSugerida(ancho) },
+    cabinas: nuevas,
+    pilastras,
+    canaletaCm: r.canaleta?.anchoCm ?? 0,
+    ajuste: r.ajuste,
+    mensaje: r.mensaje,
   }
 }
 

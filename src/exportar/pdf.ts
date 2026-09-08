@@ -163,9 +163,9 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
         const y = ay + dx * sen
         doc.addImage(dibujo.src, 'PNG', x, y, w, h, undefined, 'FAST', (-giro * 180) / Math.PI)
       }
-      if (cab.tipo === 'accesible' || cab.tipo === 'ambulatoria') {
+      if (cab.tipo === 'accesible' || cab.tipo === 'vacia') {
         const [cx, cy] = aHoja(e, pt(m, (u0 + u1) / 2, prof * 0.78))
-        texto(doc, cab.tipo === 'accesible' ? 'ACCESIBLE' : 'AMBULATORIA', cx, cy, { size: 5.5, align: 'center', color: GRIS })
+        texto(doc, cab.tipo === 'accesible' ? 'ACCESIBLE' : 'VACÍA', cx, cy, { size: 5.5, align: 'center', color: GRIS })
       }
 
       // La puerta cuelga de la PILASTRA, no del límite de la cabina: ese límite

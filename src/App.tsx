@@ -16,7 +16,7 @@ import VistaRender from './components/VistaRender'
 import ColoresMexico from './components/ColoresMexico'
 import { coloresMxPara, slugRenderMx } from './coloresMx'
 import { fotoDe, fotosHerraje, faltanFotosHerraje, terminacionesDe } from './renders'
-import { anchoTotal, bom, crearTramos, modular, modularConCatalogo, nuevoId, totalBOM } from './modulacion'
+import { anchoTotal, bom, crearTramos, modular, modularConCatalogo, nuevoId, reajustarConPuertas, totalBOM } from './modulacion'
 import { cargarTarifas, type ResultadoTarifas } from './tarifas'
 import { buscarActualizacion, type FaseActualizacion } from './actualizar'
 import { versionActual, VERSION_COMPILADA } from './version'
@@ -388,6 +388,30 @@ export default function App() {
     setPaso(7)
   }
 
+  /**
+   * Se cambió la puerta de una cabina —del menú o arrastrando su panel—. Las
+   * puertas mandan y las pilastras se reacomodan para que la tira siga cerrando
+   * contra el claro. Si no hay pilastras que cuadren, se deja lo que había.
+   */
+  function onPuerta(tramoId: string, indice: number, anchoPuertaCm: number) {
+    const t = area.tramos.find((x) => x.id === tramoId)
+    if (!t) return
+    const cabinas = t.cabinas.map((c, i) =>
+      i === indice ? { ...c, puerta: { ...c.puerta, anchoCm: anchoPuertaCm } } : c,
+    )
+    const muros = (t.muroInicio ? 1 : 0) + (t.muroFin ? 1 : 0)
+    const r = reajustarConPuertas(cabinas, t.claroCm, muros, muros < 2)
+    setArea({
+      tramos: area.tramos.map((x) =>
+        x.id !== tramoId
+          ? x
+          : r
+            ? { ...x, cabinas: r.cabinas, pilastras: r.pilastras, canaletaCm: r.canaletaCm, ajuste: r.ajuste, mensaje: r.mensaje }
+            : { ...x, cabinas },
+      ),
+    })
+  }
+
   function onCabinas(tramoId: string, cabinas: Cabina[]) {
     setArea({ tramos: area.tramos.map((t) => (t.id === tramoId ? { ...t, cabinas } : t)) })
   }
@@ -752,6 +776,7 @@ export default function App() {
                     onSeleccion={setSeleccion}
                     onCabinas={onCabinas}
                     onPilastra={onPilastra}
+                    onPuerta={onPuerta}
                   />
                 </div>
 

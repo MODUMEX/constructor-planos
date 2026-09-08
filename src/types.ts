@@ -23,7 +23,14 @@ export type Pais = 'CR' | 'MX'
 
 export type Montaje = 'PISO_HEADRAIL' | 'PISO' | 'PISO_TECHO'
 
-export type TipoCabina = 'normal' | 'accesible' | 'ambulatoria' | 'regadera' | 'orinal'
+/**
+ * Qué hay en cada cabina. 'vacia' es un hueco de la tira sin sanitario: se
+ * fabrica igual —lleva sus paneles y su puerta— pero no se le dibuja inodoro.
+ * Reemplaza a 'ambulatoria', que pedía 90 cm de ancho. Un proyecto viejo
+ * guardado con ese valor abre y se dibuja, pero pasa a comportarse como una
+ * cabina normal: pierde ese mínimo y su rótulo en el plano.
+ */
+export type TipoCabina = 'normal' | 'accesible' | 'vacia' | 'regadera' | 'orinal'
 
 export type TipoPuerta = 'puerta' | 'cortina' | 'ninguna'
 

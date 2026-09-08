@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import type { Cabina, Config, Pais, Tramo } from '../types'
 import { ANCHOS_PILASTRA, puertasPosibles, tipologia } from '../catalog'
-import { anchoTotal, minimoDe, moverDivisorConCatalogo, nuevaCabina, puertaSugerida, snap } from '../modulacion'
+import { anchoTotal, minimoDe, nuevaCabina, puertaSugerida, snap } from '../modulacion'
 import { medidaCercana, PILASTRAS_INTERNAS } from '../modulador'
 import { Grupo, Item, Menu, Raya } from './Menu'
 import { cajaDelPlano, ESPESOR_MURO, marcosDe, profundidadDeTramo, pt, SOBRA_MURO_CM, type Marco } from '../geometria'
@@ -42,6 +42,8 @@ interface Props {
   onCabinas: (tramoId: string, cabinas: Cabina[]) => void
   /** al arrastrar una pilastra: se elige su medida y el resto se reacomoda */
   onPilastra: (tramoId: string, indice: number, anchoCm: number) => void
+  /** al elegir una medida de puerta: manda la puerta y las pilastras se adaptan */
+  onPuerta: (tramoId: string, indice: number, anchoPuertaCm: number) => void
 }
 
 type MenuEstado =
@@ -60,6 +62,7 @@ export default function EditorPlano({
   onSeleccion,
   onCabinas,
   onPilastra,
+  onPuerta,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [menu, setMenu] = useState<MenuEstado>(null)
@@ -172,17 +175,17 @@ export default function EditorPlano({
     const dx = (e.clientX - a.x0) / a.escala
     const dy = (e.clientY - a.y0) / a.escala
     const deltaCm = dx * a.ax + dy * a.ay
-    // el divisor solo cae donde las dos cabinas se pueden armar con catálogo
-    const t = tramoPorId(a.tramoId)
-    const nuevas = moverDivisorConCatalogo(
-      a.cabinas,
-      t?.pilastras,
-      a.indice,
-      deltaCm,
-      config.anchoPilastraCm,
-      pais,
-    )
-    onCabinas(a.tramoId, nuevas)
+    // Arrastrar el panel agranda o achica la cabina de la izquierda: se le busca
+    // la medida de puerta de catálogo más cercana a lo que se pide y las
+    // pilastras se reacomodan solas para que la tira siga cerrando.
+    const cab = a.cabinas[a.indice]
+    if (!cab || cab.tipo === 'orinal') return
+    const lista = puertasPosibles(Infinity, pais)
+      .map((p) => p.ancho)
+      .filter((x) => (cab.tipo === 'accesible' ? x >= 85 : true))
+    const deseada = cab.puerta.anchoCm + deltaCm
+    const elegida = medidaCercana(lista, deseada)
+    if (elegida !== cab.puerta.anchoCm) onPuerta(a.tramoId, a.indice, elegida)
   }
 
   function terminarArrastre(e: React.PointerEvent) {
@@ -214,11 +217,11 @@ export default function EditorPlano({
     const izq = t.cabinas[indice]
     const der = t.cabinas[indice + 1]
     if (!izq || !der) return
-    const mitad = snap((izq.anchoCm + der.anchoCm) / 2)
-    onCabinas(
-      tramoId,
-      moverDivisorConCatalogo(t.cabinas, t.pilastras, indice, mitad - izq.anchoCm, config.anchoPilastraCm, pais),
-    )
+    // centrar es darle a las dos la misma puerta: la más cercana al promedio
+    const lista = puertasPosibles(Infinity, pais).map((p) => p.ancho)
+    const media = medidaCercana(lista, (izq.puerta.anchoCm + der.puerta.anchoCm) / 2)
+    if (media !== izq.puerta.anchoCm) onPuerta(tramoId, indice, media)
+    if (media !== der.puerta.anchoCm) onPuerta(tramoId, indice + 1, media)
   }
 
   function agregarCabina(tramoId: string, indice: number) {
@@ -638,7 +641,7 @@ export default function EditorPlano({
                   className={cab.puerta.anchoCm === ancho ? 'on' : ''}
                   disabled={!cabe}
                   title={cabe ? `Puerta de ${ancho} cm` : `No cabe en ${cab.anchoCm} cm`}
-                  onClick={() => { cambiarPuerta(menu.tramoId, menu.indice, { anchoCm: ancho }); cerrar() }}
+                  onClick={() => { onPuerta(menu.tramoId, menu.indice, ancho); cerrar() }}
                   type="button"
                 >
                   {ancho}
@@ -671,13 +674,12 @@ export default function EditorPlano({
             >
               Accesible {cab.anchoCm < 150 && cab.tipo !== 'accesible' ? '(necesita 150 cm)' : ''}
             </Item>
-            <Item activo={cab.tipo === 'ambulatoria'} onClick={() => { cambiarCabina(menu.tramoId, menu.indice, { tipo: 'ambulatoria' }); cerrar() }}>Ambulatoria</Item>
+            <Item activo={cab.tipo === 'vacia'} onClick={() => { cambiarCabina(menu.tramoId, menu.indice, { tipo: 'vacia', inodoro: false }); cerrar() }}>Vacía</Item>
             <Item activo={cab.tipo === 'regadera'} onClick={() => { cambiarCabina(menu.tramoId, menu.indice, { tipo: 'regadera', puerta: { ...cab.puerta, tipo: 'cortina' } }); cerrar() }}>Regadera</Item>
             <Item activo={cab.tipo === 'orinal'} onClick={() => { cambiarCabina(menu.tramoId, menu.indice, { tipo: 'orinal', puerta: { ...cab.puerta, tipo: 'ninguna' } }); cerrar() }}>Orinal</Item>
             <Raya />
             <Grupo>Puerta y sanitario</Grupo>
             <Item activo={cab.puerta.tipo === 'puerta'} onClick={() => { cambiarPuerta(menu.tramoId, menu.indice, { tipo: 'puerta' }); cerrar() }}>Con puerta</Item>
-            <Item activo={cab.puerta.tipo === 'cortina'} onClick={() => { cambiarPuerta(menu.tramoId, menu.indice, { tipo: 'cortina' }); cerrar() }}>Con cortina</Item>
             <Item activo={cab.puerta.tipo === 'ninguna'} onClick={() => { cambiarPuerta(menu.tramoId, menu.indice, { tipo: 'ninguna' }); cerrar() }}>Sin puerta</Item>
             <Item activo={cab.inodoro} onClick={() => { cambiarCabina(menu.tramoId, menu.indice, { inodoro: !cab.inodoro }); cerrar() }}>Dibujar inodoro</Item>
             <Raya />

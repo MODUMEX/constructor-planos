@@ -221,3 +221,101 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
     anchoCabinaAccesible: nAcc > 0 ? mejor.anchoAcc : null,
   }
 }
+
+export interface OpcionesPilastras {
+  claroCm: number
+  /**
+   * El cuerpo de cada cabina en orden: la puerta de las normales y de la
+   * accesible, o los 60 cm del orinal. Es lo que el vendedor ya eligió y NO se
+   * toca; lo que se busca son las pilastras que hagan cuadrar la tira.
+   */
+  cuerpos: number[]
+  /** cuántos de esos cuerpos llevan puerta: cada una suma su holgura de bisagra */
+  conPuerta: number
+  /** cuántas fronteras internas llevan pilastra (entre dos orinales va mampara) */
+  internas: number
+  murosPilastra: number
+  extremoAbierto?: boolean
+}
+
+export interface Pilastreo {
+  pilastras: number[]
+  total: number
+  claroAjustado: number
+  diferencia: number
+  ajuste: TipoAjuste
+  mensaje: string
+  canaleta: { anchoCm: number; codigo: string } | null
+}
+
+/**
+ * El camino inverso de `modularTira`: acá las PUERTAS ya están decididas —porque
+ * el vendedor eligió una del menú o arrastró un panel— y lo que se busca son las
+ * pilastras que hagan cerrar la tira contra el claro.
+ *
+ * Es lo que hace falta para que cambiar una puerta mueva el resto del dibujo. La
+ * otra salida, repartir el sobrante entre las puertas vecinas, casi nunca tiene
+ * solución: las puertas van de 5 en 5 cm y las pilastras internas ofrecen muchos
+ * más escalones, así que por acá casi siempre hay con qué cuadrar.
+ */
+export function ajustarPilastras(o: OpcionesPilastras): Pilastreo | null {
+  const internas = Math.max(0, o.internas)
+  const objetivo = calcularClaroAjustado(o.claroCm, o.murosPilastra, o.conPuerta)
+  const cuerpos = o.cuerpos.reduce((s, x) => s + x, 0)
+  const dosMuros = o.murosPilastra >= 2
+
+  const opInternas = internas > 0 ? PILASTRAS_INTERNAS : [0]
+  let mejor: { api: number; ae1: number; ae2: number; total: number; score: number } | null = null
+  for (const api of opInternas) {
+    for (const ae1 of PILASTRAS_EXTREMO) {
+      for (const ae2 of PILASTRAS_EXTREMO) {
+        const total = cuerpos + internas * api + ae1 + ae2
+        const dif = objetivo - total
+        const score = Math.abs(dif) + (dosMuros && total > objetivo ? (total - objetivo) * PENALIZA_PASARSE : 0)
+        if (!mejor || score < mejor.score) mejor = { api, ae1, ae2, total, score }
+      }
+    }
+  }
+  if (!mejor) return null
+
+  const diferencia = objetivo - mejor.total
+  const abs = Math.abs(diferencia)
+  const tolerancia = o.extremoAbierto ? 5 : 0.5 * o.murosPilastra
+
+  let ajuste: TipoAjuste
+  let mensaje: string
+  if (abs <= tolerancia) {
+    ajuste = 'exacto'
+    mensaje = abs > 0.5 ? `Calza; ${abs.toFixed(1)} cm los absorbe la instalación` : 'Calza exacto'
+  } else if (diferencia > 0 && abs <= CANALETA_MAX_CM) {
+    ajuste = 'canaleta'
+    mensaje = `Calza con canaleta de ${abs.toFixed(1)} cm (rellena el hueco)`
+  } else if (diferencia > 0) {
+    ajuste = 'sobra'
+    mensaje = `Con esas puertas queda un hueco de ${abs.toFixed(1)} cm: más de lo que rellena una canaleta`
+  } else {
+    ajuste = 'falta'
+    mensaje = `Con esas puertas las piezas se pasan ${abs.toFixed(1)} cm del claro`
+  }
+
+  const canaleta =
+    ajuste === 'canaleta'
+      ? (() => {
+          const ancho = Math.max(1, Math.min(CANALETA_MAX_CM, Math.ceil(abs)))
+          return { anchoCm: ancho, codigo: `CN0${ancho}` }
+        })()
+      : null
+
+  return {
+    pilastras: [mejor.ae1, ...Array(internas).fill(mejor.api), mejor.ae2],
+    total: mejor.total,
+    claroAjustado: objetivo,
+    diferencia,
+    ajuste,
+    mensaje,
+    canaleta,
+  }
+}
+
+/** el grueso de la mampara que separa dos orinales, en cm */
+export const GRUESO_MG_PIEZA = GRUESO_MG
