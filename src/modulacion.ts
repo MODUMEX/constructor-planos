@@ -191,6 +191,80 @@ export function moverDivisor(cabinas: Cabina[], indice: number, deltaCm: number)
   })
 }
 
+/**
+ * Mueve el panel divisor que está a la derecha de la cabina `indice`, pero solo
+ * a posiciones que se pueden ARMAR con piezas de catálogo.
+ *
+ * El ancho de una cabina es su puerta más lo que le toca de las pilastras de
+ * cada lado. Al mover el divisor las pilastras no cambian, así que lo que se
+ * reparte entre las dos cabinas es la suma de sus dos puertas, que es constante.
+ * De ahí que las posiciones válidas sean pocas y concretas: los pares de puertas
+ * de catálogo que suman ese total.
+ *
+ * Por eso una cabina de 80 cm entre pilastras de 24 no existe: pediría una
+ * puerta de 56. Las que sí cierran ahí son 79 (puerta 55) y 84 (puerta 60), y el
+ * arrastre salta entre esas, en vez de dibujar un ancho que no se fabrica.
+ *
+ * Si no hay ningún par posible —o si toca un orinal, que no lleva puerta— las
+ * cabinas se devuelven como estaban.
+ */
+export function moverDivisorConCatalogo(
+  cabinas: Cabina[],
+  pilastras: number[] | undefined,
+  indice: number,
+  deltaCm: number,
+  anchoPilastraCm: number,
+  pais: Pais = 'CR',
+): Cabina[] {
+  const n = cabinas.length
+  const izqCab = cabinas[indice]
+  const derCab = cabinas[indice + 1]
+  if (!izqCab || !derCab) return cabinas
+  // un orinal no tiene puerta que estirar: su ancho es la pieza misma
+  if (izqCab.tipo === 'orinal' || derCab.tipo === 'orinal') return cabinas
+
+  const anchoPil = (j: number) => pilastras?.[j] ?? anchoPilastraCm
+  const parteIzq = (i: number) => (i === 0 ? anchoPil(0) : anchoPil(i) / 2)
+  const parteDer = (i: number) => (i === n - 1 ? anchoPil(n) : anchoPil(i + 1) / 2)
+
+  const marcoIzq = parteIzq(indice) + parteDer(indice)
+  const marcoDer = parteIzq(indice + 1) + parteDer(indice + 1)
+  // lo que hay para repartir entre las dos puertas
+  const suma = izqCab.anchoCm + derCab.anchoCm - marcoIzq - marcoDer
+
+  const lista = anchosPuerta(pais)
+  const posiblesDe = (c: Cabina) =>
+    c.tipo === 'accesible' ? lista.filter((a) => a >= 85) : lista
+  const puertasIzq = posiblesDe(izqCab)
+  const puertasDer = posiblesDe(derCab)
+
+  const deseado = izqCab.anchoCm + deltaCm
+  let mejor: { dIzq: number; dDer: number; ancho: number } | null = null
+  for (const dIzq of puertasIzq) {
+    const dDer = suma - dIzq
+    if (!puertasDer.includes(dDer)) continue
+    const ancho = marcoIzq + dIzq
+    if (ancho < minimoDe(izqCab)) continue
+    if (marcoDer + dDer < minimoDe(derCab)) continue
+    if (!mejor || Math.abs(ancho - deseado) < Math.abs(mejor.ancho - deseado)) {
+      mejor = { dIzq, dDer, ancho }
+    }
+  }
+  if (!mejor) return cabinas
+  if (mejor.dIzq === izqCab.puerta.anchoCm) return cabinas
+
+  const elegido = mejor
+  return cabinas.map((c, i) => {
+    if (i === indice) {
+      return { ...c, anchoCm: marcoIzq + elegido.dIzq, puerta: { ...c.puerta, anchoCm: elegido.dIzq } }
+    }
+    if (i === indice + 1) {
+      return { ...c, anchoCm: marcoDer + elegido.dDer, puerta: { ...c.puerta, anchoCm: elegido.dDer } }
+    }
+    return c
+  })
+}
+
 function conAnchoNuevo(c: Cabina, anchoCm: number): Cabina {
   const ancho = snap(anchoCm)
   const puertaCabe = c.puerta.anchoCm <= ancho - MARGEN_PUERTA_CM

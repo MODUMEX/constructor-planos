@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import type { Cabina, Config, Pais, Tramo } from '../types'
 import { ANCHOS_PILASTRA, puertasPosibles, tipologia } from '../catalog'
-import { anchoTotal, minimoDe, moverDivisor, nuevaCabina, puertaSugerida, snap } from '../modulacion'
+import { anchoTotal, minimoDe, moverDivisorConCatalogo, nuevaCabina, puertaSugerida, snap } from '../modulacion'
 import { medidaCercana, PILASTRAS_INTERNAS } from '../modulador'
 import { Grupo, Item, Menu, Raya } from './Menu'
 import { cajaDelPlano, ESPESOR_MURO, marcosDe, profundidadDeTramo, pt, SOBRA_MURO_CM, type Marco } from '../geometria'
@@ -165,7 +165,16 @@ export default function EditorPlano({
     const dx = (e.clientX - a.x0) / a.escala
     const dy = (e.clientY - a.y0) / a.escala
     const deltaCm = dx * a.ax + dy * a.ay
-    const nuevas = moverDivisor(a.cabinas, a.indice, deltaCm)
+    // el divisor solo cae donde las dos cabinas se pueden armar con catálogo
+    const t = tramoPorId(a.tramoId)
+    const nuevas = moverDivisorConCatalogo(
+      a.cabinas,
+      t?.pilastras,
+      a.indice,
+      deltaCm,
+      config.anchoPilastraCm,
+      pais,
+    )
     onCabinas(a.tramoId, nuevas)
   }
 
@@ -198,9 +207,11 @@ export default function EditorPlano({
     const izq = t.cabinas[indice]
     const der = t.cabinas[indice + 1]
     if (!izq || !der) return
-    const suma = izq.anchoCm + der.anchoCm
-    const mitad = snap(suma / 2)
-    onCabinas(tramoId, moverDivisor(t.cabinas, indice, mitad - izq.anchoCm))
+    const mitad = snap((izq.anchoCm + der.anchoCm) / 2)
+    onCabinas(
+      tramoId,
+      moverDivisorConCatalogo(t.cabinas, t.pilastras, indice, mitad - izq.anchoCm, config.anchoPilastraCm, pais),
+    )
   }
 
   function agregarCabina(tramoId: string, indice: number) {
