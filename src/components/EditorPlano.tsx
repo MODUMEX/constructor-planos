@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import type { Cabina, Config, Pais, Tramo } from '../types'
 import { ANCHOS_PILASTRA, puertasPosibles, tipologia } from '../catalog'
 import { anchoTotal, minimoDe, nuevaCabina, puertaSugerida, snap } from '../modulacion'
-import { medidaCercana, PILASTRAS_INTERNAS } from '../modulador'
+import { medidaCercana, PILASTRAS_INTERNAS, PUERTA_ACCESIBLE_MIN } from '../modulador'
 import { Grupo, Item, Menu, Raya } from './Menu'
 import { cajaDelPlano, ESPESOR_MURO, marcosDe, profundidadDeTramo, pt, SOBRA_MURO_CM, type Marco } from '../geometria'
 import { ALTO_ORINAL_CM, ALTO_REGADERA_CM, ALTO_WC_CM, ORINAL, REGADERA, WC } from '../assets/sanitarios'
@@ -182,7 +182,7 @@ export default function EditorPlano({
     if (!cab || cab.tipo === 'orinal') return
     const lista = puertasPosibles(Infinity, pais)
       .map((p) => p.ancho)
-      .filter((x) => (cab.tipo === 'accesible' ? x >= 85 : true))
+      .filter((x) => (cab.tipo === 'accesible' ? x >= PUERTA_ACCESIBLE_MIN : true))
     const deseada = cab.puerta.anchoCm + deltaCm
     const elegida = medidaCercana(lista, deseada)
     if (elegida !== cab.puerta.anchoCm) onPuerta(a.tramoId, a.indice, elegida)
@@ -634,7 +634,9 @@ export default function EditorPlano({
           >
             <Grupo>Ancho de puerta</Grupo>
             <div className="anchos">
-              {puertasPosibles(cab.anchoCm, pais).map(({ ancho, cabe }) => (
+              {puertasPosibles(cab.anchoCm, pais)
+                .filter(({ ancho }) => (cab.tipo === 'accesible' ? ancho >= PUERTA_ACCESIBLE_MIN : true))
+                .map(({ ancho, cabe }) => (
                 <button
                   key={ancho}
                   className={cab.puerta.anchoCm === ancho ? 'on' : ''}

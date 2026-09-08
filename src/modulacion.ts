@@ -70,7 +70,7 @@ export function modularConCatalogo(
   cantidad: number,
   murosPilastra: number,
   extremoAbierto: boolean,
-  fijar?: { pilInterna?: number; pilExtremo?: number; puerta?: number },
+  fijar?: { pilInterna?: number; pilExtremo?: number; puerta?: number; puertaAccesible?: number },
   extra?: { accesible?: boolean; anchoAccesibleMinCm?: number; mingitorios?: number; anchoOrinalCm?: number; pais?: Pais },
 ): { cabinas: Cabina[]; pilastras: number[]; canaletaCm: number; ajuste: Tramo['ajuste']; mensaje: string; avisoAccesible?: string } | null {
   const conAcc = extra?.accesible === true
@@ -91,6 +91,7 @@ export function modularConCatalogo(
     murosPilastra,
     extremoAbierto,
     puertaFija: fijar?.puerta,
+    puertaAccesibleFija: fijar?.puertaAccesible,
     pilInternaFija: fijar?.pilInterna,
     pilExtremoFija: fijar?.pilExtremo,
   })
@@ -287,7 +288,7 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
     // ancha, así que sale del mismo buscador que las demás.
     // Si el cliente pidió una medida de puerta, esa manda: el buscador solo
     // puede mover las pilastras. Es la regla del negocio, no una preferencia.
-    const conCatalogo = modularConCatalogo(claroTramo, cant, muros, muros < 2, { puerta: config.puertaCm }, {
+    const conCatalogo = modularConCatalogo(claroTramo, cant, muros, muros < 2, { puerta: config.puertaCm, puertaAccesible: config.puertaAccesibleCm }, {
       accesible: conAccesible && esPrincipal,
       anchoAccesibleMinCm: config.anchoAccesibleCm,
       mingitorios: soloOrinales ? cant : 0,

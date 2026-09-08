@@ -398,9 +398,10 @@ export default function App() {
     if (!t) return
     // La medida que se elige acá queda PEDIDA para el área: si después se vuelve
     // a modular, esa es la puerta y lo que se mueve son las pilastras. La de la
-    // cabina accesible no cuenta, porque es más ancha por norma y no es la que
-    // el cliente pide para el resto del baño.
-    if (t.cabinas[indice]?.tipo === 'normal') setConfig({ puertaCm: anchoPuertaCm })
+    // cabina accesible se guarda aparte, porque es su propia medida.
+    const tipo = t.cabinas[indice]?.tipo
+    if (tipo === 'normal') setConfig({ puertaCm: anchoPuertaCm })
+    else if (tipo === 'accesible') setConfig({ puertaAccesibleCm: anchoPuertaCm })
     const cabinas = t.cabinas.map((c, i) =>
       i === indice ? { ...c, puerta: { ...c.puerta, anchoCm: anchoPuertaCm } } : c,
     )

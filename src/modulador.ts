@@ -67,6 +67,8 @@ export interface OpcionesModulacion {
   extremoAbierto?: boolean
   /** si el cliente pide una medida concreta de puerta */
   puertaFija?: number
+  /** la medida que se pidió para la puerta de la cabina accesible */
+  puertaAccesibleFija?: number
   /**
    * Fija el ancho de las pilastras internas y deja que el buscador reacomode
    * el resto. Es lo que pasa al arrastrar una pilastra: se elige su medida y
@@ -94,8 +96,11 @@ export interface OpcionesModulacion {
 /** ancho de un orinal y grueso de la mampara que los separa, en cm */
 const ANCHO_ORINAL = 60
 const GRUESO_MG = 1.27
-/** la puerta de una cabina accesible nunca baja de esta medida */
-const PUERTA_ACCESIBLE_MIN = 85
+/**
+ * La puerta de una cabina accesible nunca baja de esta medida. La ficha marca
+ * como accesibles 85, 90 y 100, pero la norma que aplica Modumex arranca en 90.
+ */
+export const PUERTA_ACCESIBLE_MIN = 90
 /**
  * Cuánto pesa quedarse corto en el ancho de la cabina accesible: es una medida
  * de accesibilidad, no una preferencia, así que pesa más que el gusto por la
@@ -128,7 +133,13 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
 
   const deCatalogo = o.catalogoPuertas && o.catalogoPuertas.length ? o.catalogoPuertas : ANCHOS_PUERTA
   const puertas = o.puertaFija ? [o.puertaFija] : deCatalogo
-  const puertasAcc = nAcc > 0 ? deCatalogo.filter((a) => a >= PUERTA_ACCESIBLE_MIN) : [0]
+  const accDeCatalogo = deCatalogo.filter((a) => a >= PUERTA_ACCESIBLE_MIN)
+  const puertasAcc =
+    nAcc > 0
+      ? o.puertaAccesibleFija && accDeCatalogo.includes(o.puertaAccesibleFija)
+        ? [o.puertaAccesibleFija]
+        : accDeCatalogo
+      : [0]
   const opInternas = internas > 0 ? (o.pilInternaFija ? [o.pilInternaFija] : PILASTRAS_INTERNAS) : [0]
   const opExtremos = o.pilExtremoFija ? [o.pilExtremoFija] : PILASTRAS_EXTREMO
   const objetivoAcc = nAcc > 0 ? (o.anchoAccesibleCm ?? 0) : 0

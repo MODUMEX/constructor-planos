@@ -128,6 +128,12 @@ export interface Config {
    * lo único que el buscador mueve son las pilastras.
    */
   puertaCm?: number
+  /**
+   * La medida pedida para la puerta de la cabina accesible, aparte de la de las
+   * cabinas normales. Se guarda al elegirla en el menú del plano y nunca baja
+   * de 90 cm, que es el mínimo de accesibilidad.
+   */
+  puertaAccesibleCm?: number
   anchoPilastraCm: number
   /** espesor del material de PT, PN y PL, en mm: 3 en Superior, 12 en compacto */
   espesorMm: number
