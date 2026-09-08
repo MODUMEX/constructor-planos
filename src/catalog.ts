@@ -285,8 +285,43 @@ export function anchosPuerta(pais: Pais = 'CR'): number[] {
 /** anchos de pilastra (familia PI) */
 export const ANCHOS_PILASTRA = [10, 12, 15, 17, 19, 24, 30, 35, 40, 45, 50, 55, 60, 70, 85, 90, 100, 120]
 
-/** anchos de panel divisor (familia PN); es la profundidad de la cabina */
-export const ANCHOS_PANEL = [55, 60, 85, 90, 95, 100, 110, 120, 130, 135, 140, 150, 165, 180]
+/**
+ * Anchos de panel divisor (familia PN); es la profundidad de la cabina.
+ *
+ * Los grandes NO existen en todos los modelos, y eso sale de las fichas de
+ * abril 2026: hasta 140 los tiene cualquiera, pero de ahí para arriba depende.
+ * Los de 170 —Estándar 170, Reforzado 170— y SCUDO llegan a 150; Imperial a
+ * 165; el resto llega a 180.
+ */
+const PANELES_HASTA_140 = [55, 60, 85, 90, 95, 100, 110, 120, 130, 135, 140]
+
+/** los anchos grandes que agrega cada modelo, por ficha */
+const PANELES_GRANDES: Record<string, number[]> = {
+  ESTANDAR: [150, 165, 180],
+  ESTANDAR170: [150],
+  REFORZADO: [150, 165, 180],
+  REFORZADO170: [150],
+  IMPERIAL: [150, 165],
+  REGADERAS: [150],
+  COLGANTE: [150, 165, 180],
+  KIDS: [150, 165, 180],
+  SCUDO: [150],
+  SUP_ESTANDAR: [150, 165, 180],
+  SUP_ESTANDAR170: [150],
+  SUP_REFORZADO: [150, 165, 180],
+  SUP_REFORZADO170: [150],
+  SUP_COLGANTE: [150, 165, 180],
+  TL_S3: [150, 165, 180],
+}
+
+/** todos los anchos de panel que existen, sin importar el modelo */
+export const ANCHOS_PANEL = [...PANELES_HASTA_140, 150, 165, 180]
+
+/** los anchos de panel que se pueden pedir en ese modelo */
+export function anchosPanel(modelo: string): number[] {
+  const grandes = PANELES_GRANDES[(modelo || '').toUpperCase()] ?? [150]
+  return [...PANELES_HASTA_140, ...grandes]
+}
 
 /**
  * Canaleta (familia CN): la pieza de relleno contra la pared. Solo entra cuando

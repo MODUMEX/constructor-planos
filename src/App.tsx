@@ -9,7 +9,7 @@ import { csvABytes, FILTRO_CSV, FILTRO_PDF, guardarArchivo } from './exportar/gu
 import { esAdmin, IVA_CR, type Usuario } from './auth'
 import type { Area, Cabina, Config, Pais, Proyecto, TipoCabina, TipologiaId } from './types'
 import {
-  ACABADOS, alturasDe, ANCHOS_PANEL, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, MG_MEDIDAS, MODELOS,
+  ACABADOS, alturasDe, anchosPanel, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, MG_MEDIDAS, MODELOS,
   PAISES, etiquetaTier, nombreHerraje, nombreModelo, tierDeColor, TIPOLOGIAS, tipologia, tipologiaEspejo,
 } from './catalog'
 import VistaRender from './components/VistaRender'
@@ -255,6 +255,8 @@ export default function App() {
   const alturas = alturasDe(config.modelo)
   // los proyectos viejos no traen la pregunta: ahí manda la tipología, como antes
   const llevaAccesible = config.llevaAccesible ?? config.tipologia === 'PMR'
+  // los paneles grandes no existen en todos los modelos
+  const panelesDelModelo = anchosPanel(config.modelo)
 
   /**
    * Tramos que no cerraron contra su claro. El buscador siempre devuelve la
@@ -316,20 +318,32 @@ export default function App() {
   function cambiarLinea(linea: Config['linea']) {
     const acabado = ACABADOS[linea][0]
     const modelo = MODELOS[linea][0].codigo
+    const paneles = anchosPanel(modelo)
     setConfig({
       linea,
       modelo,
       acabado,
       ...colorInicial(linea, acabado),
       alturaCm: alturasDe(modelo).puerta,
+      profundidadCm: paneles.includes(config.profundidadCm)
+        ? config.profundidadCm
+        : paneles[paneles.length - 1],
       // Superior 2.0 va en cara de 3 mm; el resto en compacto de 12
       espesorMm: espesorPorLinea(linea),
     })
   }
 
-  /** el modelo define la altura de las piezas, así que se cambian juntas */
+  /**
+   * El modelo define la altura de las piezas y también qué paneles existen, así
+   * que si la profundidad elegida no se fabrica en el modelo nuevo se baja al
+   * panel más grande que sí: mejor eso que dejar pedida una pieza inexistente.
+   */
   function elegirModelo(modelo: string) {
-    setConfig({ modelo, alturaCm: alturasDe(modelo).puerta })
+    const paneles = anchosPanel(modelo)
+    const profundidadCm = paneles.includes(config.profundidadCm)
+      ? config.profundidadCm
+      : paneles[paneles.length - 1]
+    setConfig({ modelo, alturaCm: alturasDe(modelo).puerta, profundidadCm })
   }
 
   /**
@@ -1127,7 +1141,7 @@ export default function App() {
                     <div className="campo">
                       <label>Profundidad de cabina (cm)</label>
                       <select value={config.profundidadCm} onChange={(e) => setConfig({ profundidadCm: Number(e.target.value) })}>
-                        {ANCHOS_PANEL.map((a) => (
+                        {panelesDelModelo.map((a) => (
                           <option key={a} value={a}>{a}</option>
                         ))}
                       </select>
