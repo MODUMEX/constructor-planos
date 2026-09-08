@@ -9,7 +9,7 @@ import { csvABytes, FILTRO_CSV, FILTRO_PDF, guardarArchivo } from './exportar/gu
 import { esAdmin, IVA_CR, type Usuario } from './auth'
 import type { Area, Cabina, Config, Pais, Proyecto, TipoCabina, TipologiaId } from './types'
 import {
-  ACABADOS, alturasDe, anchosPanel, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, MG_MEDIDAS, MODELOS,
+  ACABADOS, alturasDe, anchosPanel, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, mgMedidas, MODELOS,
   PAISES, etiquetaTier, nombreHerraje, nombreModelo, tierDeColor, TIPOLOGIAS, tipologia, tipologiaEspejo,
 } from './catalog'
 import VistaRender from './components/VistaRender'
@@ -257,6 +257,8 @@ export default function App() {
   const llevaAccesible = config.llevaAccesible ?? config.tipologia === 'PMR'
   // los paneles grandes no existen en todos los modelos
   const panelesDelModelo = anchosPanel(config.modelo)
+  // las mamparas de orinal también cambian por línea
+  const mgDeLaLinea = mgMedidas(config.linea)
 
   /**
    * Tramos que no cerraron contra su claro. El buscador siempre devuelve la
@@ -319,9 +321,12 @@ export default function App() {
     const acabado = ACABADOS[linea][0]
     const modelo = MODELOS[linea][0].codigo
     const paneles = anchosPanel(modelo)
+    const mg = mgMedidas(linea)
+    const mgSigue = mg.some((m) => m.anchoCm === (config.mgAnchoCm ?? 60) && m.altoCm === config.mgAlturaCm)
     setConfig({
       linea,
       modelo,
+      ...(mgSigue ? {} : { mgAnchoCm: mg[0].anchoCm, mgAlturaCm: mg[0].altoCm }),
       acabado,
       ...colorInicial(linea, acabado),
       alturaCm: alturasDe(modelo).puerta,
@@ -1200,13 +1205,13 @@ export default function App() {
                               setConfig({ mgAnchoCm: ancho, mgAlturaCm: alto })
                             }}
                           >
-                            {MG_MEDIDAS.map((m) => (
+                            {mgDeLaLinea.map((m) => (
                               <option key={`${m.anchoCm}x${m.altoCm}`} value={`${m.anchoCm}x${m.altoCm}`}>
                                 {m.anchoCm} × {m.altoCm}
                               </option>
                             ))}
                           </select>
-                          <span className="ayuda">Fondo × alto; la de 45 solo viene en 120</span>
+                          <span className="ayuda">Fondo × alto; solo las que fabrica {config.linea === 'SUPERIOR' ? 'Superior 2.0' : config.linea === 'TOUCHLESS' ? 'Touchless S3' : 'LEEDER'}</span>
                         </div>
                       </>
                     )}

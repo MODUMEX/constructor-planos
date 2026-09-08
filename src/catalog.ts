@@ -329,14 +329,33 @@ export function anchosPanel(modelo: string): number[] {
  * falta material; si las piezas se pasan, no cabe (la canaleta no recorta).
  */
 /**
- * Mamparas de mingitorio (familia MG). La ficha da TRES medidas y no todas las
- * combinaciones existen: la de 45 solo viene en 120 de alto.
+ * Mamparas de mingitorio (familia MG). No todas las combinaciones existen —la
+ * de 45 solo viene en 120 de alto— y además cambian por línea: la ficha de
+ * Superior 2.0 solo trae 45×120 y 60×150, sin la de 60×120.
+ *
+ * La ficha de Touchless S3 no trae tabla de mingitorios; como su cuerpo es el
+ * del LEEDER Reforzado, se le dan las mismas tres.
  */
-export const MG_MEDIDAS: { anchoCm: number; altoCm: number }[] = [
+export interface MedidaMG {
+  anchoCm: number
+  altoCm: number
+}
+
+export const MG_MEDIDAS: MedidaMG[] = [
   { anchoCm: 45, altoCm: 120 },
   { anchoCm: 60, altoCm: 120 },
   { anchoCm: 60, altoCm: 150 },
 ]
+
+const MG_SUPERIOR: MedidaMG[] = [
+  { anchoCm: 45, altoCm: 120 },
+  { anchoCm: 60, altoCm: 150 },
+]
+
+/** las mamparas de mingitorio que existen en esa línea */
+export function mgMedidas(linea: Linea): MedidaMG[] {
+  return linea === 'SUPERIOR' ? MG_SUPERIOR : MG_MEDIDAS
+}
 
 export const ANCHOS_CANALETA = [1, 2, 3, 4, 5]
 export const CANALETA_MAX_CM = 5
