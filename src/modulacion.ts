@@ -285,7 +285,9 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
     const muros = murosT
     // La cabina accesible ya no tiene camino aparte: es una cabina con puerta
     // ancha, así que sale del mismo buscador que las demás.
-    const conCatalogo = modularConCatalogo(claroTramo, cant, muros, muros < 2, undefined, {
+    // Si el cliente pidió una medida de puerta, esa manda: el buscador solo
+    // puede mover las pilastras. Es la regla del negocio, no una preferencia.
+    const conCatalogo = modularConCatalogo(claroTramo, cant, muros, muros < 2, { puerta: config.puertaCm }, {
       accesible: conAccesible && esPrincipal,
       anchoAccesibleMinCm: config.anchoAccesibleCm,
       mingitorios: soloOrinales ? cant : 0,

@@ -121,6 +121,12 @@ export interface Config {
   alturaCm: number
   profundidadCm: number
   anchoAccesibleCm: number
+  /**
+   * La medida de puerta que pidió el cliente, en cm. La modulación gira en
+   * torno a ella: si está puesta, las puertas NO se tocan y lo único que el
+   * buscador mueve son las pilastras. Sin ella, elige también la puerta.
+   */
+  puertaCm?: number
   anchoPilastraCm: number
   /** espesor del material de PT, PN y PL, en mm: 3 en Superior, 12 en compacto */
   espesorMm: number

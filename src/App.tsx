@@ -9,7 +9,7 @@ import { csvABytes, FILTRO_CSV, FILTRO_PDF, guardarArchivo } from './exportar/gu
 import { esAdmin, IVA_CR, type Usuario } from './auth'
 import type { Area, Cabina, Config, Pais, Proyecto, TipoCabina, TipologiaId } from './types'
 import {
-  ACABADOS, alturasDe, anchosPanel, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, mgMedidas, MODELOS,
+  ACABADOS, alturasDe, anchosPanel, anchosPuerta, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, mgMedidas, MODELOS,
   PAISES, etiquetaTier, nombreHerraje, nombreModelo, tierDeColor, TIPOLOGIAS, tipologia, tipologiaEspejo,
 } from './catalog'
 import VistaRender from './components/VistaRender'
@@ -1163,6 +1163,23 @@ export default function App() {
                           <option key={n} value={n}>{n}</option>
                         ))}
                       </select>
+                    </div>
+                    <div className="campo">
+                      <label>Medida de puerta (cm)</label>
+                      <select
+                        value={config.puertaCm ?? ''}
+                        onChange={(e) => setConfig({ puertaCm: e.target.value ? Number(e.target.value) : undefined })}
+                      >
+                        <option value="">La elige la app</option>
+                        {anchosPuerta(proyecto.paisFabricacion).map((p) => (
+                          <option key={p} value={p}>{p}</option>
+                        ))}
+                      </select>
+                      <span className="ayuda">
+                        {config.puertaCm
+                          ? 'Las puertas quedan fijas: solo se mueven las pilastras'
+                          : 'Sin medida pedida, el buscador también elige la puerta'}
+                      </span>
                     </div>
                     <div className="campo">
                       <label>Profundidad de cabina (cm)</label>
