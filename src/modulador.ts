@@ -75,6 +75,8 @@ export interface OpcionesModulacion {
    * las demás piezas se adaptan para que la tira siga cuadrando.
    */
   pilInternaFija?: number
+  /** qué posición movió el vendedor: solo esa se clava, el resto se reparte */
+  pilastraFijaIndice?: number
   /** lo mismo para las pilastras de los extremos */
   pilExtremoFija?: number
   /** las medidas de puerta que se pueden usar; por omisión, las de catálogo */
@@ -170,11 +172,35 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
   }
   if (!mejor) return null
 
-  const diferencia = objetivo - mejor.total
-  const abs = Math.abs(diferencia)
-  // el herraje de cada pilastra a muro absorbe medio centímetro; un extremo
-  // abierto (L o E) se come hasta 5 cm sin necesidad de canaleta
+  // La tolerancia: el herraje de cada pilastra a muro absorbe medio centímetro,
+  // y un extremo abierto (L o E) se come hasta 5 cm sin canaleta.
   const tolerancia = o.extremoAbierto ? 5 : 0.5 * o.murosPilastra
+
+  // Las pilastras no tienen que ser todas iguales. Si la tira ya cierra con
+  // internas parejas se deja así —es como sale el despiece de planta—, pero si
+  // no cierra se mezclan medidas del catálogo antes que dejar una canaleta.
+  const cuerpos = nEst * mejor.ap + nAcc * mejor.acc + fijoMG
+  const clavadas: (number | null)[] = Array(internas + 2).fill(null)
+  const iFija = o.pilastraFijaIndice
+  if (iFija !== undefined && iFija >= 0 && iFija < clavadas.length) {
+    clavadas[iFija] = (iFija === 0 || iFija === clavadas.length - 1 ? o.pilExtremoFija : o.pilInternaFija) ?? null
+  } else if (o.pilInternaFija || o.pilExtremoFija) {
+    // sin saber cuál movió, se respeta la medida en todas las de su clase
+    for (let i = 0; i < clavadas.length; i++) {
+      const ext = i === 0 || i === clavadas.length - 1
+      clavadas[i] = (ext ? o.pilExtremoFija : o.pilInternaFija) ?? null
+    }
+  }
+  if (nAcc > 0 && objetivoAcc > 0 && clavadas[0] === null) clavadas[0] = mejor.ae1
+  const uniformeCalza = Math.abs(objetivo - mejor.total) <= tolerancia
+  const repartidas = uniformeCalza
+    ? null
+    : repartirPilastras(objetivo - cuerpos, internas, PILASTRAS_INTERNAS, PILASTRAS_EXTREMO, clavadas)
+  const pilastras = repartidas ?? [mejor.ae1, ...Array(internas).fill(mejor.api), mejor.ae2]
+
+  const totalReal = repartidas ? cuerpos + repartidas.reduce((x, y) => x + y, 0) : mejor.total
+  const diferencia = objetivo - totalReal
+  const abs = Math.abs(diferencia)
 
   let ajuste: TipoAjuste
   let mensaje: string
@@ -213,15 +239,14 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
     canaletaFinal = null
   }
 
-  const pilastras = [mejor.ae1, ...Array(internas).fill(mejor.api), mejor.ae2]
 
   return {
     anchoPuerta: mejor.ap,
-    anchoPilInterna: mejor.api,
-    anchoPilExtremo1: mejor.ae1,
-    anchoPilExtremo2: mejor.ae2,
+    anchoPilInterna: pilastras[1] ?? mejor.api,
+    anchoPilExtremo1: pilastras[0],
+    anchoPilExtremo2: pilastras[pilastras.length - 1],
     pilastras,
-    total: mejor.total,
+    total: totalReal,
     claroAjustado: objetivo,
     diferencia,
     ajuste: ajusteFinal,
@@ -229,7 +254,10 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
     canaleta: canaletaFinal,
     anchoPuertaAccesible: mejor.acc || null,
     anchoOrinal: nMing > 0 ? anchoOrinal : null,
-    anchoCabinaAccesible: nAcc > 0 ? mejor.anchoAcc : null,
+    anchoCabinaAccesible:
+      nAcc > 0
+        ? pilastras[0] + mejor.acc + (internas > 0 ? pilastras[1] / 2 : pilastras[pilastras.length - 1])
+        : null,
   }
 }
 
@@ -247,6 +275,8 @@ export interface OpcionesPilastras {
   internas: number
   murosPilastra: number
   extremoAbierto?: boolean
+  /** pilastras ya clavadas a mano, una entrada por posición (null = libre) */
+  fijas?: (number | null | undefined)[]
 }
 
 export interface Pilastreo {
@@ -289,9 +319,34 @@ export function ajustarPilastras(o: OpcionesPilastras): Pilastreo | null {
   }
   if (!mejor) return null
 
+  const tolerancia = o.extremoAbierto ? 5 : 0.5 * o.murosPilastra
+
+  // Si con internas parejas no cierra, se mezclan medidas antes de recurrir a
+  // la canaleta: las pilastras no tienen por qué medir todas lo mismo.
+  if (Math.abs(objetivo - mejor.total) > tolerancia) {
+    const mezcla = repartirPilastras(
+      objetivo - cuerpos, internas, PILASTRAS_INTERNAS, PILASTRAS_EXTREMO, o.fijas,
+    )
+    if (mezcla) {
+      const total = cuerpos + mezcla.reduce((x, y) => x + y, 0)
+      const dif = objetivo - total
+      const d = Math.abs(dif)
+      if (d <= tolerancia) {
+        return {
+          pilastras: mezcla,
+          total,
+          claroAjustado: objetivo,
+          diferencia: dif,
+          ajuste: 'exacto',
+          mensaje: d > 0.05 ? `Calza; ${d.toFixed(1)} cm los absorbe la instalación` : 'Calza exacto',
+          canaleta: null,
+        }
+      }
+    }
+  }
+
   const diferencia = objetivo - mejor.total
   const abs = Math.abs(diferencia)
-  const tolerancia = o.extremoAbierto ? 5 : 0.5 * o.murosPilastra
 
   let ajuste: TipoAjuste
   let mensaje: string
@@ -330,3 +385,94 @@ export function ajustarPilastras(o: OpcionesPilastras): Pilastreo | null {
 
 /** el grueso de la mampara que separa dos orinales, en cm */
 export const GRUESO_MG_PIEZA = GRUESO_MG
+
+/**
+ * Reparte una suma de pilastras entre N posiciones usando medidas de catálogo,
+ * SIN obligarlas a ser todas iguales.
+ *
+ * Una tira no tiene por qué llevar la misma pilastra en todas las fronteras: en
+ * los planos reales conviven una de 10 en un extremo con una de 24 en el otro, y
+ * las internas cambian entre sí para que la tira cierre exacto. Antes el buscador
+ * usaba una sola medida para todas las internas y por eso muchas tiras cerraban
+ * con canaleta o con sobrante cuando sí había combinación exacta.
+ *
+ * Se resuelve por programación dinámica sobre la suma, que con 16 pilastras y
+ * medio millar de centímetros es instantáneo. De todas las combinaciones que dan
+ * la suma se elige la más PAREJA: en cada posición se prueban primero las
+ * medidas más cercanas al reparto uniforme, así el resultado no sale caprichoso.
+ */
+export function repartirPilastras(
+  totalCm: number,
+  internas: number,
+  opcionesInternas: number[] = PILASTRAS_INTERNAS,
+  opcionesExtremo: number[] = PILASTRAS_EXTREMO,
+  /** posiciones que el vendedor ya clavó a mano y no se pueden mover */
+  fijas?: (number | null | undefined)[],
+): number[] | null {
+  const posiciones = internas + 2
+  if (posiciones < 2) return null
+  const objetivo = Math.round(totalCm)
+  if (objetivo <= 0) return null
+
+  // Se va abriendo la mano: primero se intenta con las medidas más parecidas
+  // entre sí y solo si no hay combinación se admiten más distintas. Así la tira
+  // sale lo más pareja que el catálogo permita, en vez de mezclar una de 24 con
+  // una de 85 pudiendo cerrar con dos de 50.
+  const sumaFija = (fijas ?? []).reduce<number>((s, v, i) => (v && i < posiciones ? s + v : s), 0)
+  const libresInternas = internas - (fijas ?? []).filter((v, i) => v && i > 0 && i < posiciones - 1).length
+  const centro =
+    libresInternas > 0 ? (objetivo - sumaFija - 2 * opcionesExtremo[0]) / libresInternas : 0
+  const internasOrden = [...opcionesInternas].sort((a, b) => Math.abs(a - centro) - Math.abs(b - centro))
+  const extremosOrden = [...opcionesExtremo].sort((a, b) => a - b)
+
+  for (let apertura = 1; apertura <= internasOrden.length; apertura++) {
+    const permitidas = internasOrden.slice(0, apertura)
+    const salida = armar(objetivo, posiciones, permitidas, extremosOrden, centro, fijas)
+    if (salida) return salida
+  }
+  return null
+}
+
+/** busca una combinación exacta para esa suma; null si no existe */
+function armar(
+  objetivo: number,
+  posiciones: number,
+  internas: number[],
+  extremos: number[],
+  centro: number,
+  fijas?: (number | null | undefined)[],
+): number[] | null {
+  const opciones: number[][] = []
+  for (let i = 0; i < posiciones; i++) {
+    const clavada = fijas?.[i]
+    if (clavada) { opciones.push([clavada]); continue }
+    const esExtremo = i === 0 || i === posiciones - 1
+    opciones.push(esExtremo ? extremos : internas)
+  }
+
+  // alcanzable[i] = sumas que se pueden armar con las posiciones i..final
+  const alcanzable: Set<number>[] = Array.from({ length: posiciones + 1 }, () => new Set<number>())
+  alcanzable[posiciones].add(0)
+  for (let i = posiciones - 1; i >= 0; i--) {
+    for (const resto of alcanzable[i + 1]) {
+      for (const v of opciones[i]) {
+        const s = resto + v
+        if (s <= objetivo) alcanzable[i].add(s)
+      }
+    }
+  }
+  if (!alcanzable[0].has(objetivo)) return null
+
+  const salida: number[] = []
+  let falta = objetivo
+  for (let i = 0; i < posiciones; i++) {
+    const esExtremo = i === 0 || i === posiciones - 1
+    const meta = esExtremo ? extremos[0] : centro
+    const orden = [...opciones[i]].sort((a, b) => Math.abs(a - meta) - Math.abs(b - meta))
+    const elegida = orden.find((v) => v <= falta && alcanzable[i + 1].has(falta - v))
+    if (elegida === undefined) return null
+    salida.push(elegida)
+    falta -= elegida
+  }
+  return salida
+}

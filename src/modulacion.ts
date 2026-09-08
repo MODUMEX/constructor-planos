@@ -70,7 +70,14 @@ export function modularConCatalogo(
   cantidad: number,
   murosPilastra: number,
   extremoAbierto: boolean,
-  fijar?: { pilInterna?: number; pilExtremo?: number; puerta?: number; puertaAccesible?: number },
+  fijar?: {
+    pilInterna?: number
+    pilExtremo?: number
+    puerta?: number
+    puertaAccesible?: number
+    /** cuál pilastra movió el vendedor: solo esa queda clavada */
+    pilastraIndice?: number
+  },
   extra?: { accesible?: boolean; anchoAccesibleMinCm?: number; mingitorios?: number; anchoOrinalCm?: number; pais?: Pais },
 ): { cabinas: Cabina[]; pilastras: number[]; canaletaCm: number; ajuste: Tramo['ajuste']; mensaje: string; avisoAccesible?: string } | null {
   const conAcc = extra?.accesible === true
@@ -94,6 +101,7 @@ export function modularConCatalogo(
     puertaAccesibleFija: fijar?.puertaAccesible,
     pilInternaFija: fijar?.pilInterna,
     pilExtremoFija: fijar?.pilExtremo,
+    pilastraFijaIndice: fijar?.pilastraIndice,
   })
   if (!m) return null
 

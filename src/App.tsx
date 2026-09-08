@@ -446,6 +446,8 @@ export default function App() {
       {
         pilInterna: extremo ? undefined : anchoCm,
         pilExtremo: extremo ? anchoCm : undefined,
+        // solo la que movió queda clavada: las demás se reparten solas
+        pilastraIndice: indice,
         // las puertas ya elegidas NO se tocan: mover una pilastra mueve pilastras
         puerta: config.puertaCm ?? t.cabinas.find((c) => c.tipo === 'normal')?.puerta.anchoCm,
         puertaAccesible:
