@@ -333,8 +333,8 @@ export function anchosPanel(modelo: string): number[] {
  * de 45 solo viene en 120 de alto— y además cambian por línea: la ficha de
  * Superior 2.0 solo trae 45×120 y 60×150, sin la de 60×120.
  *
- * La ficha de Touchless S3 no trae tabla de mingitorios; como su cuerpo es el
- * del LEEDER Reforzado, se le dan las mismas tres.
+ * La ficha de Touchless S3 no trae tabla de mingitorios: Dayanna confirmó el
+ * 8-sep-2026 que sigue a LEEDER, o sea las mismas tres. No es una suposición.
  */
 export interface MedidaMG {
   anchoCm: number
