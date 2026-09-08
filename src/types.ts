@@ -130,8 +130,8 @@ export interface Config {
   puertaCm?: number
   /**
    * La medida pedida para la puerta de la cabina accesible, aparte de la de las
-   * cabinas normales. Se guarda al elegirla en el menú del plano y nunca baja
-   * de 90 cm, que es el mínimo de accesibilidad.
+   * cabinas normales. Se guarda al elegirla en el menú del plano y sale de las
+   * que la ficha marca como accesibles: 85, 90 y 100 cm.
    */
   puertaAccesibleCm?: number
   anchoPilastraCm: number

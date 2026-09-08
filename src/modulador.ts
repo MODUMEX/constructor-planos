@@ -97,10 +97,10 @@ export interface OpcionesModulacion {
 const ANCHO_ORINAL = 60
 const GRUESO_MG = 1.27
 /**
- * La puerta de una cabina accesible nunca baja de esta medida. La ficha marca
- * como accesibles 85, 90 y 100, pero la norma que aplica Modumex arranca en 90.
+ * La puerta de una cabina accesible nunca baja de esta medida: la ficha de abril
+ * 2026 marca con el símbolo de accesibilidad las de 85, 90 y 100 cm.
  */
-export const PUERTA_ACCESIBLE_MIN = 90
+export const PUERTA_ACCESIBLE_MIN = 85
 /**
  * Cuánto pesa quedarse corto en el ancho de la cabina accesible: es una medida
  * de accesibilidad, no una preferencia, así que pesa más que el gusto por la
