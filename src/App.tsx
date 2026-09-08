@@ -824,11 +824,7 @@ export default function App() {
                           </span>
                           <b>
                             {formatear(c.anchoCm, unidad)}
-                            {c.puerta.tipo === 'puerta' && c.tipo !== 'orinal'
-                              ? ` / PT${c.puerta.anchoCm}`
-                              : c.puerta.tipo === 'cortina'
-                                ? ' / cortina'
-                                : ''}
+                            {c.puerta.tipo === 'puerta' && c.tipo !== 'orinal' ? ` / PT${c.puerta.anchoCm}` : ''}
                           </b>
                         </div>
                       ))}

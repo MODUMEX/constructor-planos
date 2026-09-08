@@ -429,9 +429,8 @@ export default function EditorPlano({
                           />
                           <line
                             x1={pivote.x} y1={pivote.y} x2={extremo.x} y2={extremo.y}
-                            stroke={cab.puerta.tipo === 'cortina' ? '#7c8ea1' : '#2a4c8f'}
+                            stroke="#2a4c8f"
                             strokeWidth={2.6}
-                            strokeDasharray={cab.puerta.tipo === 'cortina' ? '6 4' : undefined}
                             strokeLinecap="round"
                           />
                           <circle cx={pivote.x} cy={pivote.y} r={2.6} fill="#2a4c8f" />
@@ -675,7 +674,7 @@ export default function EditorPlano({
               Accesible {cab.anchoCm < 150 && cab.tipo !== 'accesible' ? '(necesita 150 cm)' : ''}
             </Item>
             <Item activo={cab.tipo === 'vacia'} onClick={() => { cambiarCabina(menu.tramoId, menu.indice, { tipo: 'vacia', inodoro: false }); cerrar() }}>Vacía</Item>
-            <Item activo={cab.tipo === 'regadera'} onClick={() => { cambiarCabina(menu.tramoId, menu.indice, { tipo: 'regadera', puerta: { ...cab.puerta, tipo: 'cortina' } }); cerrar() }}>Regadera</Item>
+            <Item activo={cab.tipo === 'regadera'} onClick={() => { cambiarCabina(menu.tramoId, menu.indice, { tipo: 'regadera' }); cerrar() }}>Regadera</Item>
             <Item activo={cab.tipo === 'orinal'} onClick={() => { cambiarCabina(menu.tramoId, menu.indice, { tipo: 'orinal', puerta: { ...cab.puerta, tipo: 'ninguna' } }); cerrar() }}>Orinal</Item>
             <Raya />
             <Grupo>Puerta y sanitario</Grupo>

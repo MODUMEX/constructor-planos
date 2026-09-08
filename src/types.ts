@@ -32,7 +32,11 @@ export type Montaje = 'PISO_HEADRAIL' | 'PISO' | 'PISO_TECHO'
  */
 export type TipoCabina = 'normal' | 'accesible' | 'vacia' | 'regadera' | 'orinal'
 
-export type TipoPuerta = 'puerta' | 'cortina' | 'ninguna'
+/**
+ * Las regaderas también llevan puerta: la cortina no es una opción del
+ * catálogo. Un proyecto viejo guardado con 'cortina' se dibuja como puerta.
+ */
+export type TipoPuerta = 'puerta' | 'ninguna'
 
 export type Apertura = 'adentro' | 'afuera'
 
