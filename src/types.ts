@@ -92,6 +92,13 @@ export interface Tramo {
   ajuste?: 'exacto' | 'canaleta' | 'sobra' | 'falta'
   /** lo mismo, explicado para el vendedor */
   mensaje?: string
+  /**
+   * Cuánto se corrió cada panel sobre SU pilastra, en cm, con 0 = centrado.
+   * Una entrada por frontera interna. Va aparte del ancho de las cabinas
+   * porque de esos anchos salen las posiciones de las pilastras: si el
+   * corrimiento se metiera ahí, la pilastra se movería con el panel.
+   */
+  desplazaPanel?: number[]
   /** cuando la cabina accesible no llegó al ancho pedido, por qué */
   avisoAccesible?: string
 }

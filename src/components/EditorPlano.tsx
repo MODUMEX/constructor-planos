@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import type { Cabina, Config, Pais, Tramo } from '../types'
 import { ANCHOS_PILASTRA, puertasPosibles, tipologia } from '../catalog'
-import { anchoTotal, minimoDe, moverPanelEnPilastra, nuevaCabina, puertaSugerida, snap } from '../modulacion'
+import { anchoTotal, minimoDe, nuevaCabina, puertaSugerida, snap } from '../modulacion'
 import { medidaCercana, PILASTRAS_INTERNAS, PUERTA_ACCESIBLE_MIN } from '../modulador'
 import { Grupo, Item, Menu, Raya } from './Menu'
 import { cajaDelPlano, ESPESOR_MURO, marcosDe, profundidadDeTramo, pt, SOBRA_MURO_CM, type Marco } from '../geometria'
@@ -44,6 +44,8 @@ interface Props {
   onPilastra: (tramoId: string, indice: number, anchoCm: number) => void
   /** al elegir una medida de puerta: manda la puerta y las pilastras se adaptan */
   onPuerta: (tramoId: string, indice: number, anchoPuertaCm: number) => void
+  /** al arrastrar un panel: se corre sobre su pilastra, sin tocar ninguna pieza */
+  onDesplazarPanel: (tramoId: string, indice: number, desplazaCm: number) => void
 }
 
 type MenuEstado =
@@ -63,6 +65,7 @@ export default function EditorPlano({
   onCabinas,
   onPilastra,
   onPuerta,
+  onDesplazarPanel,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [menu, setMenu] = useState<MenuEstado>(null)
@@ -176,13 +179,14 @@ export default function EditorPlano({
     const dy = (e.clientY - a.y0) / a.escala
     const deltaCm = dx * a.ax + dy * a.ay
     // Arrastrar el panel lo corre SOBRE su pilastra: centrado o un poco hacia
-    // un lado. No cambia la puerta ni la pilastra, que son las piezas que se
-    // fabrican; solo cambia el claro libre de las dos cabinas vecinas.
+    // un lado. No cambia ninguna pieza —ni la puerta ni la pilastra— ni la
+    // posición de la pilastra: solo se mueve el panel dentro de su cara.
     const t = tramoPorId(a.tramoId)
-    onCabinas(
-      a.tramoId,
-      moverPanelEnPilastra(a.cabinas, t?.pilastras, a.indice, deltaCm, config.anchoPilastraCm, grueso),
-    )
+    const anchoPil = t?.pilastras?.[a.indice + 1] ?? config.anchoPilastraCm
+    const tope = Math.max(0, anchoPil / 2 - grueso / 2)
+    const previo = t?.desplazaPanel?.[a.indice] ?? 0
+    const corrido = Math.max(-tope, Math.min(tope, snap(previo + deltaCm)))
+    if (corrido !== previo) onDesplazarPanel(a.tramoId, a.indice, corrido)
   }
 
   function terminarArrastre(e: React.PointerEvent) {
@@ -215,10 +219,7 @@ export default function EditorPlano({
     const der = t.cabinas[indice + 1]
     if (!izq || !der) return
     // centrarlo es dejarlo sin corrimiento, justo en el eje de su pilastra
-    onCabinas(
-      tramoId,
-      moverPanelEnPilastra(t.cabinas, t.pilastras, indice, 0, config.anchoPilastraCm, grueso, 0),
-    )
+    onDesplazarPanel(tramoId, indice, 0)
   }
 
   function agregarCabina(tramoId: string, indice: number) {
@@ -437,8 +438,10 @@ export default function EditorPlano({
 
                     {/* panel divisor a la derecha: esto es lo que se arrastra */}
                     {i < tramo.cabinas.length - 1 && (() => {
-                      const a = pt(m, u1 - grueso / 2, 0)
-                      const b = pt(m, u1 + grueso / 2, prof)
+                      // el corrimiento mueve SOLO el panel dentro de su pilastra
+                      const corrido = tramo.desplazaPanel?.[i] ?? 0
+                      const a = pt(m, u1 + corrido - grueso / 2, 0)
+                      const b = pt(m, u1 + corrido + grueso / 2, prof)
                       const activo = arrastrando === `${tramo.id}:${i}`
                       return (
                         <g>
