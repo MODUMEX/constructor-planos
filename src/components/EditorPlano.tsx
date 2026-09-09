@@ -417,7 +417,7 @@ export default function EditorPlano({
                     )}
 
                     {/* sanitario: el dibujo real del catálogo, con el fluxómetro contra el muro */}
-                    {verInodoros && cab.inodoro && (() => {
+                    {verInodoros && cab.tipo !== 'vacia' && (() => {
                       const dibujo = cab.tipo === 'orinal' ? ORINAL : cab.tipo === 'regadera' ? REGADERA : WC
                       const alto = cab.tipo === 'orinal' ? ALTO_ORINAL_CM : cab.tipo === 'regadera' ? ALTO_REGADERA_CM : ALTO_WC_CM
                       const ancho = (alto * dibujo.ancho) / dibujo.alto
@@ -721,7 +721,7 @@ export default function EditorPlano({
             </Item>
             <Raya />
             <Grupo>Tipo de cabina</Grupo>
-            <Item activo={cab.tipo === 'normal'} onClick={() => { cambiarCabina(menu.tramoId, menu.indice, { tipo: 'normal' }); cerrar() }}>Normal</Item>
+            <Item activo={cab.tipo === 'normal'} onClick={() => { cambiarCabina(menu.tramoId, menu.indice, { tipo: 'normal' }); cerrar() }}>Inodoro</Item>
             <Item
               activo={cab.tipo === 'accesible'}
               disabled={cab.anchoCm < 150 && cab.tipo !== 'accesible'}
@@ -729,14 +729,13 @@ export default function EditorPlano({
             >
               Accesible {cab.anchoCm < 150 && cab.tipo !== 'accesible' ? '(necesita 150 cm)' : ''}
             </Item>
-            <Item activo={cab.tipo === 'vacia'} onClick={() => { cambiarCabina(menu.tramoId, menu.indice, { tipo: 'vacia', inodoro: false }); cerrar() }}>Vacía</Item>
+            <Item activo={cab.tipo === 'vacia'} onClick={() => { cambiarCabina(menu.tramoId, menu.indice, { tipo: 'vacia' }); cerrar() }}>Vacía</Item>
             <Item activo={cab.tipo === 'regadera'} onClick={() => { cambiarCabina(menu.tramoId, menu.indice, { tipo: 'regadera' }); cerrar() }}>Regadera</Item>
             <Item activo={cab.tipo === 'orinal'} onClick={() => { cambiarCabina(menu.tramoId, menu.indice, { tipo: 'orinal', puerta: { ...cab.puerta, tipo: 'ninguna' } }); cerrar() }}>Orinal</Item>
             <Raya />
-            <Grupo>Puerta y sanitario</Grupo>
+            <Grupo>Puerta</Grupo>
             <Item activo={cab.puerta.tipo === 'puerta'} onClick={() => { cambiarPuerta(menu.tramoId, menu.indice, { tipo: 'puerta' }); cerrar() }}>Con puerta</Item>
             <Item activo={cab.puerta.tipo === 'ninguna'} onClick={() => { cambiarPuerta(menu.tramoId, menu.indice, { tipo: 'ninguna' }); cerrar() }}>Sin puerta</Item>
-            <Item activo={cab.inodoro} onClick={() => { cambiarCabina(menu.tramoId, menu.indice, { inodoro: !cab.inodoro }); cerrar() }}>Dibujar inodoro</Item>
             <Raya />
             <Item onClick={() => { agregarCabina(menu.tramoId, menu.indice); cerrar() }}>Partir en dos cabinas</Item>
             <Item disabled={t.cabinas.length <= 1} onClick={() => { quitarCabina(menu.tramoId, menu.indice); cerrar() }}>

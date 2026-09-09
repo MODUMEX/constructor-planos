@@ -39,7 +39,6 @@ export function nuevaCabina(anchoCm: number, tipo: Cabina['tipo'] = 'normal'): C
     id: nuevoId('cab'),
     anchoCm: snap(anchoCm),
     tipo,
-    inodoro: true,
     puerta: {
       anchoCm: puertaSugerida(anchoCm),
       apertura: anchoCm < 135 ? 'afuera' : 'adentro',

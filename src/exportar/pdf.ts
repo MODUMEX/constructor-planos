@@ -146,7 +146,7 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
       }
 
       // sanitario: el mismo dibujo del catálogo que se ve en pantalla
-      if (cab.inodoro) {
+      if (cab.tipo !== 'vacia') {
         const dibujo = cab.tipo === 'orinal' ? ORINAL : cab.tipo === 'regadera' ? REGADERA : WC
         const altoCm = cab.tipo === 'orinal' ? ALTO_ORINAL_CM : cab.tipo === 'regadera' ? ALTO_REGADERA_CM : ALTO_WC_CM
         const anchoCm = (altoCm * dibujo.ancho) / dibujo.alto

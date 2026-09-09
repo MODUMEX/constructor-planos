@@ -25,7 +25,8 @@ export type Montaje = 'PISO_HEADRAIL' | 'PISO' | 'PISO_TECHO'
 
 /**
  * Qué hay en cada cabina. 'vacia' es un hueco de la tira sin sanitario: se
- * fabrica igual —lleva sus paneles y su puerta— pero no se le dibuja inodoro.
+ * fabrica igual —lleva sus paneles y su puerta— pero es la única que no lleva
+ * sanitario dibujado. El tipo manda el dibujo: inodoro, regadera u orinal.
  * Reemplaza a 'ambulatoria', que pedía 90 cm de ancho. Un proyecto viejo
  * guardado con ese valor abre y se dibuja, pero pasa a comportarse como una
  * cabina normal: pierde ese mínimo y su rótulo en el plano.
@@ -54,7 +55,6 @@ export interface Cabina {
   anchoCm: number
   tipo: TipoCabina
   puerta: Puerta
-  inodoro: boolean
   /** panel divisor a la derecha de esta cabina */
   panel: {
     recorte: 'ninguno' | 'simple' | 'doble'
