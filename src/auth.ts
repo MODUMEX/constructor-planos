@@ -39,6 +39,7 @@ interface Perfil {
   nombre: string | null
   rol: string | null
   distribuidor_id: string | null
+  solicitud?: boolean | null
   activo: boolean | null
 }
 
@@ -79,11 +80,16 @@ async function entrarPorSupabase(email: string, clave: string): Promise<Usuario>
 
   // el perfil vive en la tabla profiles, igual que en el Constructor actual
   const perfiles = await pedir<Perfil>(
-    `profiles?id=eq.${id}&select=nombre,rol,distribuidor_id,activo`,
+    `profiles?id=eq.${id}&select=nombre,rol,distribuidor_id,activo,solicitud`,
     token,
   )
   const perfil = perfiles[0]
   if (!perfil) throw new Error('La cuenta existe pero no tiene perfil asignado. Avisale a un administrador.')
+  // Quien pidió la cuenta desde la pantalla de entrada no entra hasta que un
+  // Administrador lo admita: hasta entonces no tiene rol ni distribuidor.
+  if (perfil.solicitud) {
+    throw new Error('Tu solicitud de cuenta todavía está esperando que un administrador la apruebe.')
+  }
   if (perfil.activo === false) throw new Error('La cuenta está desactivada.')
 
   const rol = (perfil.rol as Rol) || 'Distribuidor'
@@ -142,6 +148,54 @@ export async function iniciarSesion(email: string, clave: string): Promise<Usuar
 }
 
 export const CUENTAS_DEMO = CUENTAS.map((c) => ({ email: c.email, clave: c.clave, rol: c.rol }))
+
+/**
+ * Pedir una cuenta sin tenerla. Crea el usuario en Supabase Auth con la marca
+ * `auto_registro`, que el trigger convierte en una SOLICITUD: la cuenta existe
+ * pero no puede entrar hasta que un Administrador la admita y le diga qué rol
+ * y a qué distribuidor pertenece.
+ *
+ * Necesita que el proyecto de Supabase tenga los registros habilitados
+ * (Authentication → Sign In / Providers → Allow new users to sign up).
+ */
+export async function pedirCuenta(datos: {
+  email: string
+  clave: string
+  nombre: string
+  telefono?: string
+  nota?: string
+}): Promise<string> {
+  if (!hayNube) throw new Error('Sin conexión a la nube no se pueden pedir cuentas.')
+  if (datos.clave.length < 6) throw new Error('La contraseña tiene que tener al menos 6 caracteres.')
+  if (!datos.nombre.trim()) throw new Error('Poné tu nombre para que sepan quién pide la cuenta.')
+
+  const r = await fetch(`${URL_SUPABASE}/auth/v1/signup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: LLAVE_SUPABASE! },
+    body: JSON.stringify({
+      email: datos.email.trim(),
+      password: datos.clave,
+      data: {
+        auto_registro: '1',
+        nombre: datos.nombre.trim(),
+        telefono: datos.telefono?.trim() || null,
+        nota: datos.nota?.trim() || null,
+      },
+    }),
+  })
+  if (!r.ok) {
+    const detalle = await r.json().catch(() => null)
+    const msg = String(detalle?.msg || detalle?.error_description || detalle?.error || '')
+    if (/already registered|already exists/i.test(msg)) {
+      throw new Error('Ya hay una cuenta con ese correo. Si es tuya, pedile la contraseña a un administrador.')
+    }
+    if (/signup.*disabled|not allowed/i.test(msg)) {
+      throw new Error('Los registros están cerrados en Supabase. Un administrador tiene que habilitarlos.')
+    }
+    throw new Error(msg || 'No se pudo enviar la solicitud.')
+  }
+  return 'Tu solicitud quedó registrada. Un administrador la va a revisar y te va a habilitar el acceso.'
+}
 
 /**
  * Los permisos de la app, espejo de las políticas de la base para que la

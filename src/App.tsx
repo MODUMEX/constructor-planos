@@ -6,7 +6,7 @@ import { armarPedido, enviarPedido, erpConectado, type RespuestaERP } from './er
 import { generarCSV, nombreArchivoCSV } from './exportar/csv'
 import { generarPDF, nombreArchivoPDF } from './exportar/pdf'
 import { csvABytes, FILTRO_CSV, FILTRO_PDF, guardarArchivo } from './exportar/guardar'
-import { IVA_CR, puedeCatalogos, puedeDistribuidores, puedeUsuarios, type Usuario } from './auth'
+import { esAdmin, IVA_CR, puedeCatalogos, puedeDistribuidores, puedeUsuarios, type Usuario } from './auth'
 import type { Area, Cabina, Config, Pais, Proyecto, TipoCabina, TipologiaId } from './types'
 import {
   ACABADOS, alturasDe, anchosPanel, claroAjustado, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, mgMedidas, MODELOS,
@@ -15,6 +15,8 @@ import {
 import VistaRender from './components/VistaRender'
 import ColoresMexico from './components/ColoresMexico'
 import Usuarios from './components/Usuarios'
+import Solicitudes from './components/Solicitudes'
+import { contarSolicitudes } from './solicitudes'
 import { coloresMxPara, slugRenderMx } from './coloresMx'
 import { fotoDe, fotosHerraje, faltanFotosHerraje, terminacionesDe } from './renders'
 import { anchoTotal, bom, crearTramos, modular, modularConCatalogo, nuevoId, reajustarConPuertas, totalBOM } from './modulacion'
@@ -165,6 +167,15 @@ export default function App() {
   const [distribuidores, setDistribuidores] = useState<Distribuidor[]>([])
   const [verDistribuidores, setVerDistribuidores] = useState(false)
   const [verUsuarios, setVerUsuarios] = useState(false)
+  const [verSolicitudes, setVerSolicitudes] = useState(false)
+  // cuántas cuentas están esperando aprobación, para el contador del botón
+  const [nSolicitudes, setNSolicitudes] = useState(0)
+  useEffect(() => {
+    if (!esAdmin(usuario)) { setNSolicitudes(0); return }
+    let vivo = true
+    void contarSolicitudes(usuario).then((n) => { if (vivo) setNSolicitudes(n) })
+    return () => { vivo = false }
+  }, [usuario])
   const [verDuplicar, setVerDuplicar] = useState(false)
   // por qué se rechazó el último cambio de pilastra, para poder decírselo
   const [bloqueo, setBloqueo] = useState<string | null>(null)
@@ -708,6 +719,11 @@ export default function App() {
         {puedeUsuarios(usuario) && (
           <button className="btn plano chico" onClick={() => setVerUsuarios(true)}>Usuarios</button>
         )}
+        {esAdmin(usuario) && (
+          <button className="btn plano chico" onClick={() => setVerSolicitudes(true)}>
+            Solicitudes{nSolicitudes > 0 ? ` (${nSolicitudes})` : ''}
+          </button>
+        )}
         <button className="btn plano chico" onClick={() => setTema(tema === 'oscuro' ? 'claro' : 'oscuro')}>
           {tema === 'oscuro' ? '☀ Claro' : '☾ Oscuro'}
         </button>
@@ -756,6 +772,15 @@ export default function App() {
 
       {verUsuarios && puedeUsuarios(usuario) && (
         <Usuarios usuario={usuario} onCerrar={() => setVerUsuarios(false)} />
+      )}
+
+      {verSolicitudes && esAdmin(usuario) && (
+        <Solicitudes
+          usuario={usuario}
+          distribuidores={distribuidores}
+          onResuelta={() => void contarSolicitudes(usuario).then(setNSolicitudes)}
+          onCerrar={() => setVerSolicitudes(false)}
+        />
       )}
 
       {verTarifas && puedeCatalogos(usuario) && (
