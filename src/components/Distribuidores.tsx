@@ -35,6 +35,7 @@ interface Props {
 export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Props) {
   const [edita, setEdita] = useState<DatosDistribuidor | null>(null)
   const [guardando, setGuardando] = useState(false)
+  const [verClave, setVerClave] = useState(false)
   const [aviso, setAviso] = useState<{ ok: boolean; mensaje: string } | null>(null)
 
   const esNuevo = edita !== null && edita.distribuidorId === undefined
@@ -96,15 +97,27 @@ export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Pr
                 </div>
                 <div className="campo">
                   <label>Contraseña</label>
-                  <input
-                    type="password"
-                    value={edita.password ?? ''}
-                    onChange={(e) => campo('password', e.target.value)}
-                    placeholder={esNuevo ? 'Al menos 6 caracteres' : 'Dejala en blanco para no cambiarla'}
-                    autoComplete="new-password"
-                  />
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <input
+                      style={{ flex: 1 }}
+                      type={verClave ? 'text' : 'password'}
+                      value={edita.password ?? ''}
+                      onChange={(e) => campo('password', e.target.value)}
+                      placeholder={esNuevo ? 'Al menos 6 caracteres' : 'Dejala en blanco para no cambiarla'}
+                      autoComplete="new-password"
+                    />
+                    <button
+                      className="btn plano chico"
+                      onClick={() => setVerClave((v) => !v)}
+                      title={verClave ? 'Ocultar' : 'Ver lo que estás escribiendo'}
+                    >
+                      {verClave ? '🙈' : '👁'}
+                    </button>
+                  </div>
                   <span className="ayuda">
-                    {esNuevo ? 'Se le crea la cuenta con esta clave' : 'Solo se cambia si escribís una nueva'}
+                    {esNuevo
+                      ? 'Se le crea la cuenta con esta clave'
+                      : 'La que ya tiene no se puede ver: Supabase la guarda cifrada. Si no la sabés, escribile una nueva y entregásela.'}
                   </span>
                 </div>
                 <div className="campo">
@@ -198,7 +211,7 @@ export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Pr
                       <td className="der">{d.iva === null ? 'Auto' : d.iva + '%'}</td>
                       <td>{d.activo ? 'Activo' : 'Inactivo'}</td>
                       <td className="der">
-                        <button className="btn plano chico" onClick={() => { setEdita({ ...d }); setAviso(null) }}>Editar</button>
+                        <button className="btn plano chico" onClick={() => { setEdita({ ...d }); setVerClave(false); setAviso(null) }}>Editar</button>
                       </td>
                     </tr>
                   ))}

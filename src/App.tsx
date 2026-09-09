@@ -6,7 +6,7 @@ import { armarPedido, enviarPedido, erpConectado, type RespuestaERP } from './er
 import { generarCSV, nombreArchivoCSV } from './exportar/csv'
 import { generarPDF, nombreArchivoPDF } from './exportar/pdf'
 import { csvABytes, FILTRO_CSV, FILTRO_PDF, guardarArchivo } from './exportar/guardar'
-import { esAdmin, IVA_CR, type Usuario } from './auth'
+import { IVA_CR, puedeCatalogos, puedeDistribuidores, puedeUsuarios, type Usuario } from './auth'
 import type { Area, Cabina, Config, Pais, Proyecto, TipoCabina, TipologiaId } from './types'
 import {
   ACABADOS, alturasDe, anchosPanel, claroAjustado, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, mgMedidas, MODELOS,
@@ -14,6 +14,7 @@ import {
 } from './catalog'
 import VistaRender from './components/VistaRender'
 import ColoresMexico from './components/ColoresMexico'
+import Usuarios from './components/Usuarios'
 import { coloresMxPara, slugRenderMx } from './coloresMx'
 import { fotoDe, fotosHerraje, faltanFotosHerraje, terminacionesDe } from './renders'
 import { anchoTotal, bom, crearTramos, modular, modularConCatalogo, nuevoId, reajustarConPuertas, totalBOM } from './modulacion'
@@ -163,6 +164,7 @@ export default function App() {
   const [verAlturas, setVerAlturas] = useState(false)
   const [distribuidores, setDistribuidores] = useState<Distribuidor[]>([])
   const [verDistribuidores, setVerDistribuidores] = useState(false)
+  const [verUsuarios, setVerUsuarios] = useState(false)
   const [verDuplicar, setVerDuplicar] = useState(false)
   // por qué se rechazó el último cambio de pilastra, para poder decírselo
   const [bloqueo, setBloqueo] = useState<string | null>(null)
@@ -694,12 +696,17 @@ export default function App() {
           {buscandoActualizacion ? 'Buscando…' : 'Actualizaciones'}
         </button>
         <button className="btn plano chico" onClick={() => setVerProyectos(true)}>Proyectos</button>
-        {esAdmin(usuario) && (
+        {puedeDistribuidores(usuario) && (
+          <button className="btn plano chico" onClick={() => setVerDistribuidores(true)}>Distribuidores</button>
+        )}
+        {puedeCatalogos(usuario) && (
           <>
-            <button className="btn plano chico" onClick={() => setVerDistribuidores(true)}>Distribuidores</button>
             <button className="btn plano chico" onClick={() => setVerAlturas(true)}>Alturas</button>
             <button className="btn plano chico" onClick={() => setVerTarifas(true)}>Lista de precios</button>
           </>
+        )}
+        {puedeUsuarios(usuario) && (
+          <button className="btn plano chico" onClick={() => setVerUsuarios(true)}>Usuarios</button>
         )}
         <button className="btn plano chico" onClick={() => setTema(tema === 'oscuro' ? 'claro' : 'oscuro')}>
           {tema === 'oscuro' ? '☀ Claro' : '☾ Oscuro'}
@@ -728,7 +735,7 @@ export default function App() {
         <DuplicarArea base={area} onCrear={duplicarArea} onCerrar={() => setVerDuplicar(false)} />
       )}
 
-      {verDistribuidores && esAdmin(usuario) && (
+      {verDistribuidores && puedeDistribuidores(usuario) && (
         <Distribuidores
           usuario={usuario}
           lista={distribuidores}
@@ -737,7 +744,7 @@ export default function App() {
         />
       )}
 
-      {verAlturas && esAdmin(usuario) && (
+      {verAlturas && puedeCatalogos(usuario) && (
         <EditorAlturas
           usuario={usuario}
           tabla={alturasTabla}
@@ -747,7 +754,11 @@ export default function App() {
         />
       )}
 
-      {verTarifas && esAdmin(usuario) && (
+      {verUsuarios && puedeUsuarios(usuario) && (
+        <Usuarios usuario={usuario} onCerrar={() => setVerUsuarios(false)} />
+      )}
+
+      {verTarifas && puedeCatalogos(usuario) && (
         <EditorTarifas
           usuario={usuario}
           tabla={tarifas?.tabla ?? TARIFAS_BASE}
@@ -992,7 +1003,7 @@ export default function App() {
                       )}
                       {usuario.rol !== 'Distribuidor' && distribuidores.length === 0 && (
                         <span className="ayuda">
-                          {esAdmin(usuario)
+                          {puedeDistribuidores(usuario)
                             ? 'Todavía no hay ninguno: dalos de alta con el botón Distribuidores de arriba.'
                             : 'Todavía no hay ninguno dado de alta.'}
                         </span>

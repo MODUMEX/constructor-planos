@@ -143,7 +143,32 @@ export async function iniciarSesion(email: string, clave: string): Promise<Usuar
 
 export const CUENTAS_DEMO = CUENTAS.map((c) => ({ email: c.email, clave: c.clave, rol: c.rol }))
 
-/** puede ver y editar precios y usuarios */
+/**
+ * Los permisos de la app, espejo de las políticas de la base para que la
+ * pantalla no ofrezca lo que la base va a rechazar:
+ *
+ *   Usuarios        → Super Admin           (política profiles_modify)
+ *   Alturas/Precios → Super Admin + Admin   (es_admin_estricto)
+ *   Distribuidores  → los dos + Vendedor    (es_admin, redefinido en el SQL 16)
+ *
+ * El Vendedor modula, cotiza y ve distribuidores y pedidos, pero no toca la
+ * lista de precios ni las medidas. El Distribuidor solo ve lo suyo.
+ */
 export function esAdmin(u: Usuario | null): boolean {
   return !!u && (u.rol === 'Super Admin' || u.rol === 'Administrador')
+}
+
+/** solo el Super Admin da de alta y edita usuarios internos */
+export function puedeUsuarios(u: Usuario | null): boolean {
+  return u?.rol === 'Super Admin'
+}
+
+/** alturas de las piezas y lista de precios: Administrador y Super Admin */
+export function puedeCatalogos(u: Usuario | null): boolean {
+  return esAdmin(u)
+}
+
+/** la ficha de los distribuidores: también el Vendedor, que los atiende */
+export function puedeDistribuidores(u: Usuario | null): boolean {
+  return esAdmin(u) || u?.rol === 'Vendedor'
 }
