@@ -201,7 +201,7 @@ export async function pedirCuenta(datos: {
     }
     throw new Error(msg || 'No se pudo enviar la solicitud.')
   }
-  return 'Tu solicitud quedó registrada. Un administrador la va a revisar y te va a habilitar el acceso; no hace falta que hagas nada más.'
+  return 'Un administrador va a autorizar tu cuenta. Cuando lo haga vas a poder entrar con este mismo correo y contraseña; no hace falta que hagas nada más.'
 }
 
 /**

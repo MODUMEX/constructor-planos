@@ -116,13 +116,13 @@ export default function Login({ onEntrar }: { onEntrar: (u: Usuario) => void }) 
         {error && <div className="error">{error}</div>}
         {listo && (
           <div className="aviso-caja ok">
-            <b>Solicitud enviada</b>
+            <b>Registro enviado</b>
             <span>{listo}</span>
           </div>
         )}
 
         <button className="btn primario" type="submit" disabled={cargando} style={{ justifyContent: 'center' }}>
-          {cargando ? (pidiendo ? 'Enviando…' : 'Entrando…') : pidiendo ? 'Pedir cuenta' : 'Entrar'}
+          {cargando ? (pidiendo ? 'Registrando…' : 'Entrando…') : pidiendo ? 'Registrarse' : 'Entrar'}
         </button>
 
         {hayNube && (
