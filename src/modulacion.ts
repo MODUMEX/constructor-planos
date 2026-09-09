@@ -108,11 +108,16 @@ export function modularConCatalogo(
   // Entre dos orinales no hay pilastra sino mampara, así que en esas fronteras
   // la lista lleva el grueso de la mampara. El dibujo y las cotas leen esta
   // lista por posición, por eso tiene que traer una entrada por cada frontera.
+  // Cada frontera se lleva SU pilastra, no la primera repetida: el buscador las
+  // devuelve de medidas distintas y aplanarlas acá era lo que las emparejaba y
+  // hacía que la tira se pasara del claro.
   const pilastras: number[] = [m.pilastras[0]]
+  let k = 1
   for (let i = 1; i <= cantidad - 1; i++) {
     const izqOrinal = i > cantidad - 1 - nMing
     const derOrinal = i >= cantidad - nMing
-    pilastras.push(izqOrinal && derOrinal ? GRUESO_MG_CM : m.anchoPilInterna)
+    // entre dos orinales va mampara, y esa frontera no consume pilastra
+    pilastras.push(izqOrinal && derOrinal ? GRUESO_MG_CM : (m.pilastras[k++] ?? m.anchoPilInterna))
   }
   pilastras.push(m.pilastras[m.pilastras.length - 1])
 

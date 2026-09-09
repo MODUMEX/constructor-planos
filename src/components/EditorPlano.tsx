@@ -303,6 +303,10 @@ export default function EditorPlano({
           const m = marcos[ti]
           if (!m) return null
           const largo = anchoTotal(tramo.cabinas)
+          // La cota grande es el CLARO del proyecto, un dato que no se mueve. No se
+          // saca de la suma de las piezas: una tira que calza exacto mide un poco más
+          // que el claro crudo, porque cada puerta traslapa sobre sus pilastras.
+          const claro = tramo.claroCm && tramo.claroCm > 0 ? tramo.claroCm : largo
           // un tramo de puros orinales se dibuja con el fondo de la mampara, no con el de la cabina
           const prof = profundidadDeTramo(tramo, config.profundidadCm)
           const horizontal = Math.abs(m.ax) === 1
@@ -648,9 +652,9 @@ export default function EditorPlano({
 
               {/* cota total del tramo */}
               {verCotas && tramo.cabinas.length > 0 && (() => {
-                const c = pt(m, largo / 2, -ESPESOR_MURO - 52)
+                const c = pt(m, claro / 2, -ESPESOR_MURO - 52)
                 const ini = pt(m, 0, -ESPESOR_MURO - 44)
-                const fin = pt(m, largo, -ESPESOR_MURO - 44)
+                const fin = pt(m, claro, -ESPESOR_MURO - 44)
                 const rot = horizontal ? 0 : m.ay > 0 ? 90 : -90
                 return (
                   <g pointerEvents="none">
@@ -660,7 +664,7 @@ export default function EditorPlano({
                       fontFamily="ui-monospace, Consolas, monospace" fill="#1b2430" fontWeight={600}
                       transform={rot ? `rotate(${rot} ${c.x} ${c.y})` : undefined}
                     >
-                      {formatear(largo, unidad)}{unidadTxt}
+                      {formatear(claro, unidad)}{unidadTxt}
                     </text>
                   </g>
                 )
