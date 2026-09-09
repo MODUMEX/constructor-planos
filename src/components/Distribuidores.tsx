@@ -4,6 +4,7 @@ import {
   type DatosDistribuidor, type Distribuidor, type Region,
 } from '../distribuidores'
 import type { Usuario } from '../auth'
+import Ojo from './Ojo'
 
 /**
  * Alta y edición de distribuidores. Es lo que el Constructor viejo tenía en su
@@ -107,11 +108,12 @@ export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Pr
                       autoComplete="new-password"
                     />
                     <button
+                      type="button"
                       className="btn plano chico"
                       onClick={() => setVerClave((v) => !v)}
                       title={verClave ? 'Ocultar' : 'Ver lo que estás escribiendo'}
                     >
-                      {verClave ? '🙈' : '👁'}
+                      <Ojo abierto={verClave} />
                     </button>
                   </div>
                   <span className="ayuda">

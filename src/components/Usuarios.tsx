@@ -4,6 +4,7 @@ import {
   type DatosUsuario, type UsuarioInterno,
 } from '../usuarios'
 import type { Rol, Usuario } from '../auth'
+import Ojo from './Ojo'
 
 /**
  * Usuarios internos: Administradores y Vendedores. Solo el Super Admin entra
@@ -136,11 +137,12 @@ export default function Usuarios({ usuario, onCerrar }: Props) {
                       autoComplete="new-password"
                     />
                     <button
+                      type="button"
                       className="btn plano chico"
                       onClick={() => setVerClave((v) => !v)}
                       title={verClave ? 'Ocultar' : 'Ver lo que estás escribiendo'}
                     >
-                      {verClave ? '🙈' : '👁'}
+                      <Ojo abierto={verClave} />
                     </button>
                   </div>
                   <span className="ayuda">

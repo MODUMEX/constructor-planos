@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { CUENTAS_DEMO, hayNube, iniciarSesion, pedirCuenta, type Usuario } from '../auth'
+import Ojo from './Ojo'
 
 /**
  * Entrada a la app. Además de iniciar sesión, quien no tiene cuenta la puede
@@ -95,19 +96,19 @@ export default function Login({ onEntrar }: { onEntrar: (u: Usuario) => void }) 
               onClick={() => setVerClave((v) => !v)}
               title={verClave ? 'Ocultar' : 'Ver la contraseña'}
             >
-              {verClave ? '🙈' : '👁'}
+              <Ojo abierto={verClave} />
             </button>
           </div>
         </div>
 
         {pidiendo && (
           <div className="campo">
-            <label htmlFor="nota">Empresa y para qué la vas a usar</label>
+            <label htmlFor="nota">Empresa</label>
             <input
               id="nota"
               value={nota}
               onChange={(e) => setNota(e.target.value)}
-              placeholder="Distribuidora X, cotizaciones de mamparas"
+              placeholder="Distribuidora X"
             />
           </div>
         )}
