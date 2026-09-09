@@ -38,6 +38,23 @@ export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Pr
   const [guardando, setGuardando] = useState(false)
   const [verClave, setVerClave] = useState(false)
   const [refrescando, setRefrescando] = useState(false)
+  const [cambiando, setCambiando] = useState<number | null>(null)
+
+  /**
+   * Activa o desactiva sin abrir la ficha. Un distribuidor NO se borra: los
+   * planos ya emitidos llevan su nombre y perderlo dejaría cajetines huérfanos.
+   * Desactivado deja de salir para elegir, pero sigue en esta lista.
+   */
+  async function cambiarEstado(d: Distribuidor) {
+    setCambiando(d.distribuidorId)
+    const r = await guardarDistribuidor(usuario, { ...d, activo: !d.activo })
+    setCambiando(null)
+    setAviso({ ok: r.ok, mensaje: r.ok ? `${d.nombre} quedó ${d.activo ? 'inactivo' : 'activo'}.` : r.mensaje })
+    if (r.ok && r.dato) {
+      const nuevo = r.dato
+      onLista(lista.map((x) => (x.distribuidorId === nuevo.distribuidorId ? nuevo : x)))
+    }
+  }
 
   /** vuelve a preguntarle a la base, por si alguien la tocó por fuera de la app */
   async function refrescar() {
@@ -214,7 +231,7 @@ export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Pr
                     <tr><td colSpan={8}>Todavía no hay distribuidores dados de alta.</td></tr>
                   )}
                   {lista.map((d) => (
-                    <tr key={d.distribuidorId}>
+                    <tr key={d.distribuidorId} style={d.activo ? undefined : { opacity: 0.55 }}>
                       <td style={{ fontWeight: 600 }}>{d.nombre}</td>
                       <td>{d.contacto || '—'}</td>
                       <td>{d.ubicacion || '—'}</td>
@@ -224,6 +241,14 @@ export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Pr
                       <td>{d.activo ? 'Activo' : 'Inactivo'}</td>
                       <td className="der">
                         <button className="btn plano chico" onClick={() => { setEdita({ ...d }); setVerClave(false); setAviso(null) }}>Editar</button>
+                        <button
+                          className="btn plano chico"
+                          disabled={cambiando === d.distribuidorId}
+                          title={d.activo ? 'Deja de salir para elegir; los planos viejos conservan su nombre' : 'Vuelve a salir para elegir'}
+                          onClick={() => void cambiarEstado(d)}
+                        >
+                          {cambiando === d.distribuidorId ? '…' : d.activo ? 'Desactivar' : 'Activar'}
+                        </button>
                       </td>
                     </tr>
                   ))}
