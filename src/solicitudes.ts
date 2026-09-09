@@ -1,4 +1,5 @@
 import type { Rol, Usuario } from './auth'
+import type { Region } from './distribuidores'
 import { LLAVE_SUPABASE, URL_SUPABASE } from './entorno'
 
 /**
@@ -100,18 +101,37 @@ export async function contarSolicitudes(usuario: Usuario | null): Promise<number
   return r.ok && r.dato ? r.dato.length : 0
 }
 
+/** los datos de empresa que se completan al admitir a un distribuidor nuevo */
+export interface FichaNueva {
+  nombre: string
+  ubicacion?: string
+  region?: Region | null
+  pais?: string | null
+  descuento?: number
+  iva?: number | null
+}
+
+/**
+ * Admite la solicitud. Si entra como Distribuidor, su ficha de empresa NACE
+ * acá: el distribuidor se dio de alta solo y quien aprueba completa lo que
+ * falta (ubicación, región, país, descuento, IVA). No se le pide contraseña
+ * de nuevo: ya puso la suya al registrarse.
+ *
+ * El distribuidorId es para el otro caso: ligarlo a una ficha que ya existe.
+ */
 export async function aprobarSolicitud(
   usuario: Usuario | null,
-  d: { id: string; rol: Rol; distribuidorId: number | null },
+  d: { id: string; rol: Rol; distribuidorId: number | null; ficha?: FichaNueva },
 ): Promise<Resultado<null>> {
-  if (d.rol === 'Distribuidor' && !d.distribuidorId) {
-    return { ok: false, mensaje: 'Elegí a qué distribuidor pertenece antes de admitirlo.' }
+  if (d.rol === 'Distribuidor' && !d.distribuidorId && !d.ficha?.nombre.trim()) {
+    return { ok: false, mensaje: 'Poné el nombre de la empresa o elegí una ficha que ya exista.' }
   }
   const r = await llamar(usuario, {
     accion: 'aprobar_solicitud',
     id: d.id,
     rol: d.rol,
     distribuidor_id: d.distribuidorId,
+    ficha: d.ficha,
   })
   return { ok: r.ok, mensaje: r.mensaje }
 }
