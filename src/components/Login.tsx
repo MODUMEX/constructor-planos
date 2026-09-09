@@ -131,7 +131,7 @@ export default function Login({ onEntrar }: { onEntrar: (u: Usuario) => void }) 
             style={{ justifyContent: 'center' }}
             onClick={() => cambiarModo(pidiendo ? 'entrar' : 'pedir')}
           >
-            {pidiendo ? '← Ya tengo cuenta' : 'No tengo cuenta: quiero pedir una'}
+            {pidiendo ? '← Ya tengo cuenta' : 'Registrarse'}
           </button>
         )}
 
