@@ -8,10 +8,12 @@ import { nombreHerraje, tipologia } from '../catalog'
 import { anchoTotal } from '../modulacion'
 import { agrupar, modeloParaCsv, nombreLinea, nombreSistema, piezasDeArea } from './piezas'
 import { ALTO_ORINAL_CM, ALTO_REGADERA_CM, ALTO_WC_CM, ORINAL, REGADERA, WC } from '../assets/sanitarios'
+import { marcaDeAgua, ponerLogo, portada } from './portada'
 
 /**
- * Plano en PDF: una hoja por área, con el dibujo a escala, las cotas
- * encadenadas, el cuadro de piezas a la derecha y el cajetín abajo.
+ * Plano en PDF: una portada que el cliente firma y después una hoja por área,
+ * con el dibujo a escala, las cotas encadenadas, el cuadro de piezas a la
+ * derecha y el cajetín abajo. Todas llevan el logo de marca de agua.
  * Usa la misma geometría que la pantalla (src/geometria.ts), así que lo que
  * se ve en el editor es lo que sale impreso.
  */
@@ -306,16 +308,19 @@ function cajetin(doc: jsPDF, proyecto: Proyecto, area: Area, hoja: number, hojas
   const cols = [x, x + 96, x + 168, x + 224, x + w]
   for (let i = 1; i < 4; i++) doc.line(cols[i], y, cols[i], y + CAJETIN_H)
 
+  // La primera columna arranca corrida: el logo va a su izquierda, en su propio
+  // hueco. Antes se pisaban.
+  const SANGRIA_LOGO = 31
   const campo = (col: number, fila: number, etiqueta: string, valor: string, ancho: number) => {
-    const cx = cols[col] + 3
+    const cx = cols[col] + 3 + (col === 0 ? SANGRIA_LOGO : 0)
     const cy = y + 7 + fila * 8
     texto(doc, etiqueta, cx, cy - 3.4, { size: 4.8, color: GRIS })
     texto(doc, doc.splitTextToSize(valor || '—', ancho)[0], cx, cy, { size: 7.6, bold: fila === 0 })
   }
 
-  campo(0, 0, 'OBRA', proyecto.obra, 88)
-  campo(0, 1, 'CLIENTE', proyecto.cliente, 88)
-  campo(0, 2, 'UBICACIÓN', proyecto.ubicacion, 88)
+  campo(0, 0, 'OBRA', proyecto.obra, 88 - SANGRIA_LOGO)
+  campo(0, 1, 'CLIENTE', proyecto.cliente, 88 - SANGRIA_LOGO)
+  campo(0, 2, 'UBICACIÓN', proyecto.ubicacion, 88 - SANGRIA_LOGO)
 
   campo(1, 0, 'ÁREA', area.nombre, 66)
   campo(1, 1, 'PISO', area.piso, 66)
@@ -341,6 +346,39 @@ function cajetin(doc: jsPDF, proyecto: Proyecto, area: Area, hoja: number, hojas
   campo(3, 2, 'FECHA / HOJA', `${fecha}  ·  ${hoja} de ${hojas}`, 46)
 
   texto(doc, 'GRUPO MODUMEX', cols[3] + 3, y + CAJETIN_H - 2.5, { size: 5.4, bold: true, color: GRIS })
+  // el logo chico en su hueco de la izquierda, como en el Constructor viejo
+  ponerLogo(doc, x + 3, y + CAJETIN_H / 2 - 2.3, 25)
+}
+
+/** el cajetín de la portada: sin área, y donde va la hoja dice "Portada" */
+function cajetinPortada(doc: jsPDF, proyecto: Proyecto, fecha: string) {
+  const y = HOJA.h - M - CAJETIN_H
+  const x = M
+  const w = HOJA.w - M * 2
+  doc.setDrawColor(TINTA)
+  doc.setLineWidth(0.5)
+  doc.rect(x, y, w, CAJETIN_H)
+  const cols = [x, x + 96, x + 168, x + 224, x + w]
+  for (let i = 1; i < 4; i++) doc.line(cols[i], y, cols[i], y + CAJETIN_H)
+
+  const SANGRIA_LOGO = 31
+  const campo = (col: number, fila: number, etiqueta: string, valor: string) => {
+    const cx = cols[col] + 3 + (col === 0 ? SANGRIA_LOGO : 0)
+    const cy = y + 7 + fila * 8
+    texto(doc, etiqueta, cx, cy - 3.4, { size: 4.8, color: GRIS })
+    texto(doc, valor || '—', cx, cy, { size: 7.6, bold: fila === 0 })
+  }
+  campo(0, 0, 'OBRA', proyecto.obra)
+  campo(0, 1, 'CLIENTE', proyecto.cliente)
+  campo(0, 2, 'UBICACIÓN', proyecto.ubicacion)
+  campo(1, 0, 'DISTRIBUIDOR', proyecto.distribuidor)
+  campo(1, 1, 'ÁREAS', String(proyecto.areas.length))
+  campo(2, 0, 'N° DE PLANO', proyecto.numero)
+  campo(2, 1, 'DIBUJÓ', proyecto.creadoPor)
+  campo(2, 2, 'FECHA', fecha)
+  texto(doc, 'Portada', cols[3] + 3, y + 10, { size: 11, bold: true })
+  texto(doc, 'Firma del cliente', cols[3] + 3, y + CAJETIN_H - 4, { size: 5.4, color: GRIS })
+  ponerLogo(doc, x + 3, y + CAJETIN_H / 2 - 2.3, 25)
 }
 
 export function generarPDF(proyecto: Proyecto, fecha = new Date().toLocaleDateString('es-CR')): jsPDF {
@@ -348,8 +386,16 @@ export function generarPDF(proyecto: Proyecto, fecha = new Date().toLocaleDateSt
   const areas = proyecto.areas.filter((a) => a.tramos.length > 0)
   const lista = areas.length ? areas : proyecto.areas
 
+  // La portada va primero y toma los datos de la primera área: la línea, el
+  // modelo y el color son del proyecto, no cambian de un área a otra.
+  // la portada va limpia: es la hoja que se firma, y la marca de agua le
+  // ensuciaba la descripción. El logo grande ya está arriba a la izquierda.
+  portada(doc, proyecto, lista[0], HOJA, M, fecha, CAJETIN_H)
+  cajetinPortada(doc, proyecto, fecha)
+
   lista.forEach((area, idx) => {
-    if (idx > 0) doc.addPage()
+    doc.addPage()
+    marcaDeAgua(doc, HOJA)
 
     doc.setDrawColor(TINTA)
     doc.setLineWidth(0.7)
