@@ -71,7 +71,14 @@ async function entrarPorSupabase(email: string, clave: string): Promise<Usuario>
   if (!respuesta.ok) {
     const detalle = await respuesta.json().catch(() => null)
     const msg = (detalle?.error_description || detalle?.msg || '').toLowerCase()
-    if (msg.includes('email not confirmed')) throw new Error('La cuenta todavía no confirmó el correo.')
+    if (msg.includes('email not confirmed')) {
+      // Quien pidió la cuenta desde acá cae en este mismo error, porque el
+      // token falla antes de que se pueda mirar la marca de solicitud. Por eso
+      // el mensaje nombra las dos causas y no solo el correo.
+      throw new Error(
+        'La cuenta todavía no está habilitada: si la pediste desde acá, falta que un administrador la apruebe.',
+      )
+    }
     throw new Error('Correo o contraseña incorrectos.')
   }
   const sesion = await respuesta.json()
@@ -194,7 +201,7 @@ export async function pedirCuenta(datos: {
     }
     throw new Error(msg || 'No se pudo enviar la solicitud.')
   }
-  return 'Tu solicitud quedó registrada. Un administrador la va a revisar y te va a habilitar el acceso.'
+  return 'Tu solicitud quedó registrada. Un administrador la va a revisar y te va a habilitar el acceso; no hace falta que hagas nada más.'
 }
 
 /**
