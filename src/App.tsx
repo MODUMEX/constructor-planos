@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Login from './components/Login'
 import PreviewTipologia from './components/PreviewTipologia'
 import EditorPlano, { formatear } from './components/EditorPlano'
@@ -237,18 +237,21 @@ export default function App() {
     setProyecto((p) => (p.distribuidor === usuario.distribuidorNombre ? p : { ...p, distribuidor: usuario.distribuidorNombre! }))
   }, [usuario?.rol, usuario?.distribuidorNombre])
 
-  // la lista de distribuidores se trae una vez al entrar: el vendedor elige de
-  // ahí en vez de escribir el nombre a mano en el cajetín
-  useEffect(() => {
+  /**
+   * Trae la lista de distribuidores de la nube. Se llama al entrar y cada vez
+   * que se abre o se cierra su pantalla: antes se traía UNA sola vez, así que
+   * si alguien daba de alta o borraba uno desde la base, la app seguía
+   * mostrando la lista vieja hasta volver a entrar.
+   */
+  const recargarDistribuidores = useCallback(async () => {
     if (!usuario?.token) return
-    let vigente = true
-    listarDistribuidores(usuario).then((r) => {
-      if (vigente && r.ok && r.dato) setDistribuidores(r.dato)
-    })
-    return () => {
-      vigente = false
-    }
-  }, [usuario?.token])
+    const r = await listarDistribuidores(usuario)
+    if (r.ok && r.dato) setDistribuidores(r.dato)
+  }, [usuario])
+
+  useEffect(() => {
+    void recargarDistribuidores()
+  }, [recargarDistribuidores])
 
   // el plano, el CSV y la cotización leen las alturas del catálogo, así que
   // la tabla activa se deja puesta ahí en vez de pasarla por cada llamada
@@ -708,7 +711,7 @@ export default function App() {
         </button>
         <button className="btn plano chico" onClick={() => setVerProyectos(true)}>Proyectos</button>
         {puedeDistribuidores(usuario) && (
-          <button className="btn plano chico" onClick={() => setVerDistribuidores(true)}>Distribuidores</button>
+          <button className="btn plano chico" onClick={() => { void recargarDistribuidores(); setVerDistribuidores(true) }}>Distribuidores</button>
         )}
         {puedeCatalogos(usuario) && (
           <>
@@ -756,7 +759,7 @@ export default function App() {
           usuario={usuario}
           lista={distribuidores}
           onLista={setDistribuidores}
-          onCerrar={() => setVerDistribuidores(false)}
+          onCerrar={() => { setVerDistribuidores(false); void recargarDistribuidores() }}
         />
       )}
 
@@ -1022,7 +1025,7 @@ export default function App() {
                           ))}
                         {proyecto.distribuidor !== '' &&
                           !distribuidores.some((x) => x.nombre === proyecto.distribuidor) && (
-                            <option value={proyecto.distribuidor}>{proyecto.distribuidor}</option>
+                            <option value={proyecto.distribuidor}>{proyecto.distribuidor} (ya no está en la lista)</option>
                           )}
                       </select>
                       )}

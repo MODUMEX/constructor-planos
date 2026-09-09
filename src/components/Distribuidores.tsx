@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import {
-  crearDistribuidor, guardarDistribuidor, PAISES_DISTRIBUIDOR, REGIONES,
+  crearDistribuidor, guardarDistribuidor, listarDistribuidores, PAISES_DISTRIBUIDOR, REGIONES,
   type DatosDistribuidor, type Distribuidor, type Region,
 } from '../distribuidores'
 import type { Usuario } from '../auth'
@@ -37,6 +37,16 @@ export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Pr
   const [edita, setEdita] = useState<DatosDistribuidor | null>(null)
   const [guardando, setGuardando] = useState(false)
   const [verClave, setVerClave] = useState(false)
+  const [refrescando, setRefrescando] = useState(false)
+
+  /** vuelve a preguntarle a la base, por si alguien la tocó por fuera de la app */
+  async function refrescar() {
+    setRefrescando(true)
+    const r = await listarDistribuidores(usuario)
+    setRefrescando(false)
+    if (r.ok && r.dato) { onLista(r.dato); setAviso({ ok: true, mensaje: r.mensaje }) }
+    else setAviso({ ok: false, mensaje: r.mensaje })
+  }
   const [aviso, setAviso] = useState<{ ok: boolean; mensaje: string } | null>(null)
 
   const esNuevo = edita !== null && edita.distribuidorId === undefined
@@ -226,6 +236,11 @@ export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Pr
         <footer className="modal-pie">
           <span className="cuenta">{lista.length} distribuidor(es)</span>
           <div className="sep" style={{ flex: 1 }} />
+          {!edita && (
+            <button className="btn" onClick={() => void refrescar()} disabled={refrescando}>
+              {refrescando ? 'Actualizando…' : '↻ Actualizar'}
+            </button>
+          )}
           {edita ? (
             <>
               <button className="btn" onClick={() => { setEdita(null); setAviso(null) }} disabled={guardando}>Cancelar</button>

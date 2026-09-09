@@ -1,7 +1,7 @@
 {
   "name": "constructor-de-planos",
   "private": true,
-  "version": "2.24.5",
+  "version": "2.25.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
