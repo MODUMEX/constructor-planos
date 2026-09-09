@@ -707,7 +707,7 @@ export default function App() {
           disabled={buscandoActualizacion}
           title="Comprobar si hay una versión más nueva publicada"
         >
-          {buscandoActualizacion ? 'Buscando…' : 'Actualizaciones'}
+          {buscandoActualizacion ? 'Buscando…' : 'Actualizar app'}
         </button>
         <button className="btn plano chico" onClick={() => setVerProyectos(true)}>Proyectos</button>
         {puedeDistribuidores(usuario) && (
@@ -716,7 +716,7 @@ export default function App() {
         {puedeCatalogos(usuario) && (
           <>
             <button className="btn plano chico" onClick={() => setVerAlturas(true)}>Alturas</button>
-            <button className="btn plano chico" onClick={() => setVerTarifas(true)}>Lista de precios</button>
+            <button className="btn plano chico" onClick={() => setVerTarifas(true)}>Precios</button>
           </>
         )}
         {puedeUsuarios(usuario) && (

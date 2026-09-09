@@ -103,14 +103,24 @@ input, select { font: inherit; }
 .topbar {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 12px;
   padding: 0 16px;
-  height: 52px;
+  min-height: 52px;
   flex: 0 0 auto;
   background: var(--bg-2);
   border-bottom: 1px solid var(--line);
+  /* Con la barra llena, flex encogía la marca y los chips hasta partirles el
+     texto en dos líneas. Ahora nada se encoge (ver la regla de abajo) y si no
+     entra baja a un segundo renglón, en vez de deformarse o de cortar el
+     último botón detrás de una barra de desplazamiento. */
+  flex-wrap: wrap;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  row-gap: 6px;
 }
-.brand { display: flex; align-items: baseline; gap: 9px; }
+.topbar > * { flex-shrink: 0; }
+.topbar .btn { white-space: nowrap; }
+.brand { display: flex; align-items: baseline; gap: 9px; white-space: nowrap; }
 .brand b { font-size: 15.5px; letter-spacing: -.02em; }
 .brand span {
   font-family: var(--mono);
@@ -119,12 +129,15 @@ input, select { font: inherit; }
   text-transform: uppercase;
   color: var(--text-3);
 }
-.topbar .sep { flex: 1; }
+/* El separador empuja los botones a la derecha, pero si la barra se queda
+   sin lugar tiene que ceder su espacio en vez de sacar un chip del renglón. */
+.topbar .sep { flex: 1 1 0; min-width: 0; }
 .chip {
   font-family: var(--mono);
   font-size: 11.5px;
   padding: 4px 9px;
   border-radius: 999px;
+  white-space: nowrap;
   background: var(--surface-2);
   border: 1px solid var(--line);
   color: var(--text-2);
