@@ -691,6 +691,11 @@ export default function App() {
   return (
     <div className="app" data-tema={tema === 'claro' ? 'claro' : undefined}>
       {capaActualizacion}
+      {/*
+        Dos filas fijas y no un salto de línea cuando no cabe: arriba quién sos y
+        en qué estás, abajo a dónde podés ir. Con ocho botones en una sola fila,
+        la barra se veía apretada y el orden no se leía.
+      */}
       <header className="topbar">
         <div className="brand">
           <b>Constructor de Planos</b>
@@ -698,9 +703,9 @@ export default function App() {
         </div>
         <span className="chip">Plano N° {proyecto.numero}</span>
         <span className="chip">{proyecto.areas.length === 1 ? area.nombre : `${proyecto.areas.length} áreas`}</span>
-        <div className="sep" />
-        {avisoActualizacion && <span className="chip" title={avisoActualizacion}>{avisoActualizacion}</span>}
         <span className="chip">{usuario.nombre} · {usuario.rol}</span>
+        {avisoActualizacion && <span className="chip" title={avisoActualizacion}>{avisoActualizacion}</span>}
+        <div className="sep" />
         <button
           className="btn plano chico"
           onClick={buscarActualizacionAhora}
@@ -709,6 +714,10 @@ export default function App() {
         >
           {buscandoActualizacion ? 'Buscando…' : 'Actualizar app'}
         </button>
+        <button className="btn plano chico" onClick={() => setUsuario(null)}>Salir</button>
+      </header>
+
+      <nav className="barra-nav">
         <button className="btn plano chico" onClick={() => setVerProyectos(true)}>Proyectos</button>
         {puedeDistribuidores(usuario) && (
           <button className="btn plano chico" onClick={() => { void recargarDistribuidores(); setVerDistribuidores(true) }}>Distribuidores</button>
@@ -730,8 +739,7 @@ export default function App() {
         <button className="btn plano chico" onClick={() => setTema(tema === 'oscuro' ? 'claro' : 'oscuro')}>
           {tema === 'oscuro' ? '☀ Claro' : '☾ Oscuro'}
         </button>
-        <button className="btn plano chico" onClick={() => setUsuario(null)}>Salir</button>
-      </header>
+      </nav>
 
       {verProyectos && (
         <Proyectos

@@ -120,6 +120,23 @@ input, select { font: inherit; }
 }
 .topbar > * { flex-shrink: 0; }
 .topbar .btn { white-space: nowrap; }
+
+/* La segunda fila: a dónde se puede ir. Va aparte de la de arriba, que dice
+   quién sos y en qué estás, para que el orden se lea de un vistazo. */
+.barra-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  row-gap: 6px;
+  padding: 6px 12px;
+  flex: 0 0 auto;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--line);
+}
+.barra-nav > * { flex-shrink: 0; }
+.barra-nav .btn { white-space: nowrap; }
+.barra-nav .sep { flex: 1 1 0; min-width: 0; }
 .brand { display: flex; align-items: baseline; gap: 9px; white-space: nowrap; }
 .brand b { font-size: 15.5px; letter-spacing: -.02em; }
 .brand span {
