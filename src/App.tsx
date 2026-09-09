@@ -9,7 +9,7 @@ import { csvABytes, FILTRO_CSV, FILTRO_PDF, guardarArchivo } from './exportar/gu
 import { esAdmin, IVA_CR, type Usuario } from './auth'
 import type { Area, Cabina, Config, Pais, Proyecto, TipoCabina, TipologiaId } from './types'
 import {
-  ACABADOS, alturasDe, anchosPanel, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, mgMedidas, MODELOS,
+  ACABADOS, alturasDe, anchosPanel, claroAjustado, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, mgMedidas, MODELOS,
   PAISES, etiquetaTier, nombreHerraje, nombreModelo, tierDeColor, TIPOLOGIAS, tipologia, tipologiaEspejo,
 } from './catalog'
 import VistaRender from './components/VistaRender'
@@ -274,6 +274,20 @@ export default function App() {
    * cabinas en siete metros— se dibuja igual y nadie se entera hasta fabricar.
    */
   const tramosConProblema = area.tramos.filter((t) => t.ajuste && t.ajuste !== 'exacto')
+
+  /**
+   * Cuánto tienen que sumar TODAS las pilastras de un tramo. Es el dato que
+   * hace falta para poder elegirlas a mano y acertar: si las internas piden
+   * 141 cm, 30 · 40 · 50 no llega y hay que verlo antes, no después.
+   */
+  function sumaPilastras(t: Area['tramos'][number]): number {
+    const muros = (t.muroInicio ? 1 : 0) + (t.muroFin ? 1 : 0)
+    const conPuerta = t.cabinas.filter((c) => c.tipo !== 'orinal').length
+    const cuerpos = t.cabinas.reduce(
+      (s, c) => s + (c.tipo === 'orinal' ? c.anchoCm : c.puerta.anchoCm), 0,
+    )
+    return claroAjustado(t.claroCm, muros, conPuerta) - cuerpos
+  }
   const avisosAccesible = area.tramos.filter((t) => t.avisoAccesible)
 
   /** los colores de México no están en el catálogo, así que el render se busca por nombre */
@@ -420,8 +434,8 @@ export default function App() {
         x.id !== tramoId
           ? x
           : r
-            ? { ...x, cabinas: r.cabinas, pilastras: r.pilastras, canaletaCm: r.canaletaCm, ajuste: r.ajuste, mensaje: r.mensaje }
-            : { ...x, cabinas },
+            ? { ...x, cabinas: r.cabinas, pilastras: r.pilastras, canaletaCm: r.canaletaCm, ajuste: r.ajuste, mensaje: r.mensaje, pilastrasFijas: undefined }
+            : { ...x, cabinas, pilastrasFijas: undefined },
       ),
     })
   }
@@ -440,6 +454,14 @@ export default function App() {
     if (!t || t.cabinas.length === 0) return
     const extremo = indice === 0 || indice === t.cabinas.length
     const muros = (t.muroInicio ? 1 : 0) + (t.muroFin ? 1 : 0)
+
+    // Las medidas las decide el cliente, así que lo que ya eligió se queda:
+    // esta pilastra se suma a la lista y solo se reacomodan las que no tocó.
+    // Sin esto, elegir la segunda deshacía la primera y salían emparejadas.
+    const elegidas = [...new Set([...(t.pilastrasFijas ?? []), indice])].sort((a, b) => a - b)
+    const clavadas = Array.from({ length: t.cabinas.length + 1 }, (_, i) =>
+      i === indice ? anchoCm : elegidas.includes(i) ? (t.pilastras?.[i] ?? null) : null,
+    )
     const r = modularConCatalogo(
       t.claroCm,
       t.cabinas.length,
@@ -448,8 +470,8 @@ export default function App() {
       {
         pilInterna: extremo ? undefined : anchoCm,
         pilExtremo: extremo ? anchoCm : undefined,
-        // solo la que movió queda clavada: las demás se reparten solas
         pilastraIndice: indice,
+        pilastras: clavadas,
         // las puertas ya elegidas NO se tocan: mover una pilastra mueve pilastras
         puerta: config.puertaCm ?? t.cabinas.find((c) => c.tipo === 'normal')?.puerta.anchoCm,
         puertaAccesible:
@@ -464,17 +486,31 @@ export default function App() {
     // La excepción es una tira que ya venía pasada: ahí hay que dejarla tocar
     // las piezas para poder arreglarla.
     if (r.ajuste === 'falta' && t.ajuste !== 'falta') {
-      setBloqueo(`Esa pilastra no cabe en el claro de ${t.claroCm} cm. ${r.mensaje}`)
+      setBloqueo(
+        `Con esa medida las piezas no caben en el claro de ${t.claroCm} cm. ${r.mensaje}` +
+          (elegidas.length > 1
+            ? ' Llevás ' + elegidas.length + ' pilastras elegidas a mano: soltá alguna para darle juego.'
+            : ''),
+      )
       return
     }
     setBloqueo(null)
     setArea({
       tramos: area.tramos.map((x) =>
         x.id === tramoId
-          ? { ...x, cabinas: r.cabinas, pilastras: r.pilastras, canaletaCm: r.canaletaCm, ajuste: r.ajuste, mensaje: r.mensaje, avisoAccesible: r.avisoAccesible }
+          ? { ...x, cabinas: r.cabinas, pilastras: r.pilastras, canaletaCm: r.canaletaCm, ajuste: r.ajuste, mensaje: r.mensaje, avisoAccesible: r.avisoAccesible, pilastrasFijas: elegidas }
           : x,
       ),
     })
+  }
+
+  /** cuántas pilastras eligió el cliente a mano, para poder soltarlas */
+  const pilastrasElegidas = area.tramos.reduce((n, t) => n + (t.pilastrasFijas?.length ?? 0), 0)
+
+  /** Suelta las pilastras elegidas a mano para que el buscador vuelva a mandar. */
+  function soltarPilastras() {
+    setBloqueo(null)
+    setArea({ tramos: area.tramos.map((x) => ({ ...x, pilastrasFijas: undefined })) })
   }
 
   /**
@@ -769,6 +805,14 @@ export default function App() {
                 <button className="btn chico" onClick={bajarCSV}>CSV para el CIP</button>
                 <div className="div" />
                 <span className="chip on">Arrastrá los paneles · clic derecho en una pieza</span>
+                {pilastrasElegidas > 0 && (
+                  <>
+                    <div className="div" />
+                    <button className="btn chico" onClick={soltarPilastras} title="Vuelve a dejar que el buscador elija las pilastras">
+                      ↺ Soltar {pilastrasElegidas} pilastra{pilastrasElegidas === 1 ? '' : 's'}
+                    </button>
+                  </>
+                )}
                 <div className="sep" style={{ flex: 1 }} />
               </div>
 
@@ -789,7 +833,11 @@ export default function App() {
                         : 'Cierra con canaleta'}
                   </b>
                   {tramosConProblema.map((t) => (
-                    <span key={t.id}>{t.nombre}: {t.mensaje}</span>
+                    <span key={t.id}>
+                      {t.nombre}: {t.mensaje}
+                      {(t.pilastrasFijas?.length ?? 0) > 0 &&
+                        ` · Entre las ${(t.pilastras?.length ?? 0)} pilastras hay que repartir ${sumaPilastras(t).toFixed(1)} cm`}
+                    </span>
                   ))}
                 </div>
               )}

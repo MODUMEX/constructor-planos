@@ -94,6 +94,12 @@ export interface Tramo {
   mensaje?: string
   /** cuando la cabina accesible no llegó al ancho pedido, por qué */
   avisoAccesible?: string
+  /**
+   * Posiciones de pilastra que el CLIENTE ya eligió a mano. Se respetan tal
+   * cual en cada nueva modulación: solo se reacomodan las que no tocó. Así
+   * puede armar 30 · 40 · 50 y no tres iguales.
+   */
+  pilastrasFijas?: number[]
 }
 
 export type TipologiaId =

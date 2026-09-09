@@ -77,6 +77,12 @@ export interface OpcionesModulacion {
   pilInternaFija?: number
   /** qué posición movió el vendedor: solo esa se clava, el resto se reparte */
   pilastraFijaIndice?: number
+  /**
+   * Las pilastras que el cliente ya eligió, una entrada por posición y null
+   * donde todavía manda el buscador. Tiene prioridad sobre las dos opciones
+   * de arriba: es lo que permite 30 · 40 · 50 en vez de tres iguales.
+   */
+  pilastrasFijas?: (number | null | undefined)[]
   /** lo mismo para las pilastras de los extremos */
   pilExtremoFija?: number
   /** las medidas de puerta que se pueden usar; por omisión, las de catálogo */
@@ -164,7 +170,7 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
       : [0]
   // Si el vendedor movió UNA pilastra, solo esa queda clavada: las demás se
   // buscan libres. Forzar toda la clase era lo que emparejaba la tira entera.
-  const unaClavada = o.pilastraFijaIndice !== undefined
+  const unaClavada = o.pilastraFijaIndice !== undefined || (o.pilastrasFijas ?? []).some((v) => !!v)
   const opInternas =
     internas > 0 ? (o.pilInternaFija && !unaClavada ? [o.pilInternaFija] : PILASTRAS_INTERNAS) : [0]
   const opExtremos = o.pilExtremoFija && !unaClavada ? [o.pilExtremoFija] : PILASTRAS_EXTREMO
@@ -212,10 +218,13 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
   // no cierra se mezclan medidas del catálogo antes que dejar una canaleta.
   const cuerpos = nEst * mejor.ap + nAcc * mejor.acc + fijoMG
   const clavadas: (number | null)[] = Array(internas + 2).fill(null)
+  // lo que el cliente ya eligió se copia primero y no se discute
+  const yaElegidas = o.pilastrasFijas ?? []
+  for (let i = 0; i < clavadas.length; i++) clavadas[i] = yaElegidas[i] ?? null
   const iFija = o.pilastraFijaIndice
   if (iFija !== undefined && iFija >= 0 && iFija < clavadas.length) {
     clavadas[iFija] = (iFija === 0 || iFija === clavadas.length - 1 ? o.pilExtremoFija : o.pilInternaFija) ?? null
-  } else if (o.pilInternaFija || o.pilExtremoFija) {
+  } else if (!yaElegidas.length && (o.pilInternaFija || o.pilExtremoFija)) {
     // sin saber cuál movió, se respeta la medida en todas las de su clase
     for (let i = 0; i < clavadas.length; i++) {
       const ext = i === 0 || i === clavadas.length - 1

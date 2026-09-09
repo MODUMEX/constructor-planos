@@ -77,6 +77,8 @@ export function modularConCatalogo(
     puertaAccesible?: number
     /** cuál pilastra movió el vendedor: solo esa queda clavada */
     pilastraIndice?: number
+    /** las que el cliente ya eligió, por posición de frontera (null = libre) */
+    pilastras?: (number | null | undefined)[]
   },
   extra?: { accesible?: boolean; anchoAccesibleMinCm?: number; mingitorios?: number; anchoOrinalCm?: number; pais?: Pais },
 ): { cabinas: Cabina[]; pilastras: number[]; canaletaCm: number; ajuste: Tramo['ajuste']; mensaje: string; avisoAccesible?: string } | null {
@@ -102,6 +104,20 @@ export function modularConCatalogo(
     pilInternaFija: fijar?.pilInterna,
     pilExtremoFija: fijar?.pilExtremo,
     pilastraFijaIndice: fijar?.pilastraIndice,
+    // La lista del tramo trae una entrada por frontera, incluidas las de
+    // mampara entre orinales, que no consumen pilastra: hay que comprimirla a
+    // las posiciones que el buscador conoce.
+    pilastrasFijas: fijar?.pilastras
+      ? (() => {
+          const salida: (number | null | undefined)[] = [fijar.pilastras[0]]
+          for (let i = 1; i <= cantidad - 1; i++) {
+            const entreOrinales = i > cantidad - 1 - nMing && i >= cantidad - nMing
+            if (!entreOrinales) salida.push(fijar.pilastras[i])
+          }
+          salida.push(fijar.pilastras[cantidad])
+          return salida
+        })()
+      : undefined,
   })
   if (!m) return null
 
