@@ -275,6 +275,40 @@ export default function App() {
     else document.documentElement.removeAttribute('data-tema')
   }, [tema])
 
+  /**
+   * La región del distribuidor del proyecto. El proyecto guarda su NOMBRE, así
+   * que la región se busca en la lista; un Distribuidor solo tiene la suya.
+   */
+  const regionDistribuidor =
+    distribuidores.find((d) => d.nombre === proyecto.distribuidor)?.region ?? null
+
+  /**
+   * La moneda NO se elige: la manda la región. Costa Rica factura en colones y
+   * el resto de LATAM en dólares. Sin distribuidor elegido todavía no hay
+   * región, así que ahí se deja como estaba.
+   */
+  const monedaFija: 'CRC' | 'USD' | null =
+    regionDistribuidor === 'Costa Rica' ? 'CRC' : regionDistribuidor === 'LATAM' ? 'USD' : null
+
+  /**
+   * Se cotiza si se fabrica en Costa Rica Y el distribuidor no es de México,
+   * que no cotiza desde la app: se lleva plano y orden de compra, sin precio.
+   */
+  const cotiza = proyecto.paisFabricacion === 'CR' && regionDistribuidor !== 'México'
+
+  // OJO: estos dos efectos van ACÁ y no más abajo. Abajo hay un return temprano
+  // para la pantalla de entrada, y un hook después de un return cambia la
+  // cantidad de hooks entre "sin sesión" y "con sesión": React aborta el
+  // dibujo y la ventana queda en negro al iniciar sesión.
+  useEffect(() => {
+    if (monedaFija && moneda !== monedaFija) setMoneda(monedaFija)
+  }, [monedaFija, moneda])
+
+  // si el distribuidor elegido no cotiza, no dejarla parada en ese paso
+  useEffect(() => {
+    if (!cotiza && paso === 8) setPaso(7)
+  }, [cotiza, paso])
+
   const area = proyecto.areas[activa]
   const config = area.config
   // la altura de cada pieza la manda el modelo, no el vendedor
@@ -685,34 +719,6 @@ export default function App() {
 
   const cabinasTotal = area.tramos.reduce((s, t) => s + t.cabinas.length, 0)
 
-  /**
-   * La región del distribuidor del proyecto. El proyecto guarda su NOMBRE, así
-   * que la región se busca en la lista; un Distribuidor solo tiene la suya.
-   */
-  const regionDistribuidor =
-    distribuidores.find((d) => d.nombre === proyecto.distribuidor)?.region ?? null
-
-  /**
-   * La moneda NO se elige: la manda la región. Costa Rica factura en colones y
-   * el resto de LATAM en dólares. Sin distribuidor elegido todavía no hay
-   * región, así que ahí se deja como estaba.
-   */
-  const monedaFija: 'CRC' | 'USD' | null =
-    regionDistribuidor === 'Costa Rica' ? 'CRC' : regionDistribuidor === 'LATAM' ? 'USD' : null
-
-  /**
-   * Se cotiza si se fabrica en Costa Rica Y el distribuidor no es de México,
-   * que no cotiza desde la app: se lleva plano y orden de compra, sin precio.
-   */
-  const cotiza = proyecto.paisFabricacion === 'CR' && regionDistribuidor !== 'México'
-  useEffect(() => {
-    if (monedaFija && moneda !== monedaFija) setMoneda(monedaFija)
-  }, [monedaFija, moneda])
-
-  // si el distribuidor elegido no cotiza, no dejarla parada en ese paso
-  useEffect(() => {
-    if (!cotiza && paso === 8) setPaso(7)
-  }, [cotiza, paso])
 
   const pasosVisibles = cotiza ? PASOS : PASOS.filter((p) => p.n !== 8)
   const ultimoPaso = cotiza ? 8 : 7
