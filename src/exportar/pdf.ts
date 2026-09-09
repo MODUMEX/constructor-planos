@@ -29,6 +29,8 @@ const GRIS = 130
 const MARCA: [number, number, number] = [42, 76, 143]
 /** gris azulado de las cotas: no compite con el azul de la marca */
 const COTA: [number, number, number] = [74, 90, 114]
+/** la cota total va más oscura, para que se lea primero */
+const TINTA_COTA: [number, number, number] = [25, 25, 25]
 /** arco de barrido de la puerta */
 const ARCO: [number, number, number] = [143, 163, 196]
 
@@ -66,6 +68,149 @@ function arco(doc: jsPDF, cx: number, cy: number, r: number, desde: number, hast
   }
 }
 
+/** punta de flecha llena; `ang` es hacia dónde apunta, en radianes */
+function flecha(doc: jsPDF, x: number, y: number, ang: number, tam = 1.5) {
+  const abre = 0.26
+  doc.triangle(
+    x, y,
+    x - tam * Math.cos(ang - abre), y - tam * Math.sin(ang - abre),
+    x - tam * Math.cos(ang + abre), y - tam * Math.sin(ang + abre),
+    'F',
+  )
+}
+
+/**
+ * Rayado a 45° dentro de un rectángulo, que es como se dibuja un muro cortado
+ * en un plano de taller. Las líneas se recortan a mano al rectángulo en vez de
+ * usar recorte del PDF, que jsPDF no maneja bien.
+ */
+function rayarRect(doc: jsPDF, x: number, y: number, w: number, h: number, paso = 1.3) {
+  if (w <= 0 || h <= 0) return
+  for (let d = -h; d < w; d += paso) {
+    const t0 = Math.max(0, -d)
+    const t1 = Math.min(h, w - d)
+    if (t1 <= t0) continue
+    doc.line(x + d + t0, y + t0, x + d + t1, y + t1)
+  }
+}
+
+/** el muro: contorno y rayado, como en un plano de taller */
+function muro(doc: jsPDF, x: number, y: number, w: number, h: number) {
+  doc.setFillColor(255, 255, 255)
+  doc.setDrawColor(70)
+  doc.setLineWidth(0.4)
+  doc.rect(x, y, w, h, 'FD')
+  doc.setLineWidth(0.13)
+  doc.setDrawColor(140)
+  rayarRect(doc, x, y, w, h)
+  doc.setDrawColor(70)
+  doc.setLineWidth(0.4)
+  doc.rect(x, y, w, h)
+}
+
+/**
+ * Una cota de plano: líneas de extensión que salen de la pieza, línea de cota
+ * con flechas en las puntas y el número centrado encima. Si el tramo es muy
+ * corto para que quepan las flechas, se dibujan por fuera apuntando hacia
+ * adentro, como se hace a mano.
+ */
+function cotaEntre(
+  doc: jsPDF,
+  e: Escala,
+  m: Marco,
+  u0: number,
+  u1: number,
+  vLinea: number,
+  vPieza: number,
+  etiqueta: string,
+  o: { size?: number; bold?: boolean; color?: [number, number, number]; rot?: number; vTexto?: number } = {},
+) {
+  const color = o.color ?? COTA
+  const [ax, ay] = aHoja(e, pt(m, u0, vLinea))
+  const [bx, by] = aHoja(e, pt(m, u1, vLinea))
+  const largoMm = Math.hypot(bx - ax, by - ay)
+  if (largoMm < 0.6) return
+
+  doc.setDrawColor(color[0], color[1], color[2])
+  doc.setFillColor(color[0], color[1], color[2])
+
+  // líneas de extensión: de la pieza hasta un poco más allá de la cota
+  doc.setLineWidth(0.12)
+  const masAlla = vLinea + (vLinea - vPieza) * 0.06
+  for (const u of [u0, u1]) {
+    const [px, py] = aHoja(e, pt(m, u, vPieza))
+    const [qx, qy] = aHoja(e, pt(m, u, masAlla))
+    doc.line(px, py, qx, qy)
+  }
+
+  // línea de cota
+  doc.setLineWidth(0.22)
+  const ang = Math.atan2(by - ay, bx - ax)
+  const cabenAdentro = largoMm > 7
+  if (cabenAdentro) {
+    doc.line(ax, ay, bx, by)
+    flecha(doc, ax, ay, ang + Math.PI)
+    flecha(doc, bx, by, ang)
+  } else {
+    // el tramo no da: la línea se prolonga y las flechas van por fuera
+    const dx = Math.cos(ang) * 4
+    const dy = Math.sin(ang) * 4
+    doc.line(ax - dx, ay - dy, bx + dx, by + dy)
+    flecha(doc, ax, ay, ang)
+    flecha(doc, bx, by, ang + Math.PI)
+  }
+
+  const [tx, ty] = aHoja(e, pt(m, (u0 + u1) / 2, o.vTexto ?? vLinea))
+  texto(doc, etiqueta, tx, ty, {
+    size: o.size ?? 6.2,
+    bold: o.bold,
+    align: 'center',
+    angle: o.rot ?? 0,
+    color,
+  })
+}
+
+/** la misma cota pero medida a lo hondo: sirve para la profundidad, al costado */
+function cotaEnV(
+  doc: jsPDF,
+  e: Escala,
+  m: Marco,
+  v0: number,
+  v1: number,
+  uLinea: number,
+  uPieza: number,
+  etiqueta: string,
+  o: { size?: number; bold?: boolean; color?: [number, number, number]; rot?: number; uTexto?: number } = {},
+) {
+  const color = o.color ?? COTA
+  const [ax, ay] = aHoja(e, pt(m, uLinea, v0))
+  const [bx, by] = aHoja(e, pt(m, uLinea, v1))
+  if (Math.hypot(bx - ax, by - ay) < 0.6) return
+
+  doc.setDrawColor(color[0], color[1], color[2])
+  doc.setFillColor(color[0], color[1], color[2])
+  doc.setLineWidth(0.12)
+  for (const v of [v0, v1]) {
+    const [px, py] = aHoja(e, pt(m, uPieza, v))
+    const [qx, qy] = aHoja(e, pt(m, uLinea + (uLinea - uPieza) * 0.08, v))
+    doc.line(px, py, qx, qy)
+  }
+  doc.setLineWidth(0.22)
+  const ang = Math.atan2(by - ay, bx - ax)
+  doc.line(ax, ay, bx, by)
+  flecha(doc, ax, ay, ang + Math.PI)
+  flecha(doc, bx, by, ang)
+
+  const [tx, ty] = aHoja(e, pt(m, o.uTexto ?? uLinea, (v0 + v1) / 2))
+  texto(doc, etiqueta, tx, ty, {
+    size: o.size ?? 6.2,
+    bold: o.bold,
+    align: 'center',
+    angle: (o.rot ?? 0) + 90,
+    color,
+  })
+}
+
 function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
   const conEsquina = tipologia(area.config.tipologia).esquinaCompartida
   // el grueso de panel y pilastra sale del espesor del material: 3 mm en Superior, 12 en compacto
@@ -80,21 +225,24 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
     const horizontal = Math.abs(m.ax) === 1
     const acum = acumulado(tramo.cabinas)
 
-    // muro de fondo
-    doc.setFillColor(214, 214, 214)
-    doc.setDrawColor(90)
-    doc.setLineWidth(0.35)
+    // muro de fondo, rayado a 45° como en un plano de taller
     // el muro sobresale un poco de las piezas, para no terminar al ras
     const [mx, my] = aHoja(e, pt(m, -SOBRA_MURO_CM, -ESPESOR_MURO))
     const [mx2, my2] = aHoja(e, pt(m, largo + SOBRA_MURO_CM, 0))
-    doc.rect(Math.min(mx, mx2), Math.min(my, my2), Math.abs(mx2 - mx) || ESPESOR_MURO * e.k, Math.abs(my2 - my) || ESPESOR_MURO * e.k, 'FD')
+    muro(
+      doc,
+      Math.min(mx, mx2),
+      Math.min(my, my2),
+      Math.abs(mx2 - mx) || ESPESOR_MURO * e.k,
+      Math.abs(my2 - my) || ESPESOR_MURO * e.k,
+    )
 
     // los muros laterales se corren al frente lo mismo que el de fondo se pasa
     // de las piezas, para que la pared no termine al ras de la cabina
     const muroLateral = (u0: number, u1: number) => {
       const [ax, ay] = aHoja(e, pt(m, u0, -ESPESOR_MURO))
       const [bx, by] = aHoja(e, pt(m, u1, prof + SOBRA_MURO_CM))
-      doc.rect(Math.min(ax, bx), Math.min(ay, by), Math.abs(bx - ax), Math.abs(by - ay), 'FD')
+      muro(doc, Math.min(ax, bx), Math.min(ay, by), Math.abs(bx - ax), Math.abs(by - ay))
     }
     if (tramo.muroInicio && !conEsquina) muroLateral(-ESPESOR_MURO, 0)
     if (tramo.muroFin && !conEsquina) muroLateral(largo, largo + ESPESOR_MURO)
@@ -207,21 +355,23 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
     const rot = horizontal ? 0 : m.ay > 0 ? -90 : 90
     doc.setDrawColor(COTA[0], COTA[1], COTA[2])
     doc.setLineWidth(0.2)
+    // la cadena de cabinas, cada una con sus flechas
     tramo.cabinas.forEach((cab, i) => {
       const u0 = acum[i]
-      const u1 = u0 + cab.anchoCm
-      const [ix, iy] = aHoja(e, pt(m, u0, -ESPESOR_MURO - 13))
-      const [fx, fy] = aHoja(e, pt(m, u1, -ESPESOR_MURO - 13))
-      doc.line(ix, iy, fx, fy)
-      const [tx, ty] = aHoja(e, pt(m, (u0 + u1) / 2, -ESPESOR_MURO - 17))
-      texto(doc, String(cab.anchoCm), tx, ty, { size: 6.5, align: 'center', angle: rot, color: COTA })
+      cotaEntre(doc, e, m, u0, u0 + cab.anchoCm, -ESPESOR_MURO - 13, -ESPESOR_MURO - 1, String(cab.anchoCm), {
+        size: 6.5,
+        rot,
+        vTexto: -ESPESOR_MURO - 15,
+      })
     })
-    const [tix, tiy] = aHoja(e, pt(m, 0, -ESPESOR_MURO - 30))
-    const [tfx, tfy] = aHoja(e, pt(m, largo, -ESPESOR_MURO - 30))
-    doc.setDrawColor(TINTA)
-    doc.line(tix, tiy, tfx, tfy)
-    const [ttx, tty] = aHoja(e, pt(m, largo / 2, -ESPESOR_MURO - 34))
-    texto(doc, `${largo} cm`, ttx, tty, { size: 8, bold: true, align: 'center', angle: rot })
+    // y la total, arriba de todas
+    cotaEntre(doc, e, m, 0, largo, -ESPESOR_MURO - 27, -ESPESOR_MURO - 14, `${largo} cm`, {
+      size: 8,
+      bold: true,
+      color: TINTA_COTA,
+      rot,
+      vTexto: -ESPESOR_MURO - 30,
+    })
 
     // Cotas por PIEZA, al frente: pilastra y puerta en horizontal, panel girado
     // a lo largo de la pieza. Son las medidas que se fabrican, no el reparto.
@@ -230,11 +380,22 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
       const nCab = tramo.cabinas.length
       const cortes = [0, ...acum.slice(1), largo]
 
+      // cada pilastra, acotada por su ancho real de pieza
       cortes.forEach((u, k) => {
         const ancho = anchoPilDe(k)
         const centro = k === 0 ? u + ancho / 2 : k === cortes.length - 1 ? u - ancho / 2 : u
-        const [px, py] = aHoja(e, pt(m, centro, prof + 13))
-        texto(doc, String(ancho), px, py, { size: 5.5, align: 'center', angle: rot, color: COTA })
+        cotaEntre(doc, e, m, centro - ancho / 2, centro + ancho / 2, prof - 9, prof - 1, String(ancho), {
+          size: 5.5,
+          rot,
+          vTexto: prof - 11,
+        })
+      })
+
+      // la profundidad, al costado, como el "TO FACE" de los planos de taller
+      cotaEnV(doc, e, m, -ESPESOR_MURO, prof, -SOBRA_MURO_CM - 16, -SOBRA_MURO_CM - 2, `${prof}`, {
+        size: 6.5,
+        rot,
+        uTexto: -SOBRA_MURO_CM - 19,
       })
 
       tramo.cabinas.forEach((cab, i) => {
@@ -243,8 +404,11 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
         const u1 = u0 + cab.anchoCm
         const izq = i === 0 ? anchoPilDe(0) : anchoPilDe(i) / 2
         const der = i === nCab - 1 ? anchoPilDe(nCab) : anchoPilDe(i + 1) / 2
-        const [dx, dy] = aHoja(e, pt(m, (u0 + izq + (u1 - der)) / 2, prof + 22))
-        texto(doc, String(cab.puerta.anchoCm), dx, dy, { size: 6, align: 'center', angle: rot, color: COTA })
+        cotaEntre(doc, e, m, u0 + izq, u1 - der, prof - 20, prof - 12, String(cab.puerta.anchoCm), {
+          size: 6,
+          rot,
+          vTexto: prof - 22,
+        })
 
         // el panel divisor va a la derecha de la cabina; su cota, en vertical
         if (i < nCab - 1) {

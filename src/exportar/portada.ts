@@ -66,19 +66,54 @@ function texto(
 /**
  * El párrafo que describe lo que se va a instalar. Sale de la configuración
  * del área, así que dice siempre lo que de verdad se está fabricando.
+ *
+ * Cada línea se describe distinto porque son productos distintos: LEEDER es
+ * laminado compacto macizo, Superior 2.0 es estructura con cara y perfil, y
+ * Touchless es un LEEDER reforzado con los electrónicos S3. El Constructor
+ * viejo tenía un solo texto de LEEDER para todo, y en Superior mentía.
  */
 function descripcion(area: Area): string[] {
   const c = area.config
   const a = alturasDe(c.modelo)
   const remate = c.terminacion === 'ZOCLO' ? 'zoclo de acero inoxidable' : 'patas de acero inoxidable'
+  const alturas = `Pilastras de ${(a.pilastra / 100).toFixed(2)}m, puertas y paneles laterales de ${(a.puerta / 100).toFixed(2)}m de altura.`
+  const color = `COLOR DE DIVISIONES: ${c.color}${c.colorCodigo ? ` (${c.colorCodigo})` : ''}`
+  const herrajes = `herrajes, bisagras y cerrojos de ${nombreHerrajeLargo(c.herrajeAcabado)}.`
+
+  if (c.linea === 'SUPERIOR') {
+    return [
+      'Suministro e instalación de mamparas sanitarias línea Superior 2.0.',
+      `Puertas, pilastras y paneles de estructura con cara de ${c.espesorMm}mm`,
+      `en acabado ${c.acabado.toLowerCase()}, con perfil perimetral de aluminio.`,
+      `Línea Superior 2.0, modelo ${nombreModelo(c.linea, c.modelo)},`,
+      `fijación a piso con ${remate};`,
+      herrajes,
+      alturas,
+      color,
+    ]
+  }
+
+  if (c.linea === 'TOUCHLESS') {
+    return [
+      'Suministro e instalación de mamparas sanitarias línea Touchless S3.',
+      `Puertas y pilastras de ${c.espesorMm}mm de espesor y paneles laterales de ${c.espesorMm}mm,`,
+      'sobre estructura reforzada, con apertura y cerradura sin contacto.',
+      `Línea Touchless S3, modelo ${nombreModelo(c.linea, c.modelo)},`,
+      `fijación a piso con ${remate};`,
+      herrajes,
+      alturas,
+      color,
+    ]
+  }
+
   return [
     'Suministro e instalación de mamparas sanitarias de laminado compacto.',
     `Puertas y pilastras de ${c.espesorMm}mm de espesor y paneles laterales de ${c.espesorMm}mm.`,
     `Línea ${nombreDeLinea(c.linea)}, modelo ${nombreModelo(c.linea, c.modelo)},`,
     `fijación a piso con ${remate};`,
-    `herrajes, bisagras y cerrojos de ${nombreHerrajeLargo(c.herrajeAcabado)}.`,
-    `Pilastras de ${(a.pilastra / 100).toFixed(2)}m, puertas y paneles laterales de ${(a.puerta / 100).toFixed(2)}m de altura.`,
-    `COLOR DE DIVISIONES: ${c.color}${c.colorCodigo ? ` (${c.colorCodigo})` : ''}`,
+    herrajes,
+    alturas,
+    color,
   ]
 }
 
