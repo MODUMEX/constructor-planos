@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import {
-  crearDistribuidor, guardarDistribuidor, REGIONES,
+  crearDistribuidor, guardarDistribuidor, PAISES_DISTRIBUIDOR, REGIONES,
   type DatosDistribuidor, type Distribuidor, type Region,
 } from '../distribuidores'
 import type { Usuario } from '../auth'
@@ -21,7 +21,8 @@ import type { Usuario } from '../auth'
  */
 
 const VACIO: DatosDistribuidor = {
-  nombre: '', contacto: '', email: '', telefono: '', ubicacion: '', region: 'Costa Rica', activo: true, password: '',
+  nombre: '', contacto: '', email: '', telefono: '', ubicacion: '', region: 'Costa Rica',
+  pais: 'Costa Rica', descuento: 0, iva: null, activo: true, password: '',
 }
 
 interface Props {
@@ -38,7 +39,7 @@ export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Pr
 
   const esNuevo = edita !== null && edita.distribuidorId === undefined
 
-  function campo(k: keyof DatosDistribuidor, v: string | boolean | Region | null) {
+  function campo(k: keyof DatosDistribuidor, v: string | number | boolean | Region | null) {
     setEdita((d) => (d ? { ...d, [k]: v } : d))
     setAviso(null)
   }
@@ -128,6 +129,37 @@ export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Pr
                   <span className="ayuda">Define en qué moneda cotiza</span>
                 </div>
                 <div className="campo">
+                  <label>País</label>
+                  <select value={edita.pais ?? ''} onChange={(e) => campo('pais', e.target.value || null)}>
+                    <option value="">Sin país</option>
+                    {PAISES_DISTRIBUIDOR.map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                  <span className="ayuda">Llena el País de la cotización</span>
+                </div>
+                <div className="campo">
+                  <label>Descuento (%)</label>
+                  <input
+                    type="number" min={0} max={100} step="0.01"
+                    value={edita.descuento ?? 0}
+                    onChange={(e) => campo('descuento', e.target.value === '' ? 0 : Number(e.target.value))}
+                  />
+                  <span className="ayuda">Cae automático en su cotización</span>
+                </div>
+                <div className="campo">
+                  <label>IVA (%)</label>
+                  <input
+                    type="number" min={0} max={100} step="0.01"
+                    value={edita.iva ?? ''}
+                    placeholder="Automático"
+                    onChange={(e) => campo('iva', e.target.value === '' ? null : Number(e.target.value))}
+                  />
+                  <span className="ayuda">
+                    En blanco = el de su región (Costa Rica 13, LATAM 0). Un 0 escrito a mano SÍ es 0.
+                  </span>
+                </div>
+                <div className="campo">
                   <label>Estado</label>
                   <select value={edita.activo === false ? 'no' : 'si'} onChange={(e) => campo('activo', e.target.value === 'si')}>
                     <option value="si">Activo</option>
@@ -146,13 +178,15 @@ export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Pr
                     <th>Contacto</th>
                     <th>Ubicación</th>
                     <th>Región</th>
+                    <th className="der">Desc.</th>
+                    <th className="der">IVA</th>
                     <th>Estado</th>
                     <th></th>
                   </tr>
                 </thead>
                 <tbody>
                   {lista.length === 0 && (
-                    <tr><td colSpan={6}>Todavía no hay distribuidores dados de alta.</td></tr>
+                    <tr><td colSpan={8}>Todavía no hay distribuidores dados de alta.</td></tr>
                   )}
                   {lista.map((d) => (
                     <tr key={d.distribuidorId}>
@@ -160,6 +194,8 @@ export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Pr
                       <td>{d.contacto || '—'}</td>
                       <td>{d.ubicacion || '—'}</td>
                       <td>{d.region ?? '—'}</td>
+                      <td className="der">{d.descuento ? d.descuento + '%' : '—'}</td>
+                      <td className="der">{d.iva === null ? 'Auto' : d.iva + '%'}</td>
                       <td>{d.activo ? 'Activo' : 'Inactivo'}</td>
                       <td className="der">
                         <button className="btn plano chico" onClick={() => { setEdita({ ...d }); setAviso(null) }}>Editar</button>

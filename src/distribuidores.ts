@@ -21,6 +21,16 @@ const LLAVE_SUPABASE = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefi
 export const REGIONES = ['Costa Rica', 'LATAM', 'México'] as const
 export type Region = (typeof REGIONES)[number]
 
+/**
+ * Los países que el Constructor viejo ofrecía para el distribuidor. Llena el
+ * País de la cotización, y es distinto de la REGIÓN: la región decide la
+ * moneda y el IVA automático, el país es el dato del cliente.
+ */
+export const PAISES_DISTRIBUIDOR = [
+  'México', 'Guatemala', 'Honduras', 'El Salvador', 'Nicaragua', 'Costa Rica', 'Panamá',
+  'Rep. Dominicana', 'Puerto Rico', 'Jamaica', 'Bahamas', 'Colombia', 'Chile', 'Uruguay', 'Perú',
+] as const
+
 /** lo que se manda al dar de alta o editar: la ficha más el acceso */
 export interface DatosDistribuidor extends Partial<Distribuidor> {
   /** contraseña de la cuenta del distribuidor; obligatoria al darlo de alta */
@@ -35,6 +45,12 @@ export interface Distribuidor {
   telefono: string
   ubicacion: string
   region: Region | null
+  /** país del distribuidor; cae en el País de la cotización */
+  pais: string | null
+  /** descuento en % que cae automático en la cotización */
+  descuento: number
+  /** IVA en %; null = el automático de la región (Costa Rica 13, LATAM 0) */
+  iva: number | null
   activo: boolean
 }
 
@@ -52,10 +68,13 @@ interface Fila {
   telefono: string | null
   ubicacion: string | null
   region: string | null
+  pais: string | null
+  descuento: number | null
+  iva: number | null
   activo: boolean | null
 }
 
-const COLUMNAS = 'distribuidor_id,nombre,contacto,email,telefono,ubicacion,region,activo'
+const COLUMNAS = 'distribuidor_id,nombre,contacto,email,telefono,ubicacion,region,pais,descuento,iva,activo'
 
 function deFila(f: Fila): Distribuidor {
   return {
@@ -66,6 +85,10 @@ function deFila(f: Fila): Distribuidor {
     telefono: f.telefono ?? '',
     ubicacion: f.ubicacion ?? '',
     region: (REGIONES as readonly string[]).includes(f.region ?? '') ? (f.region as Region) : null,
+    pais: f.pais ?? null,
+    descuento: Number(f.descuento ?? 0),
+    // ojo: 0 es un IVA válido (LATAM), así que solo null es "automático"
+    iva: f.iva === null || f.iva === undefined ? null : Number(f.iva),
     activo: f.activo !== false,
   }
 }
@@ -160,6 +183,9 @@ export async function crearDistribuidor(usuario: Usuario | null, d: DatosDistrib
     telefono: (d.telefono ?? '').trim() || null,
     ubicacion: (d.ubicacion ?? '').trim() || null,
     region: d.region ?? null,
+    pais: d.pais ?? null,
+    descuento: d.descuento ?? 0,
+    iva: d.iva ?? null,
     activo: d.activo !== false,
     password: d.password,
   })
@@ -174,6 +200,9 @@ export async function crearDistribuidor(usuario: Usuario | null, d: DatosDistrib
       telefono: (d.telefono ?? '').trim(),
       ubicacion: (d.ubicacion ?? '').trim(),
       region: d.region ?? null,
+      pais: d.pais ?? null,
+      descuento: d.descuento ?? 0,
+      iva: d.iva ?? null,
       activo: d.activo !== false,
     },
     mensaje: 'Distribuidor dado de alta con su cuenta de acceso.',
@@ -197,6 +226,9 @@ export async function guardarDistribuidor(usuario: Usuario | null, d: DatosDistr
     telefono: (d.telefono ?? '').trim() || null,
     ubicacion: (d.ubicacion ?? '').trim() || null,
     region: d.region ?? null,
+    pais: d.pais ?? null,
+    descuento: d.descuento ?? 0,
+    iva: d.iva ?? null,
     activo: d.activo !== false,
     ...(d.password ? { password: d.password } : {}),
   })
@@ -211,6 +243,9 @@ export async function guardarDistribuidor(usuario: Usuario | null, d: DatosDistr
       telefono: (d.telefono ?? '').trim(),
       ubicacion: (d.ubicacion ?? '').trim(),
       region: d.region ?? null,
+      pais: d.pais ?? null,
+      descuento: d.descuento ?? 0,
+      iva: d.iva ?? null,
       activo: d.activo !== false,
     },
     mensaje: d.password ? 'Cambios guardados, incluida la contraseña.' : 'Cambios guardados.',

@@ -46,6 +46,7 @@ interface Distribuidor {
   nombre: string | null
   descuento: number | null
   iva: number | null
+  region: string | null
 }
 
 async function pedir<T>(ruta: string, token: string): Promise<T[]> {
@@ -94,13 +95,21 @@ async function entrarPorSupabase(email: string, clave: string): Promise<Usuario>
   if (perfil.distribuidor_id) {
     try {
       const dist = await pedir<Distribuidor>(
-        `distribuidor?distribuidor_id=eq.${perfil.distribuidor_id}&select=nombre,descuento,iva`,
+        `distribuidor?distribuidor_id=eq.${perfil.distribuidor_id}&select=nombre,descuento,iva,region`,
         token,
       )
       if (dist[0]) {
         distribuidorNombre = dist[0].nombre ?? undefined
         descuento = Number(dist[0].descuento ?? 0)
-        if (dist[0].iva != null) ivaPorcentaje = Number(dist[0].iva)
+        // El IVA escrito a mano manda, incluso si es 0. En blanco va el de su
+        // región: LATAM factura sin IVA y antes se le cobraba el 13 % de
+        // Costa Rica por caer en el valor por omisión.
+        ivaPorcentaje =
+          dist[0].iva != null
+            ? Number(dist[0].iva)
+            : dist[0].region === 'LATAM'
+              ? 0
+              : IVA_CR
       }
     } catch {
       /* si la tabla no responde, se cotiza sin descuento y con el IVA de Costa Rica */
