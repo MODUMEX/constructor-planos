@@ -130,7 +130,9 @@ export default function App() {
         }
       : null,
   )
-  const [tema, setTema] = useState<'oscuro' | 'claro'>(params.get('tema') === 'claro' ? 'claro' : 'oscuro')
+  // La app va en oscuro. El interruptor se quitó; queda el ?tema=claro de la
+  // dirección por si hace falta una captura en claro.
+  const [tema] = useState<'oscuro' | 'claro'>(params.get('tema') === 'claro' ? 'claro' : 'oscuro')
   const [paso, setPaso] = useState(demo ? pasoDemo : 1)
 
   // Un proyecto nuevo arranca en blanco. Los datos de ejemplo solo se cargan con
@@ -736,9 +738,6 @@ export default function App() {
             Solicitudes{nSolicitudes > 0 ? ` (${nSolicitudes})` : ''}
           </button>
         )}
-        <button className="btn plano chico" onClick={() => setTema(tema === 'oscuro' ? 'claro' : 'oscuro')}>
-          {tema === 'oscuro' ? '☀ Claro' : '☾ Oscuro'}
-        </button>
       </nav>
 
       {verProyectos && (
