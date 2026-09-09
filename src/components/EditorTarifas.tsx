@@ -44,7 +44,6 @@ export default function EditorTarifas({ usuario, tabla, onCambio, onCerrar, onRe
   const [tierSup, setTierSup] = useState<string>('linea')
   const [guardando, setGuardando] = useState(false)
   const [resultado, setResultado] = useState<ResultadoGuardado | null>(null)
-  const [verFilas, setVerFilas] = useState(false)
   const [confirmar, setConfirmar] = useState(false)
 
   const normales = useMemo(() => modelosNormales(tabla), [tabla])
@@ -158,21 +157,11 @@ export default function EditorTarifas({ usuario, tabla, onCambio, onCerrar, onRe
             ))}
           </div>
           {tabla_(usdOnly, tierSup, '$')}
-
-          {verFilas && (
-            <pre className="payload" style={{ marginTop: 16 }}>
-              {JSON.stringify(filas.slice(0, 40), null, 1)}
-              {filas.length > 40 ? `\n… y ${filas.length - 40} filas más` : ''}
-            </pre>
-          )}
         </div>
 
         <footer className="modal-pie">
           <span className="cuenta">{filas.length} tarifas en total</span>
           <div className="sep" style={{ flex: 1 }} />
-          <button className="btn" onClick={() => setVerFilas(!verFilas)}>
-            {verFilas ? 'Ocultar' : 'Ver'} lo que se guarda
-          </button>
           <button className="btn" onClick={onRecargar} disabled={guardando}>Descartar y recargar</button>
           {confirmar ? (
             <>
