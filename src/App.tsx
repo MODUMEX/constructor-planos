@@ -684,8 +684,36 @@ export default function App() {
     )
 
   const cabinasTotal = area.tramos.reduce((s, t) => s + t.cabinas.length, 0)
-  /** solo se cotiza cuando se fabrica en Costa Rica; México entrega plano y OC, sin precio */
-  const cotiza = proyecto.paisFabricacion === 'CR'
+
+  /**
+   * La región del distribuidor del proyecto. El proyecto guarda su NOMBRE, así
+   * que la región se busca en la lista; un Distribuidor solo tiene la suya.
+   */
+  const regionDistribuidor =
+    distribuidores.find((d) => d.nombre === proyecto.distribuidor)?.region ?? null
+
+  /**
+   * La moneda NO se elige: la manda la región. Costa Rica factura en colones y
+   * el resto de LATAM en dólares. Sin distribuidor elegido todavía no hay
+   * región, así que ahí se deja como estaba.
+   */
+  const monedaFija: 'CRC' | 'USD' | null =
+    regionDistribuidor === 'Costa Rica' ? 'CRC' : regionDistribuidor === 'LATAM' ? 'USD' : null
+
+  /**
+   * Se cotiza si se fabrica en Costa Rica Y el distribuidor no es de México,
+   * que no cotiza desde la app: se lleva plano y orden de compra, sin precio.
+   */
+  const cotiza = proyecto.paisFabricacion === 'CR' && regionDistribuidor !== 'México'
+  useEffect(() => {
+    if (monedaFija && moneda !== monedaFija) setMoneda(monedaFija)
+  }, [monedaFija, moneda])
+
+  // si el distribuidor elegido no cotiza, no dejarla parada en ese paso
+  useEffect(() => {
+    if (!cotiza && paso === 8) setPaso(7)
+  }, [cotiza, paso])
+
   const pasosVisibles = cotiza ? PASOS : PASOS.filter((p) => p.n !== 8)
   const ultimoPaso = cotiza ? 8 : 7
   const puedePasar = (n: number) => (n <= 6 || area.tramos.length > 0) && (n !== 8 || cotiza)
@@ -1041,6 +1069,15 @@ export default function App() {
                           {puedeDistribuidores(usuario)
                             ? 'Todavía no hay ninguno: dalos de alta con el botón Distribuidores de arriba.'
                             : 'Todavía no hay ninguno dado de alta.'}
+                        </span>
+                      )}
+                      {regionDistribuidor && (
+                        <span className="ayuda">
+                          {regionDistribuidor === 'México'
+                            ? 'México no cotiza desde la app: este proyecto lleva plano y orden de compra, sin el paso de Cotización.'
+                            : regionDistribuidor === 'Costa Rica'
+                              ? 'Cotiza en colones.'
+                              : 'Cotiza en dólares.'}
                         </span>
                       )}
                     </div>
@@ -1455,10 +1492,27 @@ export default function App() {
                       <span>Total</span>
                       <b>{money(total)}</b>
                     </div>
-                    <div className="pildoras">
-                      <button className={`pildora ${moneda === 'CRC' ? 'on' : ''}`} onClick={() => setMoneda('CRC')} type="button">Colones</button>
-                      <button className={`pildora ${moneda === 'USD' ? 'on' : ''}`} onClick={() => setMoneda('USD')} type="button">Dólares</button>
-                    </div>
+                    {monedaFija ? (
+                      <div>
+                        <span className="chip on">{monedaFija === 'CRC' ? 'Colones' : 'Dólares'}</span>
+                        <div className="ayuda" style={{ marginTop: 6 }}>
+                          La moneda la manda la región del distribuidor:{' '}
+                          {regionDistribuidor === 'Costa Rica'
+                            ? 'Costa Rica factura en colones.'
+                            : 'fuera de Costa Rica se factura en dólares.'}
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="pildoras">
+                          <button className={`pildora ${moneda === 'CRC' ? 'on' : ''}`} onClick={() => setMoneda('CRC')} type="button">Colones</button>
+                          <button className={`pildora ${moneda === 'USD' ? 'on' : ''}`} onClick={() => setMoneda('USD')} type="button">Dólares</button>
+                        </div>
+                        <div className="ayuda" style={{ marginTop: 6 }}>
+                          Elegí el distribuidor en el paso 1 y la moneda queda fija por su región.
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="aviso-caja" style={{ maxWidth: 720 }}>
