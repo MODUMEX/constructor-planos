@@ -880,3 +880,11 @@ pre.payload {
   .capa-actualizacion .barra.indefinida i { animation: none; width: 100%; }
   .capa-actualizacion .barra i { transition: none; }
 }
+
+/* Windows le mete su propio ojo a los campos de contraseña (WebView2 y Edge).
+   Quedaban dos: el suyo adentro del campo y el nuestro al lado. El de la app se
+   queda, porque es el que sabe que la contraseña guardada no se puede mostrar. */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
+}
