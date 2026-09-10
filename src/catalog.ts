@@ -433,7 +433,7 @@ export const TIPOLOGIAS: Tipologia[] = [
   {
     id: 'PMR',
     nombre: 'Cuarto accesible + cabinas',
-    descripcion: 'Cabina accesible profunda cerrada con panel, más cabinas normales al lado.',
+    descripcion: 'Un cuarto accesible que toma todo el fondo del lugar, con su divisor, más cabinas al lado.',
     tramos: [{ orientacion: 'horizontal', muroInicio: true, muroFin: false, nombre: 'Tira' }],
     esquinaCompartida: false,
     principal: 0,

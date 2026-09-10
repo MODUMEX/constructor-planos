@@ -24,6 +24,12 @@ function config(tipologia: TipologiaId, linea: Config['linea'] = 'LEEDER'): Conf
     alturaCm: 150,
     profundidadCm: 150,
     anchoAccesibleCm: 150,
+    // el cuarto PMR: su ancho, el fondo del lugar y el panel del divisor
+    anchoPmrCuartoCm: 162,
+    profundidadLugarCm: 250,
+    anchoPanelDivisorPmrCm: 100,
+    cierrePmr: 'muros',
+    puertaAccesibleCm: 90,
     anchoPilastraCm: 15,
     espesorMm: espesorPorLinea(linea),
     terminacion: 'ZOCLO',
@@ -53,6 +59,8 @@ const proyecto: Proyecto = {
     // esta va en Superior 2.0 para ver el espesor de 3 mm en el cajetín y en el CSV
     area('Baño de hombres 201', 'RECTA_ENTRE_MUROS', 420, 4, 'SUPERIOR'),
     area('Orinales 101', 'ORINALES', 240, 4),
+    // el cuarto accesible: se modula a lo ancho y a lo hondo
+    area('Baño accesible 301', 'PMR', 600, 4),
   ],
 }
 

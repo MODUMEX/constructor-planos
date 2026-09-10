@@ -918,3 +918,63 @@ input[type="password"]::-ms-reveal,
 input[type="password"]::-ms-clear {
   display: none;
 }
+
+/* ---------- barra de áreas ----------
+   La tercera fila fija: en qué área se está trabajando. Un proyecto tiene
+   varias áreas con modulaciones distintas, así que tiene que estar siempre a
+   la vista y a un clic, no escondida en un paso. */
+.barra-areas {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  row-gap: 6px;
+  padding: 6px 12px;
+  flex: 0 0 auto;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--line);
+}
+.barra-areas > * { flex-shrink: 0; }
+.barra-areas .sep { flex: 1 1 0; min-width: 0; }
+.barra-areas .rotulo {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-right: 2px;
+}
+.barra-areas .ayuda { font-size: 11px; }
+
+.tab-area {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.tab-area button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12.5px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+.tab-area button:hover { background: var(--surface-2); color: var(--text); }
+.tab-area button b {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--text-3);
+}
+/* el ✕ y el Borrar van más apretados que el nombre */
+.tab-area button + button { padding: 5px 7px; border-left: 1px solid var(--line); }
+.tab-area button.si { color: var(--bad); }
+.tab-area.on { border-color: var(--accent); background: var(--accent-soft); }
+.tab-area.on button { color: var(--text); }
+.tab-area.on button b { color: var(--accent); }

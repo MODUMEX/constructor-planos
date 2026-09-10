@@ -1,4 +1,4 @@
-import type { Cabina, Tramo } from './types'
+import type { Cabina, Config, Tramo } from './types'
 import { GRUESO_PILASTRA } from './catalog'
 import { anchoTotal } from './modulacion'
 
@@ -66,7 +66,11 @@ export interface Caja {
   h: number
 }
 
-export function cajaDelPlano(tramos: Tramo[], marcos: Marco[], prof: number, pad = 62): Caja {
+/**
+ * La caja que hay que encuadrar. `profExtraCm` es para el cuarto PMR, que llega
+ * más hondo que las cabinas: sin eso el cuarto se dibuja fuera del recorte.
+ */
+export function cajaDelPlano(tramos: Tramo[], marcos: Marco[], prof: number, pad = 62, profExtraCm = 0): Caja {
   let minX = 0
   let minY = 0
   let maxX = 0
@@ -75,7 +79,7 @@ export function cajaDelPlano(tramos: Tramo[], marcos: Marco[], prof: number, pad
     const m = marcos[i]
     if (!m) return
     const largo = Math.max(anchoTotal(t.cabinas), t.claroCm)
-    const profT = profundidadDeTramo(t, prof)
+    const profT = Math.max(profundidadDeTramo(t, prof), profExtraCm)
     for (const [u, v] of [
       [0, -ESPESOR_MURO],
       [largo, -ESPESOR_MURO],
@@ -93,3 +97,88 @@ export function cajaDelPlano(tramos: Tramo[], marcos: Marco[], prof: number, pad
 }
 
 export const GRUESO = GRUESO_PILASTRA
+
+// ---------------------------------------------------------------------------
+// Cuarto PMR
+// ---------------------------------------------------------------------------
+
+/**
+ * Una pieza del divisor del cuarto, medida SOBRE LA PROFUNDIDAD del lugar.
+ *
+ * El cuarto accesible no es una cabina más ancha: es un cuarto que llega hasta
+ * el fondo del lugar, y lo que lo separa de las cabinas es una tira modulada a
+ * lo largo de esa profundidad. Por eso el PMR se modula en las dos direcciones:
+ * a lo ancho sobre el claro, como cualquier cabina, y a lo hondo acá.
+ *
+ * La puerta del cuarto va en esa tira, no en el frente: se entra por el
+ * costado. Es lo que hace que el inodoro quede girado.
+ */
+export interface PiezaDivisorPmr {
+  tipo: 'panel' | 'puerta' | 'frente'
+  desdeCm: number
+  hastaCm: number
+}
+
+export interface CuartoPmr {
+  /** la cabina que es el cuarto; la modulación la pone siempre primera */
+  indice: number
+  /** lo que ocupa sobre el claro. Sale de la modulación, no del dato pedido */
+  desdeCm: number
+  hastaCm: number
+  anchoCm: number
+  /** hasta acá llega el cuarto: la profundidad del LUGAR */
+  profCm: number
+  /** hasta acá llegan las cabinas normales, que es menos */
+  profCabinasCm: number
+  /** con muro (P+) o con panel (PP) del lado de afuera */
+  cierre: 'muros' | 'panel'
+  divisor: PiezaDivisorPmr[]
+}
+
+/** la profundidad del lugar, que nunca puede ser menor que la de la cabina */
+export function profundidadDelLugar(config: Config): number {
+  return Math.max(config.profundidadLugarCm ?? config.profundidadCm, config.profundidadCm)
+}
+
+/**
+ * El cuarto PMR de este tramo, o null si el área no lo lleva.
+ *
+ * El ancho se toma de la cabina que la modulación armó, no del ancho pedido:
+ * si el claro no dio para los 162 cm, el plano tiene que mostrar lo que de
+ * verdad se va a fabricar.
+ */
+export function cuartoPmr(tramo: Tramo, config: Config): CuartoPmr | null {
+  if (config.tipologia !== 'PMR') return null
+  const i = tramo.cabinas.findIndex((c) => c.tipo === 'accesible')
+  if (i < 0) return null
+
+  const cab = tramo.cabinas[i]
+  const desde = acumulado(tramo.cabinas)[i]
+  const prof = profundidadDelLugar(config)
+
+  const panel = Math.max(0, config.anchoPanelDivisorPmrCm ?? 100)
+  const puerta = Math.max(0, config.puertaAccesibleCm ?? cab.puerta.anchoCm ?? 90)
+  // el frente cierra lo que sobra; si el panel y la puerta ya se pasan del
+  // fondo no se inventa una pieza negativa: queda en cero y el aviso lo da la
+  // configuración, que es donde el vendedor puede corregirlo
+  const frente = Math.max(0, Math.round((prof - panel - puerta) * 10) / 10)
+
+  const divisor: PiezaDivisorPmr[] = []
+  let v = 0
+  for (const [tipo, largo] of [['panel', panel], ['puerta', puerta], ['frente', frente]] as const) {
+    if (largo <= 0) continue
+    divisor.push({ tipo, desdeCm: v, hastaCm: Math.min(v + largo, prof) })
+    v += largo
+  }
+
+  return {
+    indice: i,
+    desdeCm: desde,
+    hastaCm: desde + cab.anchoCm,
+    anchoCm: cab.anchoCm,
+    profCm: prof,
+    profCabinasCm: config.profundidadCm,
+    cierre: config.cierrePmr ?? 'muros',
+    divisor,
+  }
+}

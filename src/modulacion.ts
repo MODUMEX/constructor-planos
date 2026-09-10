@@ -178,6 +178,18 @@ export function modularConCatalogo(
  * Reparte el claro del tramo entre N cabinas, dejando el ancho de la accesible fijo.
  * Se usa todavía en el caso PMR, que tiene su propia modulación sin portar.
  */
+/**
+ * Qué ancho se le pide a la cabina accesible sobre el claro.
+ *
+ * En el PMR no es la cabina accesible normal: es el CUARTO, que tiene su propia
+ * medida (el Constructor viejo arranca en 162). En las demás tipologías la
+ * accesible es una cabina con puerta ancha y vale el ancho de siempre.
+ */
+export function anchoAccesibleDe(config: Config): number {
+  if (config.tipologia === 'PMR') return config.anchoPmrCuartoCm ?? 162
+  return config.anchoAccesibleCm
+}
+
 export function modular(claroCm: number, cantidad: number, anchoAccesibleCm = 0): Cabina[] {
   if (cantidad <= 0) return []
   const conAccesible = anchoAccesibleCm > 0
@@ -289,7 +301,9 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
   // Antes la accesible salía de la tipología. Ahora es una pregunta aparte: el
   // vendedor dice si el área la lleva. Los proyectos viejos no traen el dato,
   // así que ahí se sigue deduciendo de la tipología.
-  const conAccesible = config.llevaAccesible ?? tipologiaId === 'PMR'
+  // En el PMR el cuarto accesible ES la tipología: no es una pregunta aparte,
+  // va siempre. En las demás lo decide el vendedor.
+  const conAccesible = tipologiaId === 'PMR' || config.llevaAccesible === true
   const soloOrinales = tipologiaId === 'ORINALES'
   return tipo.tramos.map((t, i) => {
     // el claro y la cantidad que dio el vendedor van al tramo principal;
@@ -318,7 +332,7 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
     // puede mover las pilastras. Es la regla del negocio, no una preferencia.
     const conCatalogo = modularConCatalogo(claroTramo, cant, muros, muros < 2, { puerta: config.puertaCm, puertaAccesible: config.puertaAccesibleCm }, {
       accesible: conAccesible && esPrincipal,
-      anchoAccesibleMinCm: config.anchoAccesibleCm,
+      anchoAccesibleMinCm: anchoAccesibleDe(config),
       mingitorios: soloOrinales ? cant : 0,
       anchoOrinalCm: config.anchoOrinalCm,
       pais,
@@ -328,7 +342,7 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
         ...base,
         cabinas: soloOrinales
           ? orinales(cant)
-          : modular(claroTramo, cant, conAccesible && esPrincipal ? config.anchoAccesibleCm : 0),
+          : modular(claroTramo, cant, conAccesible && esPrincipal ? anchoAccesibleDe(config) : 0),
       }
     }
     return {

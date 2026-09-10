@@ -19,7 +19,7 @@ import Solicitudes from './components/Solicitudes'
 import { contarSolicitudes } from './solicitudes'
 import { coloresMxPara, slugRenderMx } from './coloresMx'
 import { fotoDe, fotosHerraje, faltanFotosHerraje, terminacionesDe } from './renders'
-import { anchoTotal, bom, crearTramos, modular, modularConCatalogo, nuevoId, reajustarConPuertas, totalBOM } from './modulacion'
+import { anchoAccesibleDe, anchoTotal, bom, crearTramos, modular, modularConCatalogo, nuevoId, reajustarConPuertas, totalBOM } from './modulacion'
 import { cargarTarifas, type ResultadoTarifas } from './tarifas'
 import { buscarActualizacion, type FaseActualizacion } from './actualizar'
 import { versionActual, VERSION_COMPILADA } from './version'
@@ -36,6 +36,9 @@ const TC = 512
 
 /** cuántas cabinas se pueden pedir de una vez: se elige de la lista, no se escribe */
 const CANTIDADES = Array.from({ length: 15 }, (_, i) => i + 1)
+
+/** el paso donde se escoge el layout; ahí arranca cada área nueva */
+const PASO_TIPOLOGIA = 5
 
 const PASOS = [
   { n: 1, titulo: 'Proyecto', nota: 'Obra, cliente y área' },
@@ -75,6 +78,12 @@ function configInicial(): Config {
     alturaCm: 150,
     profundidadCm: 150,
     anchoAccesibleCm: 150,
+    anchoPmrCuartoCm: 162,
+    // Medida de arranque, como el claro de 420: el cuarto necesita más fondo
+    // que una cabina y con la profundidad de cabina el divisor no cerraría.
+    profundidadLugarCm: 250,
+    anchoPanelDivisorPmrCm: 100,
+    cierrePmr: 'muros',
     anchoPilastraCm: 15,   // 16 no existe en catalogo; 15 si (familia PI)
     espesorMm: 12,
     terminacion: 'ZOCLO',
@@ -149,13 +158,13 @@ export default function App() {
   })
   const [activa, setActiva] = useState(0)
 
-  const [claroCm, setClaroCm] = useState(420)
-  const [cantidad, setCantidad] = useState(4)
 
   const [unidad, setUnidad] = useState<'cm' | 'in'>('cm')
   const [verInodoros, setVerInodoros] = useState(true)
   const [verCotas, setVerCotas] = useState(true)
   const [seleccion, setSeleccion] = useState<string | null>(null)
+  /** qué área está a un clic de borrarse; se pregunta antes de sacarla */
+  const [borrarArea, setBorrarArea] = useState<number | null>(null)
   const [moneda, setMoneda] = useState<'USD' | 'CRC'>('CRC')
   const [respuesta, setRespuesta] = useState<RespuestaERP | null>(null)
   const [enviando, setEnviando] = useState(false)
@@ -316,10 +325,41 @@ export default function App() {
 
   const area = proyecto.areas[activa]
   const config = area.config
+  /**
+   * El claro y la cantidad de cabinas son POR ÁREA. Un proyecto no tiene una
+   * sola modulación: tiene varias y distintas. Al cambiar de área estos dos
+   * números cambian con ella, así que cada una se modula por su cuenta.
+   */
+  // Los proyectos guardados antes de esto no traen los dos números: ahí se leen
+  // del tramo que ya está modulado. Si no, al pasar por Medidas se verían 420 y 4
+  // y se le volvería a modular encima el plano que ya tenía.
+  const tramoPrincipal = area.tramos[tipologia(config.tipologia).principal]
+  const claroCm = config.claroPedidoCm ?? tramoPrincipal?.claroCm ?? 420
+  const cantidad = config.cabinasPedidas ?? tramoPrincipal?.cabinas.length ?? 4
+  const setClaroCm = (n: number) => setConfig({ claroPedidoCm: n })
+  const setCantidad = (n: number) => setConfig({ cabinasPedidas: n })
   // la altura de cada pieza la manda el modelo, no el vendedor
   const alturas = alturasDe(config.modelo)
   // los proyectos viejos no traen la pregunta: ahí manda la tipología, como antes
-  const llevaAccesible = config.llevaAccesible ?? config.tipologia === 'PMR'
+  const llevaAccesible = config.tipologia === 'PMR' || config.llevaAccesible === true
+  /** el área es un CUARTO accesible, no una cabina accesible en la tira */
+  const esPmrCuarto = config.tipologia === 'PMR'
+  /**
+   * La profundidad del lugar: la pared contra la que corre el divisor del
+   * cuarto. Si no se puso, se arranca con la de la cabina para no dibujar algo
+   * imposible, y el vendedor la corrige.
+   */
+  const profLugar = Math.max(config.profundidadLugarCm ?? config.profundidadCm, config.profundidadCm)
+  /**
+   * El divisor del cuarto, modulado a lo LARGO de la profundidad del lugar:
+   * el panel, la puerta del cuarto y el frente que queda. Es la parte vertical
+   * de la modulación, la que no existe en las demás tipologías.
+   */
+  const divisorPmr = (() => {
+    const panel = config.anchoPanelDivisorPmrCm ?? 100
+    const puerta = config.puertaAccesibleCm ?? 90
+    return { panel, puerta, frente: Math.round((profLugar - panel - puerta) * 10) / 10 }
+  })()
   // los paneles grandes no existen en todos los modelos
   const panelesDelModelo = anchosPanel(config.modelo)
   // las mamparas de orinal también cambian por línea
@@ -467,8 +507,19 @@ export default function App() {
     setArea({ tramos })
   }
 
+  /**
+   * Del paso de medidas al plano. Si el claro o la cantidad ya no son los que
+   * está dibujado, se vuelve a modular: mostrarle el dibujo viejo después de
+   * cambiar una medida es mentirle. Si no cambió nada se respeta lo que hay,
+   * incluidas las piezas que movió a mano.
+   */
   function irAlPlano() {
-    if (area.tramos.length === 0) remodular()
+    const t = area.tramos[tipologia(config.tipologia).principal]
+    // en un área de solo orinales el claro lo calcula la app, así que ahí lo
+    // que se compara es la cantidad
+    const soloOrinales = config.tipologia === 'ORINALES'
+    const cambio = !t || t.cabinas.length !== cantidad || (!soloOrinales && t.claroCm !== claroCm)
+    if (cambio) remodular()
     setPaso(7)
   }
 
@@ -539,7 +590,7 @@ export default function App() {
         puertaAccesible:
           config.puertaAccesibleCm ?? t.cabinas.find((c) => c.tipo === 'accesible')?.puerta.anchoCm,
       },
-      { accesible: llevaAccesible, anchoAccesibleMinCm: config.anchoAccesibleCm, anchoOrinalCm: config.anchoOrinalCm, pais: proyecto.paisFabricacion },
+      { accesible: llevaAccesible, anchoAccesibleMinCm: anchoAccesibleDe(config), anchoOrinalCm: config.anchoOrinalCm, pais: proyecto.paisFabricacion },
     )
     if (!r) return
 
@@ -605,6 +656,57 @@ export default function App() {
     })
     const espejo = tipologiaEspejo(config.tipologia)
     if (espejo !== config.tipologia) setConfig({ tipologia: espejo })
+  }
+
+  /**
+   * Se pasa a otra área. Cada área tiene SU configuración y SU modulación, así
+   * que al cambiarla cambian el dibujo y todos los pasos: un proyecto no tiene
+   * una sola modulación, tiene varias y distintas.
+   *
+   * Si el área ya está modulada se abre directo en el plano; si está en blanco,
+   * en las medidas, que es lo que le falta.
+   */
+  function irAlArea(i: number) {
+    if (i < 0 || i >= proyecto.areas.length || i === activa) return
+    setActiva(i)
+    setSeleccion(null)
+    setBorrarArea(null)
+    const destino = proyecto.areas[i]
+    if (destino.tramos.length > 0) setPaso(7)
+    else if (paso >= 7) setPaso(PASO_TIPOLOGIA)
+  }
+
+  /**
+   * Un área más, para modularla distinta. Hereda el producto de la que está
+   * abierta —línea, modelo, color, herrajes, alturas— porque en un proyecto es
+   * el mismo, y arranca SIN modulación.
+   *
+   * Cae en TIPOLOGÍA, no en Medidas: lo primero que cambia de un baño a otro es
+   * el layout, y de ahí sigue sola al claro y a las cabinas.
+   */
+  function areaNueva() {
+    const i = proyecto.areas.length
+    const nueva: Area = {
+      id: nuevoId('area'),
+      nombre: `Área ${i + 1}`,
+      piso: area.piso,
+      config: { ...config },
+      tramos: [],
+    }
+    setProyecto((p) => ({ ...p, areas: [...p.areas, nueva] }))
+    setActiva(i)
+    setSeleccion(null)
+    setBorrarArea(null)
+    setPaso(PASO_TIPOLOGIA)
+  }
+
+  /** Saca un área del proyecto. La última que queda no se puede sacar. */
+  function quitarArea(i: number) {
+    if (proyecto.areas.length <= 1) return
+    setProyecto((p) => ({ ...p, areas: p.areas.filter((_, k) => k !== i) }))
+    setActiva((n) => (n > i ? n - 1 : Math.min(n, proyecto.areas.length - 2)))
+    setSeleccion(null)
+    setBorrarArea(null)
   }
 
   /**
@@ -754,7 +856,10 @@ export default function App() {
           <span title="Versión que estás usando">Modumex · v{version}</span>
         </div>
         <span className="chip">Plano N° {proyecto.numero}</span>
-        <span className="chip">{proyecto.areas.length === 1 ? area.nombre : `${proyecto.areas.length} áreas`}</span>
+        <span className="chip" title="El área en la que estás trabajando">
+          {area.nombre || `Área ${activa + 1}`}
+          {proyecto.areas.length > 1 ? ` · ${activa + 1} de ${proyecto.areas.length}` : ''}
+        </span>
         <span className="chip">{usuario.nombre} · {usuario.rol}</span>
         {avisoActualizacion && <span className="chip" title={avisoActualizacion}>{avisoActualizacion}</span>}
         <div className="sep" />
@@ -789,6 +894,46 @@ export default function App() {
           </button>
         )}
       </nav>
+
+      {/*
+        Las áreas del proyecto. Están acá, fuera del paso, porque un proyecto no
+        tiene una sola modulación: tiene varias y distintas, y hay que poder
+        pasar de una a otra en cualquier momento para ver o cambiar su dibujo.
+      */}
+      <nav className="barra-areas">
+        <span className="rotulo">Áreas</span>
+        {proyecto.areas.map((a, i) => {
+          const modulada = a.tramos.reduce((n, t) => n + t.cabinas.length, 0)
+          return (
+            <span key={a.id} className={`tab-area${i === activa ? ' on' : ''}`}>
+              <button
+                type="button"
+                onClick={() => irAlArea(i)}
+                title={modulada > 0 ? `${modulada} cabinas moduladas` : 'Todavía sin modular'}
+              >
+                {a.nombre || `Área ${i + 1}`}
+                <b>{modulada > 0 ? modulada : '—'}</b>
+              </button>
+              {proyecto.areas.length > 1 && (
+                borrarArea === i ? (
+                  <>
+                    <button type="button" className="si" onClick={() => quitarArea(i)} title="Sí, sacarla del proyecto">Borrar</button>
+                    <button type="button" onClick={() => setBorrarArea(null)} title="Dejarla">✕</button>
+                  </>
+                ) : (
+                  <button type="button" onClick={() => setBorrarArea(i)} title="Sacar esta área del proyecto">✕</button>
+                )
+              )}
+            </span>
+          )
+        })}
+        <button className="btn plano chico" onClick={areaNueva} title="Otra área, con el mismo producto y su propia modulación">
+          + Área nueva
+        </button>
+        <div className="sep" />
+        <span className="ayuda">Cada área se modula por su cuenta</span>
+      </nav>
+
 
       {verProyectos && (
         <Proyectos
@@ -1371,19 +1516,82 @@ export default function App() {
                       </select>
                       <span className="ayuda">Es el ancho del panel divisor: solo las medidas que se fabrican</span>
                     </div>
-                    <div className="campo">
-                      <label>¿Lleva cabina accesible?</label>
-                      <select value={llevaAccesible ? 'si' : 'no'} onChange={(e) => setConfig({ llevaAccesible: e.target.value === 'si' })}>
-                        <option value="no">No</option>
-                        <option value="si">Sí</option>
-                      </select>
-                    </div>
-                    {llevaAccesible && (
-                      <div className="campo">
-                        <label>Ancho de la accesible (cm)</label>
-                        <input type="number" value={config.anchoAccesibleCm} onChange={(e) => setConfig({ anchoAccesibleCm: Number(e.target.value) })} />
-                        <span className="ayuda">Se respeta al modular</span>
-                      </div>
+                    {/*
+                      En un cuarto PMR la accesible no se pregunta: el cuarto ES la
+                      accesible. Y no lleva "ancho de la accesible" sino el ancho del
+                      cuarto más la profundidad del lugar, porque se modula a lo ancho
+                      y a lo hondo.
+                    */}
+                    {!esPmrCuarto && (
+                      <>
+                        <div className="campo">
+                          <label>¿Lleva cabina accesible?</label>
+                          <select value={llevaAccesible ? 'si' : 'no'} onChange={(e) => setConfig({ llevaAccesible: e.target.value === 'si' })}>
+                            <option value="no">No</option>
+                            <option value="si">Sí</option>
+                          </select>
+                        </div>
+                        {llevaAccesible && (
+                          <div className="campo">
+                            <label>Ancho de la accesible (cm)</label>
+                            <input type="number" value={config.anchoAccesibleCm} onChange={(e) => setConfig({ anchoAccesibleCm: Number(e.target.value) })} />
+                            <span className="ayuda">Se respeta al modular</span>
+                          </div>
+                        )}
+                      </>
+                    )}
+                    {esPmrCuarto && (
+                      <>
+                        <div className="campo">
+                          <label>Ancho del cuarto PMR (cm)</label>
+                          <input
+                            type="number" min={150} max={300} step={1}
+                            value={config.anchoPmrCuartoCm ?? 162}
+                            onChange={(e) => setConfig({ anchoPmrCuartoCm: Math.max(100, Number(e.target.value) || 162) })}
+                          />
+                          <span className="ayuda">Lo que el cuarto ocupa del claro</span>
+                        </div>
+                        <div className="campo">
+                          <label>Profundidad del lugar (cm)</label>
+                          <input
+                            type="number" min={config.profundidadCm} step={1}
+                            value={config.profundidadLugarCm ?? config.profundidadCm}
+                            onChange={(e) => setConfig({ profundidadLugarCm: Number(e.target.value) || config.profundidadCm })}
+                          />
+                          <span className="ayuda">Hasta el fondo del baño, no de la cabina: el divisor llega hasta ahí</span>
+                        </div>
+                        <div className="campo">
+                          <label>Panel del divisor (cm)</label>
+                          <input
+                            type="number" min={30} max={200} step={1}
+                            value={config.anchoPanelDivisorPmrCm ?? 100}
+                            onChange={(e) => setConfig({ anchoPanelDivisorPmrCm: Math.max(30, Number(e.target.value) || 100) })}
+                          />
+                          <span className="ayuda">
+                            Sobre {profLugar} cm de fondo: panel {divisorPmr.panel} + puerta {divisorPmr.puerta} + frente{' '}
+                            {divisorPmr.frente}
+                          </span>
+                        </div>
+                        {divisorPmr.frente < 0 && (
+                          <div className="campo">
+                            <span className="aviso-inline">
+                              El panel y la puerta ya se pasan {Math.abs(divisorPmr.frente)} cm del fondo del lugar:
+                              subí la profundidad o bajá el panel.
+                            </span>
+                          </div>
+                        )}
+                        <div className="campo">
+                          <label>Cómo cierra el cuarto</label>
+                          <select
+                            value={config.cierrePmr ?? 'muros'}
+                            onChange={(e) => setConfig({ cierrePmr: e.target.value as 'muros' | 'panel' })}
+                          >
+                            <option value="muros">Con muro (P+)</option>
+                            <option value="panel">Con panel (PP)</option>
+                          </select>
+                          <span className="ayuda">Del lado opuesto al muro del cuarto</span>
+                        </div>
+                      </>
                     )}
                     <div className="campo">
                       <label>¿Lleva orinales?</label>
@@ -1439,7 +1647,7 @@ export default function App() {
                   <div className="aviso-caja" style={{ marginTop: 22, maxWidth: 620 }}>
                     <b>Vista previa del reparto</b>
                     <span className="num">
-                      {modular(claroCm, cantidad, config.tipologia === 'PMR' ? config.anchoAccesibleCm : 0)
+                      {modular(claroCm, cantidad, config.tipologia === 'PMR' ? anchoAccesibleDe(config) : 0)
                         .map((c) => `${c.anchoCm}`)
                         .join('  ·  ')} cm
                     </span>

@@ -1,7 +1,8 @@
 import { jsPDF } from 'jspdf'
 import type { Area, Proyecto } from '../types'
 import {
-  acumulado, cajaDelPlano, ESPESOR_MURO, marcosDe, PROF_ORINAL_CM, profundidadDeTramo, pt, SOBRA_MURO_CM,
+  acumulado, cajaDelPlano, cuartoPmr, ESPESOR_MURO, marcosDe, PROF_ORINAL_CM, profundidadDeTramo,
+  profundidadDelLugar, pt, SOBRA_MURO_CM,
   type Marco,
 } from '../geometria'
 import { nombreHerraje, tipologia } from '../catalog'
@@ -222,6 +223,9 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
     const largo = anchoTotal(tramo.cabinas)
     // un tramo de puros orinales se dibuja con el fondo de la mampara
     const prof = profundidadDeTramo(tramo, area.config.profundidadCm)
+    // el cuarto accesible se dibuja hasta el fondo del lugar, no de la cabina
+    const cuarto = cuartoPmr(tramo, area.config)
+    const profIni = cuarto && cuarto.indice === 0 ? cuarto.profCm : prof
     const horizontal = Math.abs(m.ax) === 1
     const acum = acumulado(tramo.cabinas)
 
@@ -241,7 +245,7 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
     // de las piezas, para que la pared no termine al ras de la cabina
     const muroLateral = (u0: number, u1: number) => {
       const [ax, ay] = aHoja(e, pt(m, u0, -ESPESOR_MURO))
-      const [bx, by] = aHoja(e, pt(m, u1, prof + SOBRA_MURO_CM))
+      const [bx, by] = aHoja(e, pt(m, u1, profIni + SOBRA_MURO_CM))
       muro(doc, Math.min(ax, bx), Math.min(ay, by), Math.abs(bx - ax), Math.abs(by - ay))
     }
     if (tramo.muroInicio && !conEsquina) muroLateral(-ESPESOR_MURO, 0)
@@ -251,7 +255,9 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
     doc.setDrawColor(150)
     doc.setLineWidth(0.2)
     doc.setLineDashPattern([1.4, 1], 0)
-    const [f0x, f0y] = aHoja(e, pt(m, 0, prof))
+    // la línea arranca DESPUÉS del cuarto accesible: adentro del cuarto no hay
+    // frente de cabina, y dibujarla ahí hacía parecer que el cuarto estaba partido
+    const [f0x, f0y] = aHoja(e, pt(m, cuarto ? cuarto.hastaCm : 0, prof))
     const [f1x, f1y] = aHoja(e, pt(m, largo, prof))
     doc.line(f0x, f0y, f1x, f1y)
     doc.setLineDashPattern([], 0)
@@ -281,7 +287,9 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
 
       // panel divisor o cierre
       const esUltima = i === tramo.cabinas.length - 1
-      const dibujarPanel = !esUltima || !tramo.muroFin
+      // en el cuarto accesible el panel de la derecha ES el divisor, que se
+      // dibuja aparte y en piezas: si se dibujara acá taparía el hueco de la puerta
+      const dibujarPanel = (!esUltima || !tramo.muroFin) && cuarto?.indice !== i
       if (dibujarPanel) {
         doc.setFillColor(TINTA, TINTA, TINTA)
         const [ax, ay] = aHoja(e, pt(m, u1 - grueso / 2, 0))
@@ -300,21 +308,34 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
         const dibujo = cab.tipo === 'orinal' ? ORINAL : cab.tipo === 'regadera' ? REGADERA : WC
         const altoCm = cab.tipo === 'orinal' ? ALTO_ORINAL_CM : cab.tipo === 'regadera' ? ALTO_REGADERA_CM : ALTO_WC_CM
         const anchoCm = (altoCm * dibujo.ancho) / dibujo.alto
-        const [ax, ay] = aHoja(e, pt(m, (u0 + u1) / 2, 6))
         const w = anchoCm * e.k
         const h = altoCm * e.k
-        // jsPDF gira alrededor de la esquina inferior izquierda, así que
-        // el giro se hace a mano sobre el punto donde va apoyado al muro
-        const giro = Math.atan2(m.py, m.px) - Math.PI / 2
-        const cos = Math.cos(giro)
-        const sen = Math.sin(giro)
-        const dx = -w / 2
-        const x = ax + dx * cos
-        const y = ay + dx * sen
-        doc.addImage(dibujo.src, 'PNG', x, y, w, h, undefined, 'FAST', (-giro * 180) / Math.PI)
+        if (cuarto?.indice === i) {
+          // En el cuarto accesible se entra por el COSTADO, así que el inodoro gira:
+          // se apoya contra el muro de afuera y mira hacia la puerta del divisor.
+          //
+          // Girado, jsPDF pivotea sobre la esquina INFERIOR IZQUIERDA de la imagen y
+          // en sentido antihorario, así que con 90° la pieza queda arriba y a la
+          // izquierda del punto: hay que correrlo para dejarla apoyada contra el muro
+          // y centrada en la profundidad del cuarto.
+          const [wx, wy] = aHoja(e, pt(m, u0 + 6, cuarto.profCm / 2))
+          doc.addImage(dibujo.src, 'PNG', wx + h, wy + w / 2 - h, w, h, undefined, 'FAST', 90)
+        } else {
+          const [ax, ay] = aHoja(e, pt(m, (u0 + u1) / 2, 6))
+          // el giro se hace a mano sobre el punto donde va apoyado al muro
+          const giro = Math.atan2(m.py, m.px) - Math.PI / 2
+          const dx = -w / 2
+          const x = ax + dx * Math.cos(giro)
+          const y = ay + dx * Math.sin(giro)
+          doc.addImage(dibujo.src, 'PNG', x, y, w, h, undefined, 'FAST', (-giro * 180) / Math.PI)
+        }
       }
       if (cab.tipo === 'accesible' || cab.tipo === 'vacia') {
-        const [cx, cy] = aHoja(e, pt(m, (u0 + u1) / 2, prof * 0.78))
+        // en el cuarto el rótulo va abajo, para no caer sobre el inodoro girado
+        const [cx, cy] = aHoja(
+          e,
+          cuarto?.indice === i ? pt(m, (u0 + u1) / 2, cuarto.profCm * 0.9) : pt(m, (u0 + u1) / 2, prof * 0.78),
+        )
         texto(doc, cab.tipo === 'accesible' ? 'ACCESIBLE' : 'VACÍA', cx, cy, { size: 5.5, align: 'center', color: GRIS })
       }
 
@@ -326,8 +347,9 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
       const caraIzq = i === 0 ? anchoPil(0) : anchoPil(i) / 2
       const caraDer = i === nCab - 1 ? anchoPil(nCab) : anchoPil(i + 1) / 2
 
-      // puerta: hoja a 45° y arco de barrido
-      if (cab.puerta.tipo !== 'ninguna') {
+      // puerta: hoja a 45° y arco de barrido. La del cuarto accesible no va acá:
+      // va en su divisor, sobre la profundidad, porque al cuarto se entra por el costado.
+      if (cab.puerta.tipo !== 'ninguna' && cuarto?.indice !== i) {
         const pivU = cab.puerta.mano === 'der' ? u1 - caraDer : u0 + caraIzq
         const dir = cab.puerta.mano === 'der' ? -1 : 1
         const hoja = cab.puerta.anchoCm
@@ -350,6 +372,60 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
         doc.line(pxx, pyy, exx, eyy)
       }
     })
+
+    // ------------------------------------------------------------------
+    // El cuarto accesible: llega hasta el fondo del LUGAR y lo cierra un
+    // divisor modulado a lo largo de esa profundidad, con la puerta del
+    // cuarto adentro. Es la misma geometría que se ve en pantalla.
+    // ------------------------------------------------------------------
+    if (cuarto) {
+      // la pared opuesta del lugar, contra la que cierra el cuarto
+      const [wx, wy] = aHoja(e, pt(m, cuarto.desdeCm - (tramo.muroInicio ? ESPESOR_MURO : 0), cuarto.profCm))
+      const [wx2, wy2] = aHoja(e, pt(m, largo + SOBRA_MURO_CM, cuarto.profCm + ESPESOR_MURO))
+      muro(doc, Math.min(wx, wx2), Math.min(wy, wy2), Math.abs(wx2 - wx), Math.abs(wy2 - wy))
+
+      const u = cuarto.hastaCm
+      for (const pieza of cuarto.divisor) {
+        const largoPieza = pieza.hastaCm - pieza.desdeCm
+        if (pieza.tipo === 'puerta') {
+          // la puerta del cuarto abre hacia el pasillo, no hacia adentro
+          const [pxx, pyy] = aHoja(e, pt(m, u, pieza.desdeCm))
+          const [cxx, cyy] = aHoja(e, pt(m, u, pieza.hastaCm))
+          const [exx, eyy] = aHoja(e, pt(m, u + largoPieza * 0.72, pieza.desdeCm + largoPieza * 0.72))
+          doc.setDrawColor(ARCO[0], ARCO[1], ARCO[2])
+          doc.setLineWidth(0.2)
+          doc.setLineDashPattern([1.2, 1], 0)
+          arco(doc, pxx, pyy, largoPieza * e.k, Math.atan2(cyy - pyy, cxx - pxx), Math.atan2(eyy - pyy, exx - pxx))
+          doc.setLineDashPattern([], 0)
+          doc.setDrawColor(MARCA[0], MARCA[1], MARCA[2])
+          doc.setLineWidth(0.45)
+          doc.line(pxx, pyy, exx, eyy)
+        } else {
+          doc.setFillColor(TINTA, TINTA, TINTA)
+          const [ax, ay] = aHoja(e, pt(m, u - grueso / 2, pieza.desdeCm))
+          const [bx, by] = aHoja(e, pt(m, u + grueso / 2, pieza.hastaCm))
+          doc.rect(
+            Math.min(ax, bx), Math.min(ay, by),
+            Math.max(Math.abs(bx - ax), 0.5), Math.max(Math.abs(by - ay), 0.5), 'F',
+          )
+        }
+        // la medida de cada pieza del divisor, girada a lo largo de la tira
+        const [tx, ty] = aHoja(e, pt(m, u + 7, (pieza.desdeCm + pieza.hastaCm) / 2))
+        texto(doc, String(largoPieza), tx, ty, {
+          size: 5.5,
+          align: 'center',
+          angle: (horizontal ? 0 : m.ay > 0 ? -90 : 90) + 90,
+          color: COTA,
+        })
+      }
+
+      // el fondo del lugar, acotado al costado como la profundidad de cabina
+      cotaEnV(doc, e, m, -ESPESOR_MURO, cuarto.profCm, -SOBRA_MURO_CM - 30, -SOBRA_MURO_CM - 18, `${cuarto.profCm}`, {
+        size: 6.5,
+        rot: horizontal ? 0 : m.ay > 0 ? -90 : 90,
+        uTexto: -SOBRA_MURO_CM - 33,
+      })
+    }
 
     // cotas por cabina y cota total
     const rot = horizontal ? 0 : m.ay > 0 ? -90 : 90
@@ -399,7 +475,7 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
       })
 
       tramo.cabinas.forEach((cab, i) => {
-        if (cab.puerta.tipo === 'ninguna') return
+        if (cab.puerta.tipo === 'ninguna' || cuarto?.indice === i) return
         const u0 = acum[i]
         const u1 = u0 + cab.anchoCm
         const izq = i === 0 ? anchoPilDe(0) : anchoPilDe(i) / 2
@@ -411,7 +487,7 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
         })
 
         // el panel divisor va a la derecha de la cabina; su cota, en vertical
-        if (i < nCab - 1) {
+        if (i < nCab - 1 && cuarto?.indice !== i) {
           const [nx, ny] = aHoja(e, pt(m, u1 + 7, prof / 2))
           texto(doc, String(prof), nx, ny, { size: 5.5, align: 'center', angle: rot + 90, color: COTA })
         }
@@ -567,7 +643,9 @@ export function generarPDF(proyecto: Proyecto, fecha = new Date().toLocaleDateSt
 
     const prof = area.config.profundidadCm
     const marcos = marcosDe(area.tramos)
-    const caja = cajaDelPlano(area.tramos, marcos, prof, 46)
+    // el cuarto PMR llega más hondo que las cabinas: hay que encuadrarlo también
+    const profPmr = area.config.tipologia === 'PMR' ? profundidadDelLugar(area.config) : 0
+    const caja = cajaDelPlano(area.tramos, marcos, prof, 46, profPmr)
 
     const zonaW = HOJA.w - M * 2 - PANEL_W - 6
     const zonaH = HOJA.h - M * 2 - CAJETIN_H - 6

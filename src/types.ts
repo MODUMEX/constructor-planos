@@ -154,6 +154,35 @@ export interface Config {
   mgAlturaCm: number
   /** ancho de la mampara de mingitorio; la ficha da 45 y 60, y los viejos van con 60 */
   mgAnchoCm?: number
+
+  // ---------- cuarto PMR ----------
+  // El cuarto accesible no es una cabina más ancha: es un CUARTO, y se modula
+  // en las dos direcciones. A lo ancho ocupa su propia medida sobre el claro;
+  // a lo hondo llega hasta el fondo del lugar, no hasta el fondo de la cabina.
+  // El divisor que lo separa de las cabinas es una tira modulada a lo largo de
+  // esa profundidad: panel, la puerta del cuarto y el frente.
+
+  /**
+   * La profundidad del LUGAR, no la de la cabina. Es la pared contra la que
+   * corre el divisor del cuarto. Los proyectos viejos no la traen: ahí se
+   * arranca con la profundidad de cabina y el vendedor la corrige.
+   */
+  profundidadLugarCm?: number
+  /** ancho del cuarto PMR; el Constructor viejo arranca en 162, entre 150 y 300 */
+  anchoPmrCuartoCm?: number
+  /** ancho del panel del divisor del cuarto; el resto de la profundidad es puerta y frente */
+  anchoPanelDivisorPmrCm?: number
+  /** cómo cierra el cuarto del lado opuesto al muro: con muro (P+) o con panel (PP) */
+  cierrePmr?: 'muros' | 'panel'
+  // ---------- lo que se pidió en el paso de medidas ----------
+  // Van en la configuración porque son POR ÁREA: un proyecto tiene varias y
+  // casi nunca miden lo mismo. Antes vivían en un estado suelto del paso 6, así
+  // que al cambiar de área seguían los números de la anterior.
+
+  /** el claro que dio el vendedor para esta área, en cm */
+  claroPedidoCm?: number
+  /** cuántas cabinas pidió para esta área */
+  cabinasPedidas?: number
   tipologia: TipologiaId
 }
 
