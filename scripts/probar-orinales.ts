@@ -1,6 +1,7 @@
 /**
  * Comprueba que un área de solo orinales sale del buscador de modulación:
- * pilastras de catálogo en los extremos, mampara MG entre orinal y orinal.
+ * pilastra de catálogo contra el muro, mingitorio MG entre orinal y orinal y
+ * uno más cerrando el extremo que no tiene muro.
  *   npx esbuild scripts/probar-orinales.ts --bundle --platform=node --format=esm --outfile=.orinales.mjs && node .orinales.mjs
  */
 import { crearTramos, nuevoId } from '../src/modulacion'
@@ -45,8 +46,11 @@ for (const n of [2, 3, 4, 5]) {
   console.log(`  MG: ${mg.length}   PN: ${pn.length}`)
 
   const problemas: string[] = []
-  if (pl.length !== 2) problemas.push(`se esperaban 2 pilastras (una por extremo), salieron ${pl.length}`)
-  if (mg.length !== n - 1) problemas.push(`se esperaban ${n - 1} mamparas MG, salieron ${mg.length}`)
+  // La tira arranca contra muro y termina en un extremo abierto: ahí cierra con
+  // mingitorio, no con pilastra. Queda una sola pilastra, la del muro.
+  if (pl.length !== 1) problemas.push(`se esperaba 1 pilastra (la del muro), salieron ${pl.length}`)
+  // N−1 mingitorios entre los orinales y 1 más cerrando el extremo sin muro
+  if (mg.length !== n) problemas.push(`se esperaban ${n} mingitorios MG, salieron ${mg.length}`)
   if (pn.length !== 0) problemas.push(`los orinales no llevan panel de cabina, salieron ${pn.length}`)
   if (piezas.some((p) => p.familia === 'PT')) problemas.push('los orinales no llevan puerta')
   const catalogo = [10, 12, 15, 17, 19, 24, 30, 35, 40, 45, 50, 55, 60, 70, 85, 90, 100, 120]

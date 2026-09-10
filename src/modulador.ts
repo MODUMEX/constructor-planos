@@ -103,6 +103,12 @@ export interface OpcionesModulacion {
    * moviendo las pilastras, no ensanchándole los orinales.
    */
   anchosOrinal?: (number | null | undefined)[]
+  /**
+   * La tira termina en orinal y de ese lado no hay muro: entonces cierra con un
+   * MINGITORIO, no con pilastra terminal más panel de cierre. Es lo que hace el
+   * Constructor viejo: N orinales contra un extremo abierto llevan N mingitorios.
+   */
+  cierreMingitorio?: boolean
   /** una cabina accesible: es una cabina con puerta ancha, no otra geometría */
   accesible?: boolean
   /**
@@ -175,6 +181,9 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
   })
   /** si alguno se pidió a medida, los orinales NO se ensanchan para cerrar */
   const orinalesAMedida = anchosOrinal.some((_, i) => (o.anchosOrinal?.[i] ?? 0) > 0)
+  // N orinales llevan N−1 mingitorios entre ellos, y uno más si cierran contra
+  // un extremo sin muro.
+  const cierreMG = o.cierreMingitorio === true && nMing > 0
   const grosorMG = Math.max(0, nMing - 1) * GRUESO_MG
   const fijoMG = anchosOrinal.reduce((t, a) => t + a, 0) + grosorMG
 
@@ -193,6 +202,8 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
   const opInternas =
     internas > 0 ? (o.pilInternaFija && !unaClavada ? [o.pilInternaFija] : PILASTRAS_INTERNAS) : [0]
   const opExtremos = o.pilExtremoFija && !unaClavada ? [o.pilExtremoFija] : PILASTRAS_EXTREMO
+  // cerrando con mingitorio, la última "pilastra" es el grueso de esa pieza
+  const opExtremo2 = cierreMG ? [GRUESO_MG] : opExtremos
   const objetivoAcc = nAcc > 0 ? (o.anchoAccesibleCm ?? 0) : 0
 
   type Candidato =
@@ -204,7 +215,7 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
     for (const ap of nEst > 0 ? puertas : [0]) {
       for (const api of opInternas) {
         for (const ae1 of opExtremos) {
-          for (const ae2 of opExtremos) {
+          for (const ae2 of opExtremo2) {
             const total = nEst * ap + nAcc * acc + fijoMG + internas * api + ae1 + ae2
             const dif = objetivo - total
             // la accesible va primera: se lleva su pilastra de extremo entera y
@@ -251,6 +262,8 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
     }
   }
   if (nAcc > 0 && objetivoAcc > 0 && clavadas[0] === null) clavadas[0] = mejor.ae1
+  // el mingitorio de cierre no se negocia: es una pieza, no una pilastra
+  if (cierreMG) clavadas[clavadas.length - 1] = GRUESO_MG
   // Con una pilastra clavada a mano el reparto manda: es la única forma de que
   // las otras se acomoden en vez de copiarle la medida.
   const uniformeCalza = !unaClavada && cabe(objetivo - mejor.total, o.extremoAbierto, o.murosPilastra)
@@ -263,6 +276,7 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
     for (let i = 0; i < base.length; i++) if (clavadas[i]) base[i] = clavadas[i]!
     return base
   })()
+  if (cierreMG) pilastras[pilastras.length - 1] = GRUESO_MG
 
   // El total sale SIEMPRE de las pilastras que quedaron: el respaldo respeta la
   // que ella movió, así que el total del buscador ya no sirve.

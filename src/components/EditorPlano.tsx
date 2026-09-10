@@ -1,11 +1,11 @@
 import { useMemo, useRef, useState } from 'react'
 import type { Cabina, Config, Pais, Tramo } from '../types'
 import { ANCHOS_PILASTRA, puertasPosibles, tipologia } from '../catalog'
-import { anchoTotal, minimoDe, nuevaCabina, puertaSugerida, snap } from '../modulacion'
+import { anchoTotal, minimoDe, nuevaCabina, puertaSugerida, snap, cierraConMingitorio } from '../modulacion'
 import { medidaCercana, PILASTRAS_INTERNAS, PUERTA_ACCESIBLE_MIN } from '../modulador'
 import { Grupo, Item, Menu, Raya } from './Menu'
 import {
-  cajaDelPlano, cuartoPmr, ESPESOR_MURO, marcosDe, profundidadDeDivisor, profundidadDeTramo,
+  cajaDelPlano, cuartoPmr, ESPESOR_MURO, esMingitorio, marcosDe, profundidadDeDivisor, profundidadDeTramo,
   profundidadDelLugar, pt, SOBRA_MURO_CM,
   type Marco,
 } from '../geometria'
@@ -46,6 +46,11 @@ interface Props {
   onCabinas: (tramoId: string, cabinas: Cabina[]) => void
   /** al arrastrar una pilastra: se elige su medida y el resto se reacomoda */
   onPilastra: (tramoId: string, indice: number, anchoCm: number) => void
+  /**
+   * al arrastrar un MINGITORIO: cambia el ancho del orinal que tiene a la
+   * izquierda, que es la única medida libre de esa parte de la tira
+   */
+  onOrinal: (tramoId: string, indice: number, cuerpoCm: number) => void
   /** al elegir una medida de puerta: manda la puerta y las pilastras se adaptan */
   onPuerta: (tramoId: string, indice: number, anchoPuertaCm: number) => void
 
@@ -68,6 +73,7 @@ export default function EditorPlano({
   onCabinas,
   onPilastra,
   onPuerta,
+  onOrinal,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [menu, setMenu] = useState<MenuEstado>(null)
@@ -171,6 +177,7 @@ export default function EditorPlano({
   function moviendo(e: React.PointerEvent) {
     const p = arrastrePil.current
     if (p) {
+      if (!Number.isFinite(p.escala) || p.escala <= 0) return
       const dx = (e.clientX - p.x0) / p.escala
       const dy = (e.clientY - p.y0) / p.escala
       // arrastrar hacia afuera engorda la pilastra por los dos lados
@@ -185,14 +192,35 @@ export default function EditorPlano({
     }
     const a = arrastre.current
     if (!a) return
+    // sin ancho en pantalla la escala sale 0 y el desplazamiento quedaría en NaN
+    if (!Number.isFinite(a.escala) || a.escala <= 0) return
     const dx = (e.clientX - a.x0) / a.escala
     const dy = (e.clientY - a.y0) / a.escala
     const deltaCm = dx * a.ax + dy * a.ay
+    if (!Number.isFinite(deltaCm)) return
     // El panel va siempre centrado en su pilastra, así que arrastrarlo es
     // cambiar la MEDIDA de esa pilastra: se elige la de catálogo más cercana y
     // el buscador reacomoda el resto sin tocar las puertas.
     const t = tramoPorId(a.tramoId)
-    const actual = t?.pilastras?.[a.indice + 1] ?? config.anchoPilastraCm
+    if (!t) return
+
+    // Un MINGITORIO no es una pilastra: no tiene medidas de catálogo que elegir.
+    // Arrastrarlo cambia el ancho del orinal que tiene a la izquierda, que es la
+    // única medida libre de esa parte de la tira.
+    const izq = t.cabinas[a.indice]
+    const der = t.cabinas[a.indice + 1]
+    const arrastraMingitorio =
+      izq?.tipo === 'orinal' && (der?.tipo === 'orinal' || (der === undefined && !t.muroFin))
+    if (arrastraMingitorio) {
+      const nCab = t.cabinas.length
+      const pil = (k: number) => t.pilastras?.[k] ?? config.anchoPilastraCm
+      const ladoIzq = a.indice === 0 ? pil(0) : pil(a.indice) / 2
+      const ladoDer = a.indice === nCab - 1 ? pil(nCab) : pil(a.indice + 1) / 2
+      onOrinal(a.tramoId, a.indice, izq.anchoCm - ladoIzq - ladoDer + deltaCm)
+      return
+    }
+
+    const actual = t.pilastras?.[a.indice + 1] ?? config.anchoPilastraCm
     const elegida = medidaCercana(PILASTRAS_INTERNAS, actual + deltaCm * 2)
     if (elegida !== actual) onPilastra(a.tramoId, a.indice + 1, elegida)
   }
@@ -562,14 +590,32 @@ export default function EditorPlano({
                       )
                     })()}
                     {i === tramo.cabinas.length - 1 && !tramo.muroFin && (() => {
+                      // si la tira termina en orinal, la pieza de cierre es un mingitorio
+                      const profCierre = profundidadDeDivisor(tramo, i, prof, config.mgAnchoCm)
                       const a = pt(m, largo - grueso / 2, 0)
-                      const b = pt(m, largo + grueso / 2, prof)
+                      const b = pt(m, largo + grueso / 2, profCierre)
+                      const cierraMingitorio = cierraConMingitorio(tramo)
                       return (
-                        <rect
-                          x={Math.min(a.x, b.x)} y={Math.min(a.y, b.y)}
-                          width={Math.max(Math.abs(b.x - a.x), MIN_PIEZA_PX)} height={Math.max(Math.abs(b.y - a.y), MIN_PIEZA_PX)}
-                          fill="#22303f" pointerEvents="none"
-                        />
+                        <g>
+                          <rect
+                            x={Math.min(a.x, b.x)} y={Math.min(a.y, b.y)}
+                            width={Math.max(Math.abs(b.x - a.x), MIN_PIEZA_PX)} height={Math.max(Math.abs(b.y - a.y), MIN_PIEZA_PX)}
+                            fill="#22303f" pointerEvents="none"
+                          />
+                          {cierraMingitorio && (
+                            <rect
+                              x={horizontal ? Math.min(a.x, b.x) - 6 : Math.min(a.x, b.x)}
+                              y={horizontal ? Math.min(a.y, b.y) : Math.min(a.y, b.y) - 6}
+                              width={horizontal ? 14 : Math.abs(b.x - a.x)}
+                              height={horizontal ? Math.abs(b.y - a.y) : 14}
+                              fill="transparent"
+                              style={{ cursor: horizontal ? 'col-resize' : 'row-resize' }}
+                              onPointerDown={(e) => empezarArrastre(e, tramo, i, m)}
+                            >
+                              <title>Mingitorio de cierre — arrastra para cambiar el ancho del orinal</title>
+                            </rect>
+                          )}
+                        </g>
                       )
                     })()}
 
@@ -632,6 +678,8 @@ export default function EditorPlano({
                       stroke="#9aa8b8" strokeWidth={1.2} strokeDasharray="10 7" pointerEvents="none"
                     />
                     {cortes.map((u2, k) => {
+                      // en las fronteras de mingitorio no hay pilastra que dibujar
+                      if (esMingitorio(tramo, k)) return null
                       // La pilastra se dibuja con SU ancho (el de la pieza, 10–85 cm según
                       // catálogo), no con el espesor del material: son cosas distintas y
                       // dibujarla de 1.27 cm la volvía invisible en planta.

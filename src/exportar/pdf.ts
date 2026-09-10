@@ -1,7 +1,8 @@
 import { jsPDF } from 'jspdf'
 import type { Area, Proyecto } from '../types'
 import {
-  acumulado, cajaDelPlano, cuartoPmr, ESPESOR_MURO, marcosDe, PROF_ORINAL_CM, profundidadDeDivisor,
+  acumulado, cajaDelPlano, cuartoPmr, esMingitorio, ESPESOR_MURO, marcosDe, PROF_ORINAL_CM,
+  profundidadDeDivisor,
   profundidadDeTramo,
   profundidadDelLugar, pt, SOBRA_MURO_CM,
   type Marco,
@@ -272,6 +273,8 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
       doc.setDrawColor(70)
       doc.setLineWidth(0.25)
       cortes.forEach((u, k) => {
+        // en las fronteras de mingitorio no hay pilastra que dibujar
+        if (esMingitorio(tramo, k)) return
         // cada pilastra con SU ancho de catálogo, el que eligió la modulación
         const anchoPil = Math.max(tramo.pilastras?.[k] ?? area.config.anchoPilastraCm, grueso)
         // en los extremos se corre hacia adentro para no invadir el muro
@@ -465,6 +468,7 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
 
       // cada pilastra, acotada por su ancho real de pieza
       cortes.forEach((u, k) => {
+        if (esMingitorio(tramo, k)) return
         const ancho = anchoPilDe(k)
         const centro = k === 0 ? u + ancho / 2 : k === cortes.length - 1 ? u - ancho / 2 : u
         cotaEntre(doc, e, m, centro - ancho / 2, centro + ancho / 2, prof - 9, prof - 1, String(ancho), {

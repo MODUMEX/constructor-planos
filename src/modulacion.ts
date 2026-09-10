@@ -86,6 +86,8 @@ export function modularConCatalogo(
     anchoOrinalCm?: number
     /** el ancho pedido para cada orinal, en orden; no tienen que ser iguales */
     anchosOrinalCm?: (number | null | undefined)[]
+    /** la tira termina en orinal y de ese lado no hay muro: cierra con mingitorio */
+    cierreMingitorio?: boolean
     pais?: Pais
   },
 ): { cabinas: Cabina[]; pilastras: number[]; canaletaCm: number; ajuste: Tramo['ajuste']; mensaje: string; avisoAccesible?: string } | null {
@@ -103,6 +105,7 @@ export function modularConCatalogo(
     mingitorios: nMing,
     anchoOrinal: extra?.anchoOrinalCm,
     anchosOrinal: extra?.anchosOrinalCm,
+    cierreMingitorio: extra?.cierreMingitorio,
     catalogoPuertas: anchosPuerta(extra?.pais ?? 'CR'),
     anchoAccesibleCm: extra?.anchoAccesibleMinCm,
     murosPilastra,
@@ -290,13 +293,27 @@ function entreOrinales(tramo: Tramo, i: number): boolean {
   return tramo.cabinas[i]?.tipo === 'orinal' && tramo.cabinas[i + 1]?.tipo === 'orinal'
 }
 
+/**
+ * Una tira que termina en orinal y no tiene muro de ese lado cierra con un
+ * MINGITORIO, no con pilastra terminal más panel de cierre: es como lo arma el
+ * Constructor viejo. Se reconoce por la pieza que quedó en esa frontera.
+ */
+export function cierraConMingitorio(tramo: Tramo): boolean {
+  const n = tramo.cabinas.length
+  if (n === 0 || tramo.muroFin) return false
+  if (tramo.cabinas[n - 1].tipo !== 'orinal') return false
+  const ultima = tramo.pilastras?.[n]
+  return ultima === undefined || ultima <= GRUESO_MG_CM + 0.01
+}
+
 export function pilastrasDe(tramo: Tramo): number {
   const n = tramo.cabinas.length
   if (n === 0) return 0
-  // las dos de los extremos más las internas, salvo las fronteras de mampara
+  // las de los extremos más las internas, salvo las fronteras de mingitorio
   let internas = 0
   for (let i = 0; i < n - 1; i++) if (!entreOrinales(tramo, i)) internas += 1
-  return internas + 2
+  // cerrando con mingitorio, ese extremo no lleva pilastra
+  return internas + (cierraConMingitorio(tramo) ? 1 : 2)
 }
 
 export function panelesDe(tramo: Tramo): number {
@@ -369,6 +386,8 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
       mingitorios: soloOrinales ? cant : ming,
       anchoOrinalCm: config.anchoOrinalCm,
       anchosOrinalCm: config.anchosOrinalCm,
+      // si la tira termina en orinal y de ese lado no hay muro, cierra con mingitorio
+      cierreMingitorio: !t.muroFin && (soloOrinales ? cant : ming) > 0,
       pais,
     })
     if (!conCatalogo) {

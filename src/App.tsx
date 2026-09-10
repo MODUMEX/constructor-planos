@@ -579,6 +579,72 @@ export default function App() {
    * resto de la tira con piezas de catálogo, para que siga cuadrando el claro.
    * Arrastrar una interna cambia todas las internas, que es como se modula.
    */
+  /**
+   * Se arrastró un MINGITORIO. A diferencia del panel de una cabina, que va
+   * centrado en su pilastra y arrastrarlo cambia esa pilastra, el mingitorio
+   * cambia el ancho del ORINAL que tiene a la izquierda: es la única medida
+   * libre de esa parte de la tira.
+   *
+   * La medida queda pedida en la configuración del área, así que no se pierde
+   * al volver a modular: es igual que escribirla en el paso de medidas.
+   */
+  function onOrinal(tramoId: string, indice: number, cuerpoCm: number) {
+    const t = area.tramos.find((x) => x.id === tramoId)
+    if (!t || t.cabinas[indice]?.tipo !== 'orinal') return
+    if (!Number.isFinite(cuerpoCm)) return
+    const ancho = Math.max(30, Math.round(cuerpoCm * 2) / 2)
+
+    // qué número de orinal es dentro de la tira
+    const orden = t.cabinas.slice(0, indice + 1).filter((c) => c.tipo === 'orinal').length - 1
+    const cuantos = t.cabinas.filter((c) => c.tipo === 'orinal').length
+    const anchos = Array.from({ length: cuantos }, (_, k) => config.anchosOrinalCm?.[k] ?? null)
+    if (anchos[orden] === ancho) return
+    anchos[orden] = ancho
+
+    const muros = (t.muroInicio ? 1 : 0) + (t.muroFin ? 1 : 0)
+    const r = modularConCatalogo(
+      t.claroCm,
+      t.cabinas.length,
+      muros,
+      muros < 2,
+      {
+        // las pilastras que ella ya eligió y las puertas no se tocan
+        pilastras: Array.from({ length: t.cabinas.length + 1 }, (_, i) =>
+          (t.pilastrasFijas ?? []).includes(i) ? (t.pilastras?.[i] ?? null) : null,
+        ),
+        puerta: config.puertaCm ?? t.cabinas.find((c) => c.tipo === 'normal')?.puerta.anchoCm,
+        puertaAccesible:
+          config.puertaAccesibleCm ?? t.cabinas.find((c) => c.tipo === 'accesible')?.puerta.anchoCm,
+      },
+      {
+        accesible: llevaAccesible,
+        anchoAccesibleMinCm: anchoAccesibleDe(config),
+        mingitorios: cuantos,
+        anchoOrinalCm: config.anchoOrinalCm,
+        anchosOrinalCm: anchos,
+        cierreMingitorio: !t.muroFin && cuantos > 0,
+        pais: proyecto.paisFabricacion,
+      },
+    )
+    if (!r) return
+    if (r.ajuste === 'falta' && t.ajuste !== 'falta') {
+      setBloqueo(
+        `Con el orinal de ${ancho} cm las piezas no caben en el claro de ${t.claroCm} cm. ${r.mensaje}. ` +
+          'El plano quedó como estaba.',
+      )
+      return
+    }
+    setBloqueo(null)
+    setConfig({ anchosOrinalCm: anchos })
+    setArea({
+      tramos: area.tramos.map((x) =>
+        x.id === tramoId
+          ? { ...x, cabinas: r.cabinas, pilastras: r.pilastras, canaletaCm: r.canaletaCm, ajuste: r.ajuste, mensaje: r.mensaje, avisoAccesible: r.avisoAccesible }
+          : x,
+      ),
+    })
+  }
+
   function onPilastra(tramoId: string, indice: number, anchoCm: number) {
     const t = area.tramos.find((x) => x.id === tramoId)
     if (!t || t.cabinas.length === 0) return
@@ -614,6 +680,7 @@ export default function App() {
         mingitorios: t.cabinas.filter((c) => c.tipo === 'orinal').length,
         anchoOrinalCm: config.anchoOrinalCm,
         anchosOrinalCm: config.anchosOrinalCm,
+        cierreMingitorio: !t.muroFin && t.cabinas[t.cabinas.length - 1]?.tipo === 'orinal',
         pais: proyecto.paisFabricacion,
       },
     )
@@ -670,6 +737,8 @@ export default function App() {
     setArea({
       tramos: area.tramos.map((t) => ({
         ...t,
+        // el espejo cambia de lado los muros del tramo: si no, el cierre con
+        // mingitorio y las pilastras de punta quedan del lado equivocado
         muroInicio: t.muroFin,
         muroFin: t.muroInicio,
         pilastras: t.pilastras ? [...t.pilastras].reverse() : undefined,
@@ -1130,6 +1199,7 @@ export default function App() {
                     onSeleccion={setSeleccion}
                     onCabinas={onCabinas}
                     onPilastra={onPilastra}
+                    onOrinal={onOrinal}
                     onPuerta={onPuerta}
                   />
                 </div>

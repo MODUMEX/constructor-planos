@@ -29,6 +29,18 @@ export function profundidadDeTramo(tramo: Tramo, profundidadCm: number): number 
  * menos honda: la ficha la da como "fondo × alto" (45 × 120, 60 × 120…).
  * Dibujarla con los 150 del panel la hacía parecer una cabina cerrada.
  */
+/**
+ * Si la frontera k de la tira es un MINGITORIO y no una pilastra. Las fronteras
+ * van de 0 (antes de la primera cabina) a n (después de la última): entre dos
+ * orinales va mingitorio, y también contra un extremo sin muro.
+ */
+export function esMingitorio(tramo: Tramo, k: number): boolean {
+  const n = tramo.cabinas.length
+  if (k === 0) return tramo.cabinas[0]?.tipo === 'orinal' && !tramo.muroInicio
+  if (k >= n) return tramo.cabinas[n - 1]?.tipo === 'orinal' && !tramo.muroFin
+  return tramo.cabinas[k - 1]?.tipo === 'orinal' && tramo.cabinas[k]?.tipo === 'orinal'
+}
+
 export function profundidadDeDivisor(
   tramo: Tramo,
   i: number,
@@ -37,7 +49,11 @@ export function profundidadDeDivisor(
 ): number {
   const izq = tramo.cabinas[i]
   const der = tramo.cabinas[i + 1]
-  if (izq?.tipo === 'orinal' && der?.tipo === 'orinal') return mgAnchoCm && mgAnchoCm > 0 ? mgAnchoCm : 60
+  // el último orinal contra un extremo sin muro cierra con otro mingitorio
+  const esCierre = izq?.tipo === 'orinal' && der === undefined && !tramo.muroFin
+  if ((izq?.tipo === 'orinal' && der?.tipo === 'orinal') || esCierre) {
+    return mgAnchoCm && mgAnchoCm > 0 ? mgAnchoCm : 60
+  }
   return profundidadCm
 }
 

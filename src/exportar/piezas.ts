@@ -1,5 +1,6 @@
 import type { Area, Cabina, Config, Tramo } from '../types'
 import { alturasDe, nombreModelo, tipologia } from '../catalog'
+import { cierraConMingitorio } from '../modulacion'
 
 /**
  * Piezas del proyecto con el SubTipo que espera el CIP.
@@ -111,10 +112,14 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
     // divisor a la derecha de esta cabina; contra el muro no lleva nada.
     // Entre orinales el divisor es una mampara MG, no un panel de cabina.
     const esUltima = i === n - 1
-    // N orinales llevan N−1 mamparas: la del extremo abierto no existe, ahí
-    // el orinal da a la nada.
+    // Entre dos orinales va mingitorio. Y si la tira TERMINA en orinal contra un
+    // extremo sin muro, ese lado cierra con otro mingitorio y no con panel de
+    // cierre: N orinales contra un extremo abierto llevan N mingitorios.
+    const cierraMG = cierraConMingitorio(tramo)
     const llevaDivisor =
-      cab.tipo === 'orinal' ? tramo.cabinas[i + 1]?.tipo === 'orinal' : !esUltima || !tramo.muroFin
+      cab.tipo === 'orinal'
+        ? tramo.cabinas[i + 1]?.tipo === 'orinal' || (esUltima && cierraMG)
+        : !esUltima || !tramo.muroFin
     if (llevaDivisor) {
       if (cab.tipo === 'orinal') {
         piezas.push({
@@ -165,13 +170,16 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
       if (entreOrinales) continue
       piezas.push({ familia: 'PL', anchoCm: anchoDe(i + 1), altoCm: altoPil, subTipo: 'PLCEN', area })
     }
-    piezas.push({
-      familia: 'PL',
-      anchoCm: anchoDe(n),
-      altoCm: altoPil,
-      subTipo: tramo.muroFin ? 'PLLATMUR' : 'PLLAT',
-      area,
-    })
+    // cerrando con mingitorio ese extremo no lleva pilastra: la pieza es el mingitorio
+    if (!cierraConMingitorio(tramo)) {
+      piezas.push({
+        familia: 'PL',
+        anchoCm: anchoDe(n),
+        altoCm: altoPil,
+        subTipo: tramo.muroFin ? 'PLLATMUR' : 'PLLAT',
+        area,
+      })
+    }
   }
 
   return piezas
