@@ -19,7 +19,7 @@ import Solicitudes from './components/Solicitudes'
 import { contarSolicitudes } from './solicitudes'
 import { coloresMxPara, slugRenderMx } from './coloresMx'
 import { fotoDe, fotosHerraje, faltanFotosHerraje, terminacionesDe } from './renders'
-import { anchoAccesibleDe, anchoTotal, bom, crearTramos, modular, modularConCatalogo, nuevoId, reajustarConPuertas, totalBOM } from './modulacion'
+import { anchoAccesibleDe, anchoTotal, bom, crearTramos, modularConCatalogo, nuevoId, reajustarConPuertas, totalBOM } from './modulacion'
 import { cargarTarifas, type ResultadoTarifas } from './tarifas'
 import { buscarActualizacion, type FaseActualizacion } from './actualizar'
 import { versionActual, VERSION_COMPILADA } from './version'
@@ -513,6 +513,23 @@ export default function App() {
    * cambiar una medida es mentirle. Si no cambió nada se respeta lo que hay,
    * incluidas las piezas que movió a mano.
    */
+  /**
+   * El reparto que se muestra antes de dibujar. Sale del MISMO buscador que la
+   * modulación de verdad, con los orinales incluidos: antes usaba un reparto
+   * parejo que ignoraba los orinales, así que prometía medidas que no eran.
+   */
+  const vistaPrevia = useMemo(() => {
+    const previos = crearTramos(config.tipologia, claroCm, cantidad, config, proyecto.paisFabricacion)
+    const principal = previos[tipologia(config.tipologia).principal]
+    return {
+      cabinas: principal?.cabinas ?? [],
+      // el mismo aviso que dará el plano, pero antes de dibujarlo: con orinales
+      // es fácil pedir más piezas de las que entran en el claro
+      cabe: principal?.ajuste !== 'falta' && principal?.ajuste !== 'sobra',
+      mensaje: principal?.mensaje ?? '',
+    }
+  }, [config, claroCm, cantidad, proyecto.paisFabricacion])
+
   function irAlPlano() {
     const t = area.tramos[tipologia(config.tipologia).principal]
     // en un área de solo orinales el claro lo calcula la app, así que ahí lo
@@ -590,7 +607,15 @@ export default function App() {
         puertaAccesible:
           config.puertaAccesibleCm ?? t.cabinas.find((c) => c.tipo === 'accesible')?.puerta.anchoCm,
       },
-      { accesible: llevaAccesible, anchoAccesibleMinCm: anchoAccesibleDe(config), anchoOrinalCm: config.anchoOrinalCm, pais: proyecto.paisFabricacion },
+      {
+        accesible: llevaAccesible,
+        anchoAccesibleMinCm: anchoAccesibleDe(config),
+        // los orinales de la tira: sin esto el buscador los trata como baños con puerta
+        mingitorios: t.cabinas.filter((c) => c.tipo === 'orinal').length,
+        anchoOrinalCm: config.anchoOrinalCm,
+        anchosOrinalCm: config.anchosOrinalCm,
+        pais: proyecto.paisFabricacion,
+      },
     )
     if (!r) return
 
@@ -1619,9 +1644,44 @@ export default function App() {
                           <input
                             type="number"
                             value={config.anchoOrinalCm ?? 60}
-                            onChange={(e) => setConfig({ anchoOrinalCm: Number(e.target.value) })}
+                            onChange={(e) => setConfig({ anchoOrinalCm: Number(e.target.value), anchosOrinalCm: undefined })}
                           />
-                          <span className="ayuda">Lo normal son 60</span>
+                          <span className="ayuda">Lo normal son 60; vale para todos</span>
+                        </div>
+                        {/*
+                          No tienen que medir todos lo mismo: acá se le da la medida a
+                          cada uno. El que quede en blanco toma el ancho general de
+                          arriba. En cuanto uno lleva medida pedida, los orinales dejan
+                          de ensancharse para cerrar el claro: eso lo hacen las pilastras.
+                        */}
+                        <div className="campo" style={{ gridColumn: '1 / -1' }}>
+                          <label>Ancho de cada uno por separado (cm)</label>
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            {Array.from({ length: config.orinales }, (_, i) => (
+                              <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                                <span className="ayuda">Orinal {i + 1}</span>
+                                <input
+                                  type="number"
+                                  style={{ width: 78 }}
+                                  placeholder={String(config.anchoOrinalCm ?? 60)}
+                                  value={config.anchosOrinalCm?.[i] ?? ''}
+                                  onChange={(e) => {
+                                    const lista = Array.from(
+                                      { length: config.orinales },
+                                      (_, k) => config.anchosOrinalCm?.[k] ?? null,
+                                    )
+                                    lista[i] = e.target.value === '' ? null : Number(e.target.value)
+                                    setConfig({ anchosOrinalCm: lista.some((x) => x != null) ? lista : undefined })
+                                  }}
+                                />
+                              </label>
+                            ))}
+                          </div>
+                          <span className="ayuda">
+                            {config.anchosOrinalCm?.some((x) => x != null)
+                              ? 'Los que pediste a medida no se tocan: el claro lo cierran las pilastras'
+                              : 'En blanco toman el ancho de arriba y se ensanchan para cerrar el claro'}
+                          </span>
                         </div>
                         <div className="campo">
                           <label>Mampara del orinal (cm)</label>
@@ -1647,10 +1707,13 @@ export default function App() {
                   <div className="aviso-caja" style={{ marginTop: 22, maxWidth: 620 }}>
                     <b>Vista previa del reparto</b>
                     <span className="num">
-                      {modular(claroCm, cantidad, config.tipologia === 'PMR' ? anchoAccesibleDe(config) : 0)
-                        .map((c) => `${c.anchoCm}`)
-                        .join('  ·  ')} cm
+                      {vistaPrevia.cabinas.map((c) => `${c.anchoCm}${c.tipo === 'orinal' ? " orinal" : ""}`).join('  ·  ')} cm
                     </span>
+                    {!vistaPrevia.cabe && (
+                      <span className="aviso-inline">
+                        {vistaPrevia.mensaje} — subí el claro o bajá una pieza antes de dibujar.
+                      </span>
+                    )}
                   </div>
                 </>
               )}

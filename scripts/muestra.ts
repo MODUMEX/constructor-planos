@@ -34,14 +34,21 @@ function config(tipologia: TipologiaId, linea: Config['linea'] = 'LEEDER'): Conf
     espesorMm: espesorPorLinea(linea),
     terminacion: 'ZOCLO',
     kap: false,
-    orinales: 3,
+    orinales: 0,
     mgAlturaCm: 120,
     tipologia,
   }
 }
 
-function area(nombre: string, tipologia: TipologiaId, claro: number, cabinas: number, linea?: Config['linea']): Area {
-  const cfg = config(tipologia, linea)
+function area(
+  nombre: string,
+  tipologia: TipologiaId,
+  claro: number,
+  cabinas: number,
+  linea?: Config['linea'],
+  orinales = 0,
+): Area {
+  const cfg = { ...config(tipologia, linea), orinales }
   return { id: nuevoId('area'), nombre, piso: 'Planta baja', config: cfg, tramos: crearTramos(tipologia, claro, cabinas, cfg) }
 }
 
@@ -54,7 +61,8 @@ const proyecto: Proyecto = {
   distribuidor: 'Modumex Costa Rica',
   creadoPor: 'Dayanna Lizano',
   areas: [
-    area('Baño de hombres 101', 'RECTA_MURO_IZQ', 420, 4),
+    // mixto: baños con orinales al costado, con el claro que hace falta para los dos
+    area('Baño de hombres 101', 'RECTA_MURO_IZQ', 620, 4, undefined, 3),
     area('Baño de mujeres 102', 'RECTA_MURO_DER', 420, 4),
     // esta va en Superior 2.0 para ver el espesor de 3 mm en el cajetín y en el CSV
     area('Baño de hombres 201', 'RECTA_ENTRE_MUROS', 420, 4, 'SUPERIOR'),

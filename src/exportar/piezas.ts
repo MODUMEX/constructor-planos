@@ -186,7 +186,14 @@ export function piezasDeArea(area: Area): Pieza[] {
   // orinales sueltos de un baño mixto: N orinales llevan N−1 divisores.
   // En un área de solo orinales los divisores ya salieron de las propias cabinas.
   const soloOrinales = area.config.tipologia === 'ORINALES'
-  const divisores = soloOrinales ? 0 : Math.max(0, area.config.orinales - 1)
+  // Desde que los orinales entran en la tira, sus mamparas ya salieron con ellos.
+  // Esta suma queda SOLO para los proyectos guardados antes de eso, que traen la
+  // cantidad en la configuración pero no los orinales dibujados.
+  const enLaTira = area.tramos.reduce(
+    (t, tr) => t + tr.cabinas.filter((c) => c.tipo === 'orinal').length,
+    0,
+  )
+  const divisores = soloOrinales || enLaTira > 0 ? 0 : Math.max(0, area.config.orinales - 1)
   for (let i = 0; i < divisores; i++) {
     piezas.push({
       familia: 'MG',

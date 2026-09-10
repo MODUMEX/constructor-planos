@@ -53,6 +53,12 @@ export interface Modulacion {
   anchoPuertaAccesible: number | null
   /** ancho de cada orinal: 60 cm mas lo que le toque del sobrante */
   anchoOrinal: number | null
+  /**
+   * El ancho de CADA orinal, en orden. No tienen que medir todos lo mismo: el
+   * cliente decide la medida de cada uno, igual que con las pilastras. Cuando
+   * no se pidió ninguna, los tres salen del ancho base.
+   */
+  anchosOrinal: number[] | null
   /** ancho que le quedó a la cabina accesible, para poder avisar si no llega */
   anchoCabinaAccesible: number | null
 }
@@ -91,6 +97,12 @@ export interface OpcionesModulacion {
   mingitorios?: number
   /** ancho de cada orinal, en cm; por omisión los 60 de siempre */
   anchoOrinal?: number
+  /**
+   * Ancho pedido para cada orinal, en orden. Manda sobre `anchoOrinal` y
+   * NO se toca: si el cliente pidió uno de 50 y otro de 70, la tira se cierra
+   * moviendo las pilastras, no ensanchándole los orinales.
+   */
+  anchosOrinal?: (number | null | undefined)[]
   /** una cabina accesible: es una cabina con puerta ancha, no otra geometría */
   accesible?: boolean
   /**
@@ -156,8 +168,15 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
   const objetivo = calcularClaroAjustado(o.claroCm, o.murosPilastra, nEst + nAcc)
   const dosMuros = o.murosPilastra >= 2
   const anchoBaseOrinal = o.anchoOrinal && o.anchoOrinal > 0 ? o.anchoOrinal : ANCHO_ORINAL
+  // Cada orinal con SU medida. Las que el cliente no pidió salen del ancho base.
+  const anchosOrinal = Array.from({ length: nMing }, (_, i) => {
+    const pedido = o.anchosOrinal?.[i]
+    return pedido && pedido > 0 ? pedido : anchoBaseOrinal
+  })
+  /** si alguno se pidió a medida, los orinales NO se ensanchan para cerrar */
+  const orinalesAMedida = anchosOrinal.some((_, i) => (o.anchosOrinal?.[i] ?? 0) > 0)
   const grosorMG = Math.max(0, nMing - 1) * GRUESO_MG
-  const fijoMG = nMing * anchoBaseOrinal + grosorMG
+  const fijoMG = anchosOrinal.reduce((t, a) => t + a, 0) + grosorMG
 
   const deCatalogo = o.catalogoPuertas && o.catalogoPuertas.length ? o.catalogoPuertas : ANCHOS_PUERTA
   const puertas = o.puertaFija ? [o.puertaFija] : deCatalogo
@@ -278,11 +297,15 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
   // Con orinales, el sobrante NO va a canaleta: se reparte ensanchandolos, que es
   // lo que hace el Constructor actual. La canaleta queda para cuando no los hay.
   let anchoOrinal = anchoBaseOrinal
+  const anchosFinal = anchosOrinal.slice()
   let ajusteFinal = ajuste
   let mensajeFinal = mensaje
   let canaletaFinal = canaleta
-  if (nMing > 0 && diferencia > 0.5) {
+  // Solo se ensanchan los que NO tienen medida pedida: si el cliente dio la
+  // medida, esa manda y el sobrante lo cierran las pilastras.
+  if (nMing > 0 && diferencia > 0.5 && !orinalesAMedida) {
     anchoOrinal = anchoBaseOrinal + diferencia / nMing
+    for (let i = 0; i < anchosFinal.length; i++) anchosFinal[i] = anchoOrinal
     ajusteFinal = "exacto"
     mensajeFinal = `Calza; los ${abs.toFixed(1)} cm de sobra se reparten entre los ${nMing} orinales`
     canaletaFinal = null
@@ -303,6 +326,7 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
     canaleta: canaletaFinal,
     anchoPuertaAccesible: mejor.acc || null,
     anchoOrinal: nMing > 0 ? anchoOrinal : null,
+    anchosOrinal: nMing > 0 ? anchosFinal : null,
     anchoCabinaAccesible:
       nAcc > 0
         ? pilastras[0] + mejor.acc + (internas > 0 ? pilastras[1] / 2 : pilastras[pilastras.length - 1])

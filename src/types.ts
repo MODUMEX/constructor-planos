@@ -151,6 +151,15 @@ export interface Config {
   orinales: number
   /** ancho de cada orinal, en cm; los proyectos viejos van con 60 */
   anchoOrinalCm?: number
+  /**
+   * El ancho pedido para CADA orinal, en orden y en cm. No tienen que medir
+   * todos lo mismo: el cliente decide la medida de cada uno, igual que con las
+   * pilastras. Los que queden vacíos salen del ancho general de arriba.
+   *
+   * En cuanto uno lleva medida pedida, los orinales dejan de ensancharse para
+   * cerrar el claro: eso lo resuelven las pilastras.
+   */
+  anchosOrinalCm?: (number | null)[]
   mgAlturaCm: number
   /** ancho de la mampara de mingitorio; la ficha da 45 y 60, y los viejos van con 60 */
   mgAnchoCm?: number

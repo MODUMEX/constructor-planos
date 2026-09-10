@@ -5,7 +5,8 @@ import { anchoTotal, minimoDe, nuevaCabina, puertaSugerida, snap } from '../modu
 import { medidaCercana, PILASTRAS_INTERNAS, PUERTA_ACCESIBLE_MIN } from '../modulador'
 import { Grupo, Item, Menu, Raya } from './Menu'
 import {
-  cajaDelPlano, cuartoPmr, ESPESOR_MURO, marcosDe, profundidadDeTramo, profundidadDelLugar, pt, SOBRA_MURO_CM,
+  cajaDelPlano, cuartoPmr, ESPESOR_MURO, marcosDe, profundidadDeDivisor, profundidadDeTramo,
+  profundidadDelLugar, pt, SOBRA_MURO_CM,
   type Marco,
 } from '../geometria'
 import { ALTO_ORINAL_CM, ALTO_REGADERA_CM, ALTO_WC_CM, ORINAL, REGADERA, WC } from '../assets/sanitarios'
@@ -500,8 +501,10 @@ export default function EditorPlano({
                         en piezas: acá se deja solo la zona de agarre, sin la pieza, para
                         no tapar el hueco de la puerta del cuarto. */}
                     {i < tramo.cabinas.length - 1 && (() => {
+                      // entre dos orinales el divisor es una mampara, con su propio fondo
+                      const profDiv = profundidadDeDivisor(tramo, i, prof, config.mgAnchoCm)
                       const a = pt(m, u1 - grueso / 2, 0)
-                      const b = pt(m, u1 + grueso / 2, prof)
+                      const b = pt(m, u1 + grueso / 2, profDiv)
                       const activo = arrastrando === `${tramo.id}:${i}`
                       return (
                         <g>
@@ -531,14 +534,14 @@ export default function EditorPlano({
                           )}
                           {/* cota del panel: va en vertical, a lo largo de la pieza */}
                           {verCotas && cuarto?.indice !== i && (() => {
-                            const c = pt(m, u1, prof * 0.5)
+                            const c = pt(m, u1, profDiv * 0.5)
                             return (
                               <text
                                 x={c.x} y={c.y} textAnchor="middle" fontSize={14} fill="#7f8fa3"
                                 pointerEvents="none"
                                 transform={`rotate(${horizontal ? -90 : 0} ${c.x} ${c.y})`}
                               >
-                                {formatear(prof, unidad)}
+                                {formatear(profDiv, unidad)}
                               </text>
                             )
                           })()}

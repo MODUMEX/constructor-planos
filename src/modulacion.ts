@@ -79,7 +79,15 @@ export function modularConCatalogo(
     /** las que el cliente ya eligió, por posición de frontera (null = libre) */
     pilastras?: (number | null | undefined)[]
   },
-  extra?: { accesible?: boolean; anchoAccesibleMinCm?: number; mingitorios?: number; anchoOrinalCm?: number; pais?: Pais },
+  extra?: {
+    accesible?: boolean
+    anchoAccesibleMinCm?: number
+    mingitorios?: number
+    anchoOrinalCm?: number
+    /** el ancho pedido para cada orinal, en orden; no tienen que ser iguales */
+    anchosOrinalCm?: (number | null | undefined)[]
+    pais?: Pais
+  },
 ): { cabinas: Cabina[]; pilastras: number[]; canaletaCm: number; ajuste: Tramo['ajuste']; mensaje: string; avisoAccesible?: string } | null {
   const conAcc = extra?.accesible === true
   const nMing = extra?.mingitorios ?? 0
@@ -94,6 +102,7 @@ export function modularConCatalogo(
     accesible: conAcc,
     mingitorios: nMing,
     anchoOrinal: extra?.anchoOrinalCm,
+    anchosOrinal: extra?.anchosOrinalCm,
     catalogoPuertas: anchosPuerta(extra?.pais ?? 'CR'),
     anchoAccesibleCm: extra?.anchoAccesibleMinCm,
     murosPilastra,
@@ -110,7 +119,7 @@ export function modularConCatalogo(
       ? (() => {
           const salida: (number | null | undefined)[] = [fijar.pilastras[0]]
           for (let i = 1; i <= cantidad - 1; i++) {
-            const entreOrinales = i > cantidad - 1 - nMing && i >= cantidad - nMing
+            const entreOrinales = i > cantidad - nMing && i >= cantidad - nMing
             if (!entreOrinales) salida.push(fijar.pilastras[i])
           }
           salida.push(fijar.pilastras[cantidad])
@@ -129,7 +138,8 @@ export function modularConCatalogo(
   const pilastras: number[] = [m.pilastras[0]]
   let k = 1
   for (let i = 1; i <= cantidad - 1; i++) {
-    const izqOrinal = i > cantidad - 1 - nMing
+    // la frontera i separa la cabina i-1 de la cabina i
+    const izqOrinal = i > cantidad - nMing
     const derOrinal = i >= cantidad - nMing
     // entre dos orinales va mampara, y esa frontera no consume pilastra
     pilastras.push(izqOrinal && derOrinal ? GRUESO_MG_CM : (m.pilastras[k++] ?? m.anchoPilInterna))
@@ -143,7 +153,10 @@ export function modularConCatalogo(
     const esAcc = conAcc && i === 0
     const esOrinal = i >= cantidad - nMing
     const puerta = esAcc ? (m.anchoPuertaAccesible ?? m.anchoPuerta) : m.anchoPuerta
-    const cuerpo = esOrinal ? (m.anchoOrinal ?? anchoOrinal) : puerta
+    // cada orinal con SU ancho: el buscador los devuelve en orden
+    const cuerpo = esOrinal
+      ? (m.anchosOrinal?.[i - (cantidad - nMing)] ?? m.anchoOrinal ?? anchoOrinal)
+      : puerta
     const c = nuevaCabina(izq + cuerpo + der, esAcc ? 'accesible' : esOrinal ? 'orinal' : 'normal')
     if (esOrinal) c.puerta = { ...c.puerta, tipo: 'ninguna' }
     else c.puerta.anchoCm = puerta
@@ -272,18 +285,28 @@ export function reajustarConPuertas(
 }
 
 /** cuántas pilastras lleva un tramo: una por divisor interno y una en cada extremo */
+/** entre dos orinales va una mampara, no una pilastra ni un panel de cabina */
+function entreOrinales(tramo: Tramo, i: number): boolean {
+  return tramo.cabinas[i]?.tipo === 'orinal' && tramo.cabinas[i + 1]?.tipo === 'orinal'
+}
+
 export function pilastrasDe(tramo: Tramo): number {
   const n = tramo.cabinas.length
   if (n === 0) return 0
-  return n - 1 + 2
+  // las dos de los extremos más las internas, salvo las fronteras de mampara
+  let internas = 0
+  for (let i = 0; i < n - 1; i++) if (!entreOrinales(tramo, i)) internas += 1
+  return internas + 2
 }
 
 export function panelesDe(tramo: Tramo): number {
   const n = tramo.cabinas.length
   if (n === 0) return 0
-  let paneles = n - 1
+  let paneles = 0
+  for (let i = 0; i < n - 1; i++) if (!entreOrinales(tramo, i)) paneles += 1
   if (!tramo.muroInicio) paneles += 1
-  if (!tramo.muroFin) paneles += 1
+  // un orinal contra el extremo abierto no lleva panel de cierre: da a la nada
+  if (!tramo.muroFin && tramo.cabinas[n - 1]?.tipo !== 'orinal') paneles += 1
   return paneles
 }
 
@@ -305,11 +328,21 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
   // va siempre. En las demás lo decide el vendedor.
   const conAccesible = tipologiaId === 'PMR' || config.llevaAccesible === true
   const soloOrinales = tipologiaId === 'ORINALES'
+  /**
+   * Los orinales se suman APARTE de las cabinas y van a un costado, como en el
+   * Constructor viejo: la cantidad que pidió el vendedor son baños cerrados, y
+   * los orinales se agregan al final de la tira. Entre dos orinales va una
+   * mampara, no una pilastra.
+   */
+  const nOrinales = soloOrinales ? 0 : Math.max(0, config.orinales ?? 0)
   return tipo.tramos.map((t, i) => {
     // el claro y la cantidad que dio el vendedor van al tramo principal;
     // los secundarios arrancan con una medida de partida que después se arrastra
     const esPrincipal = i === tipo.principal
     const cant = esPrincipal ? cantidad : 2
+    // los orinales solo van en el tramo principal, al costado de los baños
+    const ming = esPrincipal ? nOrinales : 0
+    const total = cant + ming
     // En un área de solo orinales el vendedor da la cantidad, no el claro: la
     // tira mide los orinales, las mamparas que los separan y las dos pilastras
     // de los extremos, que también son piezas de catálogo.
@@ -330,11 +363,12 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
     // ancha, así que sale del mismo buscador que las demás.
     // Si el cliente pidió una medida de puerta, esa manda: el buscador solo
     // puede mover las pilastras. Es la regla del negocio, no una preferencia.
-    const conCatalogo = modularConCatalogo(claroTramo, cant, muros, muros < 2, { puerta: config.puertaCm, puertaAccesible: config.puertaAccesibleCm }, {
+    const conCatalogo = modularConCatalogo(claroTramo, soloOrinales ? cant : total, muros, muros < 2, { puerta: config.puertaCm, puertaAccesible: config.puertaAccesibleCm }, {
       accesible: conAccesible && esPrincipal,
       anchoAccesibleMinCm: anchoAccesibleDe(config),
-      mingitorios: soloOrinales ? cant : 0,
+      mingitorios: soloOrinales ? cant : ming,
       anchoOrinalCm: config.anchoOrinalCm,
+      anchosOrinalCm: config.anchosOrinalCm,
       pais,
     })
     if (!conCatalogo) {

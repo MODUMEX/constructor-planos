@@ -1,7 +1,8 @@
 import { jsPDF } from 'jspdf'
 import type { Area, Proyecto } from '../types'
 import {
-  acumulado, cajaDelPlano, cuartoPmr, ESPESOR_MURO, marcosDe, PROF_ORINAL_CM, profundidadDeTramo,
+  acumulado, cajaDelPlano, cuartoPmr, ESPESOR_MURO, marcosDe, PROF_ORINAL_CM, profundidadDeDivisor,
+  profundidadDeTramo,
   profundidadDelLugar, pt, SOBRA_MURO_CM,
   type Marco,
 } from '../geometria'
@@ -291,9 +292,11 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
       // dibuja aparte y en piezas: si se dibujara acá taparía el hueco de la puerta
       const dibujarPanel = (!esUltima || !tramo.muroFin) && cuarto?.indice !== i
       if (dibujarPanel) {
+        // entre dos orinales el divisor es una mampara, con su propio fondo
+        const profDiv = profundidadDeDivisor(tramo, i, prof, area.config.mgAnchoCm)
         doc.setFillColor(TINTA, TINTA, TINTA)
         const [ax, ay] = aHoja(e, pt(m, u1 - grueso / 2, 0))
-        const [bx, by] = aHoja(e, pt(m, u1 + grueso / 2, prof))
+        const [bx, by] = aHoja(e, pt(m, u1 + grueso / 2, profDiv))
         doc.rect(Math.min(ax, bx), Math.min(ay, by), Math.max(Math.abs(bx - ax), 0.5), Math.max(Math.abs(by - ay), 0.5), 'F')
       }
       if (i === 0 && !tramo.muroInicio) {
@@ -440,8 +443,12 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
         vTexto: -ESPESOR_MURO - 15,
       })
     })
-    // y la total, arriba de todas
-    cotaEntre(doc, e, m, 0, largo, -ESPESOR_MURO - 27, -ESPESOR_MURO - 14, `${largo} cm`, {
+    // Y la total: es el CLARO del proyecto, la medida de pared a pared, no la
+    // suma de las piezas. La pantalla ya la mostraba así; el PDF ponía la suma,
+    // que en una tira que calza justo da un par de centímetros más y hacía
+    // dudar al instalador de la medida del muro.
+    const claroCota = tramo.claroCm && tramo.claroCm > 0 ? tramo.claroCm : largo
+    cotaEntre(doc, e, m, 0, largo, -ESPESOR_MURO - 27, -ESPESOR_MURO - 14, `${claroCota} cm`, {
       size: 8,
       bold: true,
       color: TINTA_COTA,
@@ -488,8 +495,9 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
 
         // el panel divisor va a la derecha de la cabina; su cota, en vertical
         if (i < nCab - 1 && cuarto?.indice !== i) {
-          const [nx, ny] = aHoja(e, pt(m, u1 + 7, prof / 2))
-          texto(doc, String(prof), nx, ny, { size: 5.5, align: 'center', angle: rot + 90, color: COTA })
+          const profDiv = profundidadDeDivisor(tramo, i, prof, area.config.mgAnchoCm)
+          const [nx, ny] = aHoja(e, pt(m, u1 + 7, profDiv / 2))
+          texto(doc, String(profDiv), nx, ny, { size: 5.5, align: 'center', angle: rot + 90, color: COTA })
         }
       })
     }

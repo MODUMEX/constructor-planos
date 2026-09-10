@@ -23,6 +23,25 @@ export function profundidadDeTramo(tramo: Tramo, profundidadCm: number): number 
 }
 
 /**
+ * El fondo con el que se dibuja el divisor que va a la DERECHA de la cabina i.
+ *
+ * Entre dos orinales no va un panel de cabina sino una mampara, que es mucho
+ * menos honda: la ficha la da como "fondo × alto" (45 × 120, 60 × 120…).
+ * Dibujarla con los 150 del panel la hacía parecer una cabina cerrada.
+ */
+export function profundidadDeDivisor(
+  tramo: Tramo,
+  i: number,
+  profundidadCm: number,
+  mgAnchoCm?: number,
+): number {
+  const izq = tramo.cabinas[i]
+  const der = tramo.cabinas[i + 1]
+  if (izq?.tipo === 'orinal' && der?.tipo === 'orinal') return mgAnchoCm && mgAnchoCm > 0 ? mgAnchoCm : 60
+  return profundidadCm
+}
+
+/**
  * Cada tramo se dibuja en su propio marco: un origen más dos direcciones,
  * `a` a lo largo del muro y `p` hacia el frente de las cabinas. La pantalla
  * y el PDF usan el mismo marco, así que dibujan exactamente el mismo plano.
