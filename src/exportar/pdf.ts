@@ -1,7 +1,8 @@
 import { jsPDF } from 'jspdf'
 import type { Area, Proyecto } from '../types'
 import {
-  acumulado, cajaDelPlano, cuartoPmr, esMingitorio, ESPESOR_MURO, marcosDe, PROF_ORINAL_CM,
+  acumulado, anchoDeOrinal, cajaDelPlano, cuartoPmr, esMingitorio, ESPESOR_MURO, marcosDe,
+  PROF_ORINAL_CM,
   profundidadDeDivisor,
   profundidadDeTramo,
   profundidadDelLugar, pt, SOBRA_MURO_CM,
@@ -486,11 +487,23 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
       })
 
       tramo.cabinas.forEach((cab, i) => {
-        if (cab.puerta.tipo === 'ninguna' || cuarto?.indice === i) return
+        if (cuarto?.indice === i) return
         const u0 = acum[i]
         const u1 = u0 + cab.anchoCm
         const izq = i === 0 ? anchoPilDe(0) : anchoPilDe(i) / 2
         const der = i === nCab - 1 ? anchoPilDe(nCab) : anchoPilDe(i + 1) / 2
+        // El orinal no lleva puerta, pero sí tiene su medida, que NO es la de su
+        // cabina: la cabina se lleva además media pilastra de cada lado.
+        if (cab.tipo === 'orinal') {
+          const libre = anchoDeOrinal(tramo, i, area.config.anchoPilastraCm)
+          cotaEntre(doc, e, m, u0 + izq, u1 - der, prof - 20, prof - 12, String(libre), {
+            size: 6,
+            rot,
+            vTexto: prof - 22,
+          })
+          return
+        }
+        if (cab.puerta.tipo === 'ninguna') return
         cotaEntre(doc, e, m, u0 + izq, u1 - der, prof - 20, prof - 12, String(cab.puerta.anchoCm), {
           size: 6,
           rot,

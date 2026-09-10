@@ -5,7 +5,8 @@ import { anchoTotal, minimoDe, nuevaCabina, puertaSugerida, snap, cierraConMingi
 import { medidaCercana, PILASTRAS_INTERNAS, PUERTA_ACCESIBLE_MIN } from '../modulador'
 import { Grupo, Item, Menu, Raya } from './Menu'
 import {
-  cajaDelPlano, cuartoPmr, ESPESOR_MURO, esMingitorio, marcosDe, profundidadDeDivisor, profundidadDeTramo,
+  anchoDeOrinal, cajaDelPlano, cuartoPmr, ESPESOR_MURO, esMingitorio, marcosDe, profundidadDeDivisor,
+  profundidadDeTramo,
   profundidadDelLugar, pt, SOBRA_MURO_CM,
   type Marco,
 } from '../geometria'
@@ -453,6 +454,18 @@ export default function EditorPlano({
                         textAnchor="middle" fontSize={14} fill="#8fa2bb" pointerEvents="none"
                       >
                         {formatear(cab.puerta.anchoCm, unidad)}
+                      </text>
+                    )}
+
+                    {/* La medida del ORINAL, que no es la de su cabina: la cabina se lleva
+                        además media pilastra de cada lado. Sin esto parecía que la app no
+                        respetaba el ancho pedido. */}
+                    {verCotas && cab.tipo === 'orinal' && (
+                      <text
+                        x={cotaPuerta.x} y={cotaPuerta.y + (horizontal ? 26 : 0)}
+                        textAnchor="middle" fontSize={14} fill="#8fa2bb" pointerEvents="none"
+                      >
+                        {formatear(anchoDeOrinal(tramo, i, config.anchoPilastraCm), unidad)}
                       </text>
                     )}
 

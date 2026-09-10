@@ -20,6 +20,7 @@ import { contarSolicitudes } from './solicitudes'
 import { coloresMxPara, slugRenderMx } from './coloresMx'
 import { fotoDe, fotosHerraje, faltanFotosHerraje, terminacionesDe } from './renders'
 import { anchoAccesibleDe, anchoTotal, bom, crearTramos, modularConCatalogo, nuevoId, reajustarConPuertas, totalBOM } from './modulacion'
+import { anchoDeOrinal } from './geometria'
 import { cargarTarifas, type ResultadoTarifas } from './tarifas'
 import { buscarActualizacion, type FaseActualizacion } from './actualizar'
 import { versionActual, VERSION_COMPILADA } from './version'
@@ -1249,6 +1250,8 @@ export default function App() {
                           <b>
                             {formatear(c.anchoCm, unidad)}
                             {c.puerta.tipo === 'puerta' && c.tipo !== 'orinal' ? ` / PT${c.puerta.anchoCm}` : ''}
+                            {/* la cabina se lleva media pilastra de cada lado: el orinal mide menos */}
+                            {c.tipo === 'orinal' ? ` / orinal ${anchoDeOrinal(t, i, config.anchoPilastraCm)}` : ''}
                           </b>
                         </div>
                       ))}

@@ -34,6 +34,25 @@ export function profundidadDeTramo(tramo: Tramo, profundidadCm: number): number 
  * van de 0 (antes de la primera cabina) a n (después de la última): entre dos
  * orinales va mingitorio, y también contra un extremo sin muro.
  */
+/**
+ * El ancho LIBRE del orinal, sin lo que le toca de las piezas vecinas.
+ *
+ * La cabina mide más que eso —se lleva media pilastra de cada lado, como
+ * cualquier baño—, así que la cota de la cabina no es la medida que se pidió.
+ * Esta es la que hay que mostrar sobre el orinal para que se entienda.
+ */
+export function anchoDeOrinal(tramo: Tramo, i: number, anchoPilastraCm: number): number {
+  const n = tramo.cabinas.length
+  const cab = tramo.cabinas[i]
+  if (!cab) return 0
+  const pil = (k: number) => tramo.pilastras?.[k] ?? anchoPilastraCm
+  const izq = i === 0 ? pil(0) : pil(i) / 2
+  const der = i === n - 1 ? pil(n) : pil(i + 1) / 2
+  // a medios centímetros, como el resto de las medidas del plano: la cabina ya
+  // viene redondeada así y sin esto un orinal pedido de 60 se leía 59.9
+  return Math.round((cab.anchoCm - izq - der) * 2) / 2
+}
+
 export function esMingitorio(tramo: Tramo, k: number): boolean {
   const n = tramo.cabinas.length
   if (k === 0) return tramo.cabinas[0]?.tipo === 'orinal' && !tramo.muroInicio
