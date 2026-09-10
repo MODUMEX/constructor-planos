@@ -172,6 +172,11 @@ export default function App() {
   const [verSolicitudes, setVerSolicitudes] = useState(false)
   // cuántas cuentas están esperando aprobación, para el contador del botón
   const [nSolicitudes, setNSolicitudes] = useState(0)
+
+  // el aviso del cambio rechazado es de UN área: al pasar a otra no aplica
+  useEffect(() => {
+    setBloqueo(null)
+  }, [activa])
   useEffect(() => {
     if (!esAdmin(usuario)) { setNSolicitudes(0); return }
     let vivo = true
@@ -356,6 +361,11 @@ export default function App() {
   }
 
   function setArea(cambio: Partial<Area>) {
+    // El aviso de "no se aplicó" habla del cambio que se rechazó, no del plano.
+    // Si sobrevive a un cambio posterior queda contradiciendo al aviso del
+    // tramo, que sí describe lo que hay. Por eso se borra acá, que es por donde
+    // pasan TODOS los cambios del área.
+    setBloqueo(null)
     setProyecto((p) => ({ ...p, areas: p.areas.map((a, i) => (i === activa ? { ...a, ...cambio } : a)) }))
   }
 
@@ -538,11 +548,17 @@ export default function App() {
     // La excepción es una tira que ya venía pasada: ahí hay que dejarla tocar
     // las piezas para poder arreglarla.
     if (r.ajuste === 'falta' && t.ajuste !== 'falta') {
+      // Cuántas pilastras hay en la tira: una por frontera más las dos de punta.
+      const posiciones = t.cabinas.length + 1
+      const todasClavadas = elegidas.length >= posiciones
       setBloqueo(
-        `Con esa medida las piezas no caben en el claro de ${t.claroCm} cm. ${r.mensaje}` +
-          (elegidas.length > 1
-            ? ' Llevás ' + elegidas.length + ' pilastras elegidas a mano: soltá alguna para darle juego.'
-            : ''),
+        `Con esa medida las piezas no caben en el claro de ${t.claroCm} cm. ${r.mensaje}. ` +
+          'El plano quedó como estaba.' +
+          (todasClavadas
+            ? ` Tenés las ${posiciones} pilastras elegidas a mano, así que no queda ninguna libre para acomodar: soltalas con el botón de arriba.`
+            : elegidas.length > 1
+              ? ` Llevás ${elegidas.length} de ${posiciones} pilastras elegidas a mano: soltá alguna para darle juego.`
+              : ''),
       )
       return
     }
