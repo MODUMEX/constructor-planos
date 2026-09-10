@@ -1,11 +1,12 @@
 /**
  * Comprueba que un área de solo orinales sale del buscador de modulación:
- * pilastra de catálogo contra el muro, mingitorio MG entre orinal y orinal y
- * uno más cerrando el extremo que no tiene muro.
+ * En el campo de orinales NO hay pilastras ni puertas: son los espacios y los
+ * mingitorios que los separan, más uno de cierre en el extremo que no tiene muro.
  *   npx esbuild scripts/probar-orinales.ts --bundle --platform=node --format=esm --outfile=.orinales.mjs && node .orinales.mjs
  */
 import { crearTramos, nuevoId } from '../src/modulacion'
 import { piezasDeArea } from '../src/exportar/piezas'
+import { anchoDeOrinal } from '../src/geometria'
 import { espesorPorLinea } from '../src/catalog'
 import type { Area, Config } from '../src/types'
 
@@ -46,15 +47,19 @@ for (const n of [2, 3, 4, 5]) {
   console.log(`  MG: ${mg.length}   PN: ${pn.length}`)
 
   const problemas: string[] = []
-  // La tira arranca contra muro y termina en un extremo abierto: ahí cierra con
-  // mingitorio, no con pilastra. Queda una sola pilastra, la del muro.
-  if (pl.length !== 1) problemas.push(`se esperaba 1 pilastra (la del muro), salieron ${pl.length}`)
+  // en el campo de orinales no hay pilastras: ni contra el muro ni en la punta
+  if (pl.length !== 0) problemas.push(`no van pilastras en el campo de orinales, salieron ${pl.length}`)
   // N−1 mingitorios entre los orinales y 1 más cerrando el extremo sin muro
   if (mg.length !== n) problemas.push(`se esperaban ${n} mingitorios MG, salieron ${mg.length}`)
   if (pn.length !== 0) problemas.push(`los orinales no llevan panel de cabina, salieron ${pn.length}`)
   if (piezas.some((p) => p.familia === 'PT')) problemas.push('los orinales no llevan puerta')
   const catalogo = [10, 12, 15, 17, 19, 24, 30, 35, 40, 45, 50, 55, 60, 70, 85, 90, 100, 120]
   for (const p of pl) if (!catalogo.includes(p.anchoCm)) problemas.push(`pilastra de ${p.anchoCm} cm no está en el catálogo`)
+  // cada orinal tiene que quedar con el espacio que se pidió, 60 por omisión
+  t.cabinas.forEach((c, i) => {
+    const libre = anchoDeOrinal(t, i, cfg.anchoPilastraCm)
+    if (Math.abs(libre - 60) > 0.6) problemas.push(`el orinal ${i + 1} quedó de ${libre} cm y se pidió de 60`)
+  })
 
   if (problemas.length) {
     fallas += 1

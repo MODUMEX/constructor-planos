@@ -105,10 +105,14 @@ export interface OpcionesModulacion {
   anchosOrinal?: (number | null | undefined)[]
   /**
    * La tira termina en orinal y de ese lado no hay muro: entonces cierra con un
-   * MINGITORIO, no con pilastra terminal más panel de cierre. Es lo que hace el
-   * Constructor viejo: N orinales contra un extremo abierto llevan N mingitorios.
+   * MINGITORIO. Contra un muro no cierra con nada: el espacio del último orinal
+   * llega hasta la pared.
    */
   cierreMingitorio?: boolean
+  /** grueso del panel de cabina, en cm; es lo que separa el último baño del primer orinal */
+  grosorPanel?: number
+  /** la tira ARRANCA en orinal y de ese lado no hay muro: también cierra con mingitorio */
+  cierreMingitorioInicio?: boolean
   /** una cabina accesible: es una cabina con puerta ancha, no otra geometría */
   accesible?: boolean
   /**
@@ -167,9 +171,16 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
   const cabinas = nEst + nAcc + nMing
   if (cabinas < 1) return null
 
-  // Entre dos orinales va SOLO la mampara MG, no pilastra: por eso se descuentan
-  // esas fronteras del conteo de pilastras internas.
-  const internas = Math.max(0, cabinas - 1 - Math.max(0, nMing - 1))
+  /**
+   * En el campo de orinales NO hay pilastras ni puertas: solo los espacios y los
+   * mingitorios que los separan. Lo que separa al último baño del primer orinal
+   * es el PANEL de esa cabina, no una pilastra.
+   *
+   * Así que las fronteras que tocan un orinal salen del conteo de pilastras.
+   */
+  const conCabinas = nEst + nAcc > 0
+  const fronterasOrinal = nMing > 0 ? (conCabinas ? nMing : nMing - 1) : 0
+  const internas = Math.max(0, cabinas - 1 - fronterasOrinal)
   // los orinales no llevan puerta, así que no suman holgura de bisagra
   const objetivo = calcularClaroAjustado(o.claroCm, o.murosPilastra, nEst + nAcc)
   const dosMuros = o.murosPilastra >= 2
@@ -182,9 +193,12 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
   /** si alguno se pidió a medida, los orinales NO se ensanchan para cerrar */
   const orinalesAMedida = anchosOrinal.some((_, i) => (o.anchosOrinal?.[i] ?? 0) > 0)
   // N orinales llevan N−1 mingitorios entre ellos, y uno más si cierran contra
-  // un extremo sin muro.
+  // un extremo sin muro. Ese último va en la pilastra de punta, que pasa a valer
+  // el grueso del mingitorio.
   const cierreMG = o.cierreMingitorio === true && nMing > 0
-  const grosorMG = Math.max(0, nMing - 1) * GRUESO_MG
+  // el panel de la última cabina, que es lo que separa los baños del campo de orinales
+  const panelAlCampo = conCabinas && nMing > 0 ? (o.grosorPanel ?? 0) : 0
+  const grosorMG = Math.max(0, nMing - 1) * GRUESO_MG + panelAlCampo
   const fijoMG = anchosOrinal.reduce((t, a) => t + a, 0) + grosorMG
 
   const deCatalogo = o.catalogoPuertas && o.catalogoPuertas.length ? o.catalogoPuertas : ANCHOS_PUERTA
@@ -202,8 +216,12 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
   const opInternas =
     internas > 0 ? (o.pilInternaFija && !unaClavada ? [o.pilInternaFija] : PILASTRAS_INTERNAS) : [0]
   const opExtremos = o.pilExtremoFija && !unaClavada ? [o.pilExtremoFija] : PILASTRAS_EXTREMO
-  // cerrando con mingitorio, la última "pilastra" es el grueso de esa pieza
-  const opExtremo2 = cierreMG ? [GRUESO_MG] : opExtremos
+  // Las puntas del campo de orinales no llevan pilastra: son el mingitorio de
+  // cierre si no hay muro, o nada si el orinal da contra la pared. El arranque
+  // solo puede ser del campo cuando la tira es de puros orinales.
+  const arranqueOrinal = nMing > 0 && !conCabinas
+  const opExtremo1 = arranqueOrinal ? [o.cierreMingitorioInicio ? GRUESO_MG : 0] : opExtremos
+  const opExtremo2 = nMing > 0 ? [cierreMG ? GRUESO_MG : 0] : opExtremos
   const objetivoAcc = nAcc > 0 ? (o.anchoAccesibleCm ?? 0) : 0
 
   type Candidato =
@@ -214,7 +232,7 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
   for (const acc of puertasAcc.length ? puertasAcc : [0]) {
     for (const ap of nEst > 0 ? puertas : [0]) {
       for (const api of opInternas) {
-        for (const ae1 of opExtremos) {
+        for (const ae1 of opExtremo1) {
           for (const ae2 of opExtremo2) {
             const total = nEst * ap + nAcc * acc + fijoMG + internas * api + ae1 + ae2
             const dif = objetivo - total
@@ -262,8 +280,9 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
     }
   }
   if (nAcc > 0 && objetivoAcc > 0 && clavadas[0] === null) clavadas[0] = mejor.ae1
-  // el mingitorio de cierre no se negocia: es una pieza, no una pilastra
-  if (cierreMG) clavadas[clavadas.length - 1] = GRUESO_MG
+  // las puntas del campo de orinales no se negocian: mingitorio de cierre, o nada
+  if (nMing > 0) clavadas[clavadas.length - 1] = cierreMG ? GRUESO_MG : 0
+  if (arranqueOrinal) clavadas[0] = o.cierreMingitorioInicio ? GRUESO_MG : 0
   // Con una pilastra clavada a mano el reparto manda: es la única forma de que
   // las otras se acomoden en vez de copiarle la medida.
   const uniformeCalza = !unaClavada && cabe(objetivo - mejor.total, o.extremoAbierto, o.murosPilastra)
@@ -276,7 +295,8 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
     for (let i = 0; i < base.length; i++) if (clavadas[i]) base[i] = clavadas[i]!
     return base
   })()
-  if (cierreMG) pilastras[pilastras.length - 1] = GRUESO_MG
+  if (nMing > 0) pilastras[pilastras.length - 1] = cierreMG ? GRUESO_MG : 0
+  if (arranqueOrinal) pilastras[0] = o.cierreMingitorioInicio ? GRUESO_MG : 0
 
   // El total sale SIEMPRE de las pilastras que quedaron: el respaldo respeta la
   // que ella movió, así que el total del buscador ya no sirve.
@@ -514,8 +534,8 @@ export function repartirPilastras(
   // entre sí y solo si no hay combinación se admiten más distintas. Así la tira
   // sale lo más pareja que el catálogo permita, en vez de mezclar una de 24 con
   // una de 85 pudiendo cerrar con dos de 50.
-  const sumaFija = (fijas ?? []).reduce<number>((s, v, i) => (v && i < posiciones ? s + v : s), 0)
-  const libresInternas = internas - (fijas ?? []).filter((v, i) => v && i > 0 && i < posiciones - 1).length
+  const sumaFija = (fijas ?? []).reduce<number>((s, v, i) => (v != null && i < posiciones ? s + v : s), 0)
+  const libresInternas = internas - (fijas ?? []).filter((v, i) => v != null && i > 0 && i < posiciones - 1).length
   const centro =
     libresInternas > 0 ? (objetivo - sumaFija - 2 * opcionesExtremo[0]) / libresInternas : 0
   const internasOrden = [...opcionesInternas].sort((a, b) => Math.abs(a - centro) - Math.abs(b - centro))
@@ -547,8 +567,10 @@ function armar(
 ): number[] | null {
   const opciones: number[][] = []
   for (let i = 0; i < posiciones; i++) {
+    // ojo: una posición clavada en CERO también está clavada (la punta del campo
+    // de orinales no lleva pieza), así que se compara contra null, no por verdadero
     const clavada = fijas?.[i]
-    if (clavada) { opciones.push([clavada]); continue }
+    if (clavada != null) { opciones.push([clavada]); continue }
     const esExtremo = i === 0 || i === posiciones - 1
     opciones.push(esExtremo ? extremos : internas)
   }

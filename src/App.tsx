@@ -624,6 +624,7 @@ export default function App() {
         anchoOrinalCm: config.anchoOrinalCm,
         anchosOrinalCm: anchos,
         cierreMingitorio: !t.muroFin && cuantos > 0,
+        grosorPanelCm: Math.max(config.espesorMm / 10, 0.3),
         pais: proyecto.paisFabricacion,
       },
     )
@@ -682,6 +683,7 @@ export default function App() {
         anchoOrinalCm: config.anchoOrinalCm,
         anchosOrinalCm: config.anchosOrinalCm,
         cierreMingitorio: !t.muroFin && t.cabinas[t.cabinas.length - 1]?.tipo === 'orinal',
+        grosorPanelCm: Math.max(config.espesorMm / 10, 0.3),
         pais: proyecto.paisFabricacion,
       },
     )

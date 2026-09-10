@@ -1,6 +1,6 @@
 import type { Area, Cabina, Config, Tramo } from '../types'
 import { alturasDe, nombreModelo, tipologia } from '../catalog'
-import { cierraConMingitorio } from '../modulacion'
+import { cierraConMingitorio, fronteraDeOrinal } from '../modulacion'
 
 /**
  * Piezas del proyecto con el SubTipo que espera el CIP.
@@ -154,7 +154,10 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
     // posición. Los tramos guardados antes de eso no traen la lista: ahí se cae
     // en el ancho único de la configuración, como se hacía antes.
     const anchoDe = (i: number) => tramo.pilastras?.[i] ?? config.anchoPilastraCm
-    if (!omitirPilastraInicial) {
+    // En el campo de orinales no hay pilastras: solo los espacios y los
+    // mingitorios que los separan. La pilastra de arranque solo va si esa
+    // frontera no es del campo.
+    if (!omitirPilastraInicial && !fronteraDeOrinal(tramo, 0)) {
       piezas.push({
         familia: 'PL',
         anchoCm: anchoDe(0),
@@ -164,14 +167,14 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
       })
     }
     for (let i = 0; i < n - 1; i++) {
-      // entre dos orinales va solo la mampara MG, no pilastra
-      const entreOrinales =
-        tramo.cabinas[i].tipo === 'orinal' && tramo.cabinas[i + 1].tipo === 'orinal'
-      if (entreOrinales) continue
+      // ninguna frontera del campo de orinales lleva pilastra: entre dos orinales
+      // va el mingitorio, y entre el último baño y el primer orinal, su panel
+      if (fronteraDeOrinal(tramo, i + 1)) continue
       piezas.push({ familia: 'PL', anchoCm: anchoDe(i + 1), altoCm: altoPil, subTipo: 'PLCEN', area })
     }
-    // cerrando con mingitorio ese extremo no lleva pilastra: la pieza es el mingitorio
-    if (!cierraConMingitorio(tramo)) {
+    // el campo de orinales no lleva pilastra de punta: es el mingitorio de cierre,
+    // o nada si el último orinal da contra la pared
+    if (!fronteraDeOrinal(tramo, n)) {
       piezas.push({
         familia: 'PL',
         anchoCm: anchoDe(n),

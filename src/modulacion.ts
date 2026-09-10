@@ -88,12 +88,17 @@ export function modularConCatalogo(
     anchosOrinalCm?: (number | null | undefined)[]
     /** la tira termina en orinal y de ese lado no hay muro: cierra con mingitorio */
     cierreMingitorio?: boolean
+    /** grueso del panel de cabina: lo que separa el último baño del campo de orinales */
+    grosorPanelCm?: number
+    /** la tira arranca en orinal sin muro de ese lado: también cierra con mingitorio */
+    cierreMingitorioInicio?: boolean
     pais?: Pais
   },
 ): { cabinas: Cabina[]; pilastras: number[]; canaletaCm: number; ajuste: Tramo['ajuste']; mensaje: string; avisoAccesible?: string } | null {
   const conAcc = extra?.accesible === true
   const nMing = extra?.mingitorios ?? 0
   const anchoOrinal = extra?.anchoOrinalCm && extra.anchoOrinalCm > 0 ? extra.anchoOrinalCm : 60
+  const grosorPanel = extra?.grosorPanelCm ?? 0
   // la accesible va primera y los orinales al final, como en el Constructor actual
   const normales = cantidad - (conAcc ? 1 : 0) - nMing
   if (normales < 0) return null
@@ -106,6 +111,8 @@ export function modularConCatalogo(
     anchoOrinal: extra?.anchoOrinalCm,
     anchosOrinal: extra?.anchosOrinalCm,
     cierreMingitorio: extra?.cierreMingitorio,
+    grosorPanel: extra?.grosorPanelCm,
+    cierreMingitorioInicio: extra?.cierreMingitorioInicio,
     catalogoPuertas: anchosPuerta(extra?.pais ?? 'CR'),
     anchoAccesibleCm: extra?.anchoAccesibleMinCm,
     murosPilastra,
@@ -122,8 +129,9 @@ export function modularConCatalogo(
       ? (() => {
           const salida: (number | null | undefined)[] = [fijar.pilastras[0]]
           for (let i = 1; i <= cantidad - 1; i++) {
-            const entreOrinales = i > cantidad - nMing && i >= cantidad - nMing
-            if (!entreOrinales) salida.push(fijar.pilastras[i])
+            // las fronteras que tocan un orinal no son pilastras del buscador
+            const delCampo = i >= cantidad - nMing
+            if (!delCampo) salida.push(fijar.pilastras[i])
           }
           salida.push(fijar.pilastras[cantidad])
           return salida
@@ -141,11 +149,14 @@ export function modularConCatalogo(
   const pilastras: number[] = [m.pilastras[0]]
   let k = 1
   for (let i = 1; i <= cantidad - 1; i++) {
-    // la frontera i separa la cabina i-1 de la cabina i
+    // La frontera i separa la cabina i−1 de la cabina i. En el campo de orinales
+    // no hay pilastras: entre dos orinales va el mingitorio, y entre el último
+    // baño y el primer orinal va el PANEL de esa cabina.
     const izqOrinal = i > cantidad - nMing
     const derOrinal = i >= cantidad - nMing
-    // entre dos orinales va mampara, y esa frontera no consume pilastra
-    pilastras.push(izqOrinal && derOrinal ? GRUESO_MG_CM : (m.pilastras[k++] ?? m.anchoPilInterna))
+    if (izqOrinal && derOrinal) pilastras.push(GRUESO_MG_CM)
+    else if (derOrinal) pilastras.push(grosorPanel)
+    else pilastras.push(m.pilastras[k++] ?? m.anchoPilInterna)
   }
   pilastras.push(m.pilastras[m.pilastras.length - 1])
 
@@ -288,9 +299,20 @@ export function reajustarConPuertas(
 }
 
 /** cuántas pilastras lleva un tramo: una por divisor interno y una en cada extremo */
-/** entre dos orinales va una mampara, no una pilastra ni un panel de cabina */
+/** entre dos orinales va un mingitorio, no una pilastra ni un panel de cabina */
 function entreOrinales(tramo: Tramo, i: number): boolean {
   return tramo.cabinas[i]?.tipo === 'orinal' && tramo.cabinas[i + 1]?.tipo === 'orinal'
+}
+
+/**
+ * Si la frontera k cae DENTRO del campo de orinales, donde no hay pilastras.
+ * Las fronteras van de 0 (antes de la primera cabina) a n (después de la última).
+ */
+export function fronteraDeOrinal(tramo: Tramo, k: number): boolean {
+  const n = tramo.cabinas.length
+  if (k <= 0) return tramo.cabinas[0]?.tipo === 'orinal'
+  if (k >= n) return tramo.cabinas[n - 1]?.tipo === 'orinal'
+  return tramo.cabinas[k - 1]?.tipo === 'orinal' || tramo.cabinas[k]?.tipo === 'orinal'
 }
 
 /**
@@ -309,11 +331,10 @@ export function cierraConMingitorio(tramo: Tramo): boolean {
 export function pilastrasDe(tramo: Tramo): number {
   const n = tramo.cabinas.length
   if (n === 0) return 0
-  // las de los extremos más las internas, salvo las fronteras de mingitorio
-  let internas = 0
-  for (let i = 0; i < n - 1; i++) if (!entreOrinales(tramo, i)) internas += 1
-  // cerrando con mingitorio, ese extremo no lleva pilastra
-  return internas + (cierraConMingitorio(tramo) ? 1 : 2)
+  // una por frontera, menos las que caen en el campo de orinales
+  let cuantas = 0
+  for (let k = 0; k <= n; k++) if (!fronteraDeOrinal(tramo, k)) cuantas += 1
+  return cuantas
 }
 
 export function panelesDe(tramo: Tramo): number {
@@ -365,7 +386,14 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
     // de los extremos, que también son piezas de catálogo.
     const murosT = (t.muroInicio ? 1 : 0) + (t.muroFin ? 1 : 0)
     const anchoOrinal = config.anchoOrinalCm && config.anchoOrinalCm > 0 ? config.anchoOrinalCm : 60
-    const claroOrinales = cant * anchoOrinal + Math.max(0, cant - 1) * GRUESO_MG_CM + 2 * 10 + murosT
+    // Un área de solo orinales no lleva pilastras: son los espacios y los
+    // mingitorios que los separan, más el de cierre si ese lado no tiene muro.
+    const claroOrinales =
+      cant * anchoOrinal +
+      Math.max(0, cant - 1) * GRUESO_MG_CM +
+      (t.muroFin ? 0 : GRUESO_MG_CM) +
+      (t.muroInicio ? 0 : GRUESO_MG_CM) +
+      murosT
     const claroTramo = soloOrinales ? claroOrinales : esPrincipal ? claroCm : LARGO_SECUNDARIO_CM
     const base = {
       id: nuevoId('tramo'),
@@ -388,6 +416,8 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
       anchosOrinalCm: config.anchosOrinalCm,
       // si la tira termina en orinal y de ese lado no hay muro, cierra con mingitorio
       cierreMingitorio: !t.muroFin && (soloOrinales ? cant : ming) > 0,
+      grosorPanelCm: Math.max(config.espesorMm / 10, 0.3),
+      cierreMingitorioInicio: soloOrinales && !t.muroInicio,
       pais,
     })
     if (!conCatalogo) {

@@ -53,11 +53,17 @@ export function anchoDeOrinal(tramo: Tramo, i: number, anchoPilastraCm: number):
   return Math.round((cab.anchoCm - izq - der) * 2) / 2
 }
 
+/**
+ * Si la frontera k de la tira cae en el CAMPO DE ORINALES, donde no hay pilastra
+ * que dibujar: entre dos orinales va el mingitorio, entre el último baño y el
+ * primer orinal va el panel de esa cabina, y en la punta va el mingitorio de
+ * cierre o nada, según haya muro. Las fronteras van de 0 a n.
+ */
 export function esMingitorio(tramo: Tramo, k: number): boolean {
   const n = tramo.cabinas.length
-  if (k === 0) return tramo.cabinas[0]?.tipo === 'orinal' && !tramo.muroInicio
-  if (k >= n) return tramo.cabinas[n - 1]?.tipo === 'orinal' && !tramo.muroFin
-  return tramo.cabinas[k - 1]?.tipo === 'orinal' && tramo.cabinas[k]?.tipo === 'orinal'
+  if (k <= 0) return tramo.cabinas[0]?.tipo === 'orinal'
+  if (k >= n) return tramo.cabinas[n - 1]?.tipo === 'orinal'
+  return tramo.cabinas[k - 1]?.tipo === 'orinal' || tramo.cabinas[k]?.tipo === 'orinal'
 }
 
 export function profundidadDeDivisor(
