@@ -7,7 +7,7 @@ import { generarCSV, nombreArchivoCSV } from './exportar/csv'
 import { generarPDF, nombreArchivoPDF } from './exportar/pdf'
 import { csvABytes, FILTRO_CSV, FILTRO_PDF, guardarArchivo } from './exportar/guardar'
 import { esAdmin, IVA_CR, puedeCatalogos, puedeDistribuidores, puedeUsuarios, type Usuario } from './auth'
-import type { Area, Cabina, Config, Pais, Proyecto, TipoCabina, TipologiaId } from './types'
+import type { Area, Cabina, Config, Pais, Proyecto, TipoCabina, TipologiaId, Tramo } from './types'
 import {
   ACABADOS, alturasDe, anchosPanel, claroAjustado, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, mgMedidas, MODELOS,
   PAISES, etiquetaTier, nombreHerraje, nombreModelo, tierDeColor, TIPOLOGIAS, tipologia, tipologiaEspejo,
@@ -336,7 +336,17 @@ export default function App() {
   // y se le volvería a modular encima el plano que ya tenía.
   const tramoPrincipal = area.tramos[tipologia(config.tipologia).principal]
   const claroCm = config.claroPedidoCm ?? tramoPrincipal?.claroCm ?? 420
-  const cantidad = config.cabinasPedidas ?? tramoPrincipal?.cabinas.length ?? 4
+  /**
+   * Cuántos BAÑOS tiene la tira. Los orinales no cuentan: se piden aparte y la
+   * modulación se los agrega al final. Si acá se contaran las cabinas enteras,
+   * cada vez que se vuelve a modular se les sumarían los orinales otra vez y la
+   * tira crecería sola en cada pasada.
+   */
+  const banosDe = (t?: Tramo) =>
+    config.tipologia === 'ORINALES'
+      ? (t?.cabinas.length ?? 0)
+      : (t?.cabinas.filter((c) => c.tipo !== 'orinal').length ?? 0)
+  const cantidad = config.cabinasPedidas ?? (tramoPrincipal ? banosDe(tramoPrincipal) : 4)
   const setClaroCm = (n: number) => setConfig({ claroPedidoCm: n })
   const setCantidad = (n: number) => setConfig({ cabinasPedidas: n })
   // la altura de cada pieza la manda el modelo, no el vendedor
@@ -536,7 +546,14 @@ export default function App() {
     // en un área de solo orinales el claro lo calcula la app, así que ahí lo
     // que se compara es la cantidad
     const soloOrinales = config.tipologia === 'ORINALES'
-    const cambio = !t || t.cabinas.length !== cantidad || (!soloOrinales && t.claroCm !== claroCm)
+    // se comparan los BAÑOS, no las cabinas: los orinales van aparte y si se
+    // contaran acá el plano se daría por viejo siempre y se remodularía solo,
+    // borrando lo que ella hubiera movido a mano
+    const cambio =
+      !t ||
+      banosDe(t) !== cantidad ||
+      (!soloOrinales && t.claroCm !== claroCm) ||
+      t.cabinas.filter((c) => c.tipo === 'orinal').length !== (soloOrinales ? 0 : config.orinales)
     if (cambio) remodular()
     setPaso(7)
   }
