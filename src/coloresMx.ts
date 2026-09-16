@@ -64,12 +64,16 @@ export function espesorDeLinea(linea: Linea): number {
 
 /**
  * Los colores que se pueden usar en esa línea. El material descontinuado no se
- * ofrece; los apartados para un cliente sí aparecen, pero marcados, porque la
- * decisión de usarlos no es de la app.
+ * ofrece nunca.
+ *
+ * Los apartados o especificados para un cliente solo se muestran adentro de
+ * Modumex: a un distribuidor no se le enseña material comprometido con otro.
  */
-export function coloresMxPara(linea: Linea): ColorMX[] {
+export function coloresMxPara(linea: Linea, conReservados = true): ColorMX[] {
   const mm = espesorDeLinea(linea)
-  return COLORES_MX.filter((c) => !c.descontinuado && c.espesorMm === mm)
+  return COLORES_MX.filter(
+    (c) => !c.descontinuado && c.espesorMm === mm && (conReservados || !c.reservado),
+  )
 }
 
 export function descontinuadosMx(): ColorMX[] {

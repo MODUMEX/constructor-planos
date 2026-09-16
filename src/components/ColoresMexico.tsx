@@ -15,13 +15,16 @@ import {
 export default function ColoresMexico({
   linea,
   color,
+  verReservados,
   onElegir,
 }: {
   linea: Linea
   color: string
+  /** si se muestran los apartados para un cliente: solo adentro de Modumex */
+  verReservados: boolean
   onElegir: (c: ColorMX) => void
 }) {
-  const lista = useMemo(() => coloresMxPara(linea), [linea])
+  const lista = useMemo(() => coloresMxPara(linea, verReservados), [linea, verReservados])
   const descontinuados = descontinuadosMx().filter((c) => c.espesorMm === espesorDeLinea(linea))
 
   return (
@@ -60,8 +63,10 @@ export default function ColoresMexico({
       <div className="aviso-caja" style={{ maxWidth: 720, marginTop: 6 }}>
         <b>Lo que dice la lista original</b>
         <span>
-          Los marcados en amarillo vienen apartados o especificados para un cliente: aparecen igual, pero la
-          decisión de usarlos no es de la app.
+          {/* el aviso de los apartados solo tiene sentido si se están viendo */}
+          {verReservados
+            ? 'Los marcados en amarillo vienen apartados o especificados para un cliente: aparecen igual, pero la decisión de usarlos no es de la app.'
+            : 'Es el material de línea disponible.'}
           {descontinuados.length > 0 && (
             <>
               {' '}Quedaron afuera {descontinuados.length} descontinuados de este espesor:{' '}

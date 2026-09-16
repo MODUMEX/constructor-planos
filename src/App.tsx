@@ -6,10 +6,10 @@ import { armarPedido, enviarPedido, erpConectado, type RespuestaERP } from './er
 import { generarCSV, nombreArchivoCSV } from './exportar/csv'
 import { generarPDF, nombreArchivoPDF } from './exportar/pdf'
 import { csvABytes, FILTRO_CSV, FILTRO_PDF, guardarArchivo } from './exportar/guardar'
-import { esAdmin, IVA_CR, puedeCatalogos, puedeDistribuidores, puedeUsuarios, type Usuario } from './auth'
+import { esAdmin, IVA_CR, puedeCatalogos, puedeColoresReservados, puedeDistribuidores, puedeUsuarios, type Usuario } from './auth'
 import type { Area, Cabina, Config, Pais, Proyecto, TipoCabina, TipologiaId, Tramo } from './types'
 import {
-  ACABADOS, alturasDe, anchosPanel, claroAjustado, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, mgMedidas, MODELOS,
+  ACABADOS, acabadoEsElColor, alturasDe, anchosPanel, claroAjustado, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, mgMedidas, MODELOS,
   PAISES, etiquetaTier, nombreHerraje, nombreModelo, tierDeColor, TIPOLOGIAS, tipologia, tipologiaEspejo,
 } from './catalog'
 import VistaRender from './components/VistaRender'
@@ -436,7 +436,7 @@ export default function App() {
           a = { ...a, config: { ...a.config, linea: 'LEEDER', espesorMm: espesorPorLinea('LEEDER') } }
         }
         if (paisFabricacion === 'MX') {
-          const disponibles = coloresMxPara(a.config.linea)
+          const disponibles = coloresMxPara(a.config.linea, puedeColoresReservados(usuario))
           const sigue = disponibles.find((c) => c.color === a.config.color)
           const elegido = sigue ?? disponibles[0]
           if (!elegido) return a
@@ -506,8 +506,12 @@ export default function App() {
    * porque los de 3 mm son solo de Superior y los de 12 mm de LEEDER.
    */
   function colorInicial(linea: Config['linea'], acabado: Config['acabado']) {
+    // el esmaltado y el acero son su propio color: no hay lista que elegir
+    if (acabadoEsElColor(acabado)) {
+      return { color: coloresPara(linea, acabado)[0].nombre, colorCodigo: undefined }
+    }
     if (proyecto.paisFabricacion === 'MX') {
-      const primero = coloresMxPara(linea)[0]
+      const primero = coloresMxPara(linea, puedeColoresReservados(usuario))[0]
       if (primero) return { color: primero.color, colorCodigo: primero.codigoBase }
     }
     return { color: coloresPara(linea, acabado)[0].nombre, colorCodigo: undefined }
@@ -1446,10 +1450,21 @@ export default function App() {
                     ))}
                   </div>
 
-                  {proyecto.paisFabricacion === 'MX' ? (
+                  {/* El esmaltado y el acero no llevan color: el acabado ES el color,
+                      así que no hay lista que elegir. */}
+                  {acabadoEsElColor(config.acabado) ? (
+                    <div className="aviso-caja" style={{ maxWidth: 720, marginTop: 24 }}>
+                      <b>Este acabado es su propio color</b>
+                      <span>
+                        {config.acabado} no lleva color de lámina: el área queda en{' '}
+                        {coloresPara(config.linea, config.acabado)[0]?.nombre ?? config.color}.
+                      </span>
+                    </div>
+                  ) : proyecto.paisFabricacion === 'MX' ? (
                     <ColoresMexico
                       linea={config.linea}
                       color={config.color}
+                      verReservados={puedeColoresReservados(usuario)}
                       onElegir={(c) =>
                         setConfig({ color: c.color, colorCodigo: c.codigoBase })
                       }

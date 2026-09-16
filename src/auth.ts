@@ -229,6 +229,15 @@ export function puedeCatalogos(u: Usuario | null): boolean {
   return esAdmin(u)
 }
 
+/**
+ * Los colores apartados o especificados para un cliente. Solo los ve quien
+ * trabaja en Modumex: a un distribuidor no se le muestra el material que está
+ * comprometido con otro.
+ */
+export function puedeColoresReservados(u: Usuario | null): boolean {
+  return esAdmin(u) || u?.rol === 'Vendedor'
+}
+
 /** la ficha de los distribuidores: también el Vendedor, que los atiende */
 export function puedeDistribuidores(u: Usuario | null): boolean {
   return esAdmin(u) || u?.rol === 'Vendedor'

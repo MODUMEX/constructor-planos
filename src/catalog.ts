@@ -196,6 +196,14 @@ export function etiquetaColor(c: Color): string {
   return c.nombreViejo ? `${c.nombre} (${c.nombreViejo})` : c.nombre
 }
 
+/**
+ * Esmaltada Antigrafiti y Acero Inoxidable no llevan color: el acabado ES el
+ * color. No hay lista que elegir, y el color del área es el nombre del acabado.
+ */
+export function acabadoEsElColor(acabado: Acabado): boolean {
+  return acabado === 'Esmaltada Antigrafiti' || acabado === 'Acero Inoxidable'
+}
+
 export function etiquetaTier(tier: TierColor): string {
   return { linea: 'Línea', especial: 'Especial', aceroInox: 'Acero Inox', antigrafiti: 'Antigrafiti' }[tier]
 }
