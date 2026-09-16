@@ -556,6 +556,18 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
           }
         }
       })
+
+      // El mingitorio de cierre queda fuera del recorrido de cabinas, porque su
+      // frontera es la punta de la tira. Sin esto era el único que se quedaba
+      // sin su cota de fondo.
+      if (esMingitorio(tramo, nCab) && !tramo.muroFin) {
+        const fondoMg = area.config.mgAnchoCm ?? 60
+        cotaEnV(doc, e, m, 0, fondoMg, largo + 9, largo, String(fondoMg), {
+          size: 5.5,
+          rot,
+          uTexto: largo + 12,
+        })
+      }
     }
   })
 }
@@ -686,11 +698,14 @@ function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) 
   cotaAlto(doc, e, aX(largo + SOBRA_MURO_CM) + 8, pisoY, hPilastra, 0, `${hPilastra}`)
   // los 10 cm del zoclo o de la pata, del otro lado para no encimarse
   cotaAlto(doc, e, aX(-SOBRA_MURO_CM) - 7, pisoY, ALTO_BASE_CM, 0, `${ALTO_BASE_CM}`)
-  // el alto del mingitorio que eligió el cliente, sobre el primero que haya
-  const uMing = cortes.find((_: number, k: number) => esMingitorio(tramo, k) && k > 0 && k < cortes.length - 1)
-  if (uMing !== undefined) {
-    cotaAlto(doc, e, aX(uMing) - 4, pisoY, hPilastra, hPilastra - mgAlto, `${mgAlto}`)
-  }
+  // El alto del mingitorio que eligió el cliente, en CADA uno de los que se
+  // dibujan: la misma condición que arriba, así que ninguno queda sin su cota.
+  cortes.forEach((u: number, k: number) => {
+    if (!esMingitorio(tramo, k)) return
+    if (k === cortes.length - 1 && tramo.muroFin) return
+    if (k === 0 && tramo.muroInicio) return
+    cotaAlto(doc, e, aX(u) - 4, pisoY, hPilastra, hPilastra - mgAlto, `${mgAlto}`)
+  })
 
   const conZocloTxt = area.config.terminacion === 'ZOCLO' ? 'zoclo' : 'patas'
   texto(doc, 'ALZADO', aX(largo / 2), pisoY + 9, { size: 7.5, bold: true, align: 'center', color: GRIS })
