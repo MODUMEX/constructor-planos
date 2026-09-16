@@ -16,7 +16,7 @@ function descomprimir(libro) {
   // un .xlsx es un zip, pero Expand-Archive se niega por la extensión
   const ps = [
     'Add-Type -AssemblyName System.IO.Compression.FileSystem;',
-    "[System.IO.Compression.ZipFile]::ExtractToDirectory(",
+    '[System.IO.Compression.ZipFile]::ExtractToDirectory(',
     `'${libro.replace(/'/g, "''")}', '${destino}')`,
   ].join(' ')
   execFileSync('powershell', ['-NoProfile', '-Command', ps])
@@ -45,16 +45,34 @@ function filas(dir, hoja, cadenas) {
   })
 }
 
-/** el índice de variantes de Odoo: 24 129 SKU con su línea, pieza y tamaño */
-export function variantesOdoo(libro = LIBRO) {
+let cache = null
+
+function leerTodo(libro) {
+  if (cache) return cache
   if (!fs.existsSync(libro)) return null
   const dir = descomprimir(libro)
   try {
     const cadenas = textos(dir)
-    return filas(dir, 'sheet1.xml', cadenas).slice(1).map((f) => ({
-      sku: f.A, nombre: f.B, linea: f.C, pieza: f.D, tamano: f.E,
-    }))
+    cache = {
+      variantes: filas(dir, 'sheet1.xml', cadenas).slice(1).map((f) => ({
+        sku: f.A, nombre: f.B, linea: f.C, pieza: f.D, tamano: f.E,
+      })),
+      lineas: filas(dir, 'sheet2.xml', cadenas).slice(1).map((f) => ({
+        sku: f.A, tipo: f.B, comp: f.C, desc: f.D, cant: Number(f.E), uni: f.F,
+      })),
+    }
+    return cache
   } finally {
     fs.rmSync(dir, { recursive: true, force: true })
   }
+}
+
+/** el índice de variantes de Odoo: 24 129 SKU con su línea, pieza y tamaño */
+export function variantesOdoo(libro = LIBRO) {
+  return leerTodo(libro)?.variantes ?? null
+}
+
+/** las líneas de BOM de cada SKU */
+export function lineasBom(libro = LIBRO) {
+  return leerTodo(libro)?.lineas ?? null
 }
