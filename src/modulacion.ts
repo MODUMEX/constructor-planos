@@ -88,8 +88,6 @@ export function modularConCatalogo(
     anchosOrinalCm?: (number | null | undefined)[]
     /** la tira termina en orinal y de ese lado no hay muro: cierra con mingitorio */
     cierreMingitorio?: boolean
-    /** grueso del panel de cabina: lo que separa el último baño del campo de orinales */
-    grosorPanelCm?: number
     /** la tira arranca en orinal sin muro de ese lado: también cierra con mingitorio */
     cierreMingitorioInicio?: boolean
     pais?: Pais
@@ -98,7 +96,6 @@ export function modularConCatalogo(
   const conAcc = extra?.accesible === true
   const nMing = extra?.mingitorios ?? 0
   const anchoOrinal = extra?.anchoOrinalCm && extra.anchoOrinalCm > 0 ? extra.anchoOrinalCm : 60
-  const grosorPanel = extra?.grosorPanelCm ?? 0
   // la accesible va primera y los orinales al final, como en el Constructor actual
   const normales = cantidad - (conAcc ? 1 : 0) - nMing
   if (normales < 0) return null
@@ -111,7 +108,6 @@ export function modularConCatalogo(
     anchoOrinal: extra?.anchoOrinalCm,
     anchosOrinal: extra?.anchosOrinalCm,
     cierreMingitorio: extra?.cierreMingitorio,
-    grosorPanel: extra?.grosorPanelCm,
     cierreMingitorioInicio: extra?.cierreMingitorioInicio,
     catalogoPuertas: anchosPuerta(extra?.pais ?? 'CR'),
     anchoAccesibleCm: extra?.anchoAccesibleMinCm,
@@ -149,16 +145,23 @@ export function modularConCatalogo(
   const pilastras: number[] = [m.pilastras[0]]
   let k = 1
   for (let i = 1; i <= cantidad - 1; i++) {
-    // La frontera i separa la cabina i−1 de la cabina i. En el campo de orinales
-    // no hay pilastras: entre dos orinales va el mingitorio, y entre el último
-    // baño y el primer orinal va el PANEL de esa cabina.
+    // La frontera i separa la cabina i−1 de la cabina i.
+    //
+    // Entre dos orinales va el mingitorio, que no consume pilastra. Pero donde
+    // termina la tira de baños y empieza el campo va la pilastra LATERAL de esa
+    // tira: de ahí cuelga la puerta de la última cabina y ahí se amarra su panel.
+    // Esa es la última que devuelve el buscador.
     const izqOrinal = i > cantidad - nMing
     const derOrinal = i >= cantidad - nMing
     if (izqOrinal && derOrinal) pilastras.push(GRUESO_MG_CM)
-    else if (derOrinal) pilastras.push(grosorPanel)
+    else if (derOrinal) pilastras.push(m.pilastras[m.pilastras.length - 1])
     else pilastras.push(m.pilastras[k++] ?? m.anchoPilInterna)
   }
-  pilastras.push(m.pilastras[m.pilastras.length - 1])
+  // La punta: si ahí termina el campo de orinales es el mingitorio de cierre, o
+  // nada contra la pared; si termina la tira de baños, su pilastra lateral.
+  pilastras.push(
+    nMing > 0 ? (extra?.cierreMingitorio ? GRUESO_MG_CM : 0) : m.pilastras[m.pilastras.length - 1],
+  )
 
   const cabinas: Cabina[] = []
   for (let i = 0; i < cantidad; i++) {
@@ -305,14 +308,17 @@ function entreOrinales(tramo: Tramo, i: number): boolean {
 }
 
 /**
- * Si la frontera k cae DENTRO del campo de orinales, donde no hay pilastras.
- * Las fronteras van de 0 (antes de la primera cabina) a n (después de la última).
+ * Si la frontera k cae DENTRO del campo de orinales, donde no hay pilastras: las
+ * de entre dos orinales y las puntas del propio campo.
+ *
+ * La frontera entre el último baño y el primer orinal NO es del campo: ahí va la
+ * pilastra lateral con la que cierra la tira de baños.
  */
 export function fronteraDeOrinal(tramo: Tramo, k: number): boolean {
   const n = tramo.cabinas.length
   if (k <= 0) return tramo.cabinas[0]?.tipo === 'orinal'
   if (k >= n) return tramo.cabinas[n - 1]?.tipo === 'orinal'
-  return tramo.cabinas[k - 1]?.tipo === 'orinal' || tramo.cabinas[k]?.tipo === 'orinal'
+  return tramo.cabinas[k - 1]?.tipo === 'orinal' && tramo.cabinas[k]?.tipo === 'orinal'
 }
 
 /**
@@ -416,7 +422,6 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
       anchosOrinalCm: config.anchosOrinalCm,
       // si la tira termina en orinal y de ese lado no hay muro, cierra con mingitorio
       cierreMingitorio: !t.muroFin && (soloOrinales ? cant : ming) > 0,
-      grosorPanelCm: Math.max(config.espesorMm / 10, 0.3),
       cierreMingitorioInicio: soloOrinales && !t.muroInicio,
       pais,
     })

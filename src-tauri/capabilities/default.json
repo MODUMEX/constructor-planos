@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permisos de la ventana principal: lo mínimo para la ventana y para guardar el plano y la orden de compra donde el usuario elija.",
+  "description": "Permisos de la ventana principal: lo mínimo para la ventana y para guardar el plano y la orden de compra DONDE EL USUARIO ELIJA. La ruta sale siempre del diálogo Guardar como de Windows, nunca de la aplicación: por eso el permiso de escritura no se limita a unas carpetas. Limitado a Descargas, Documentos, Escritorio y la carpeta del usuario, guardar en una unidad de red o en otro disco fallaba y dejaba un archivo de 0 bytes que no abría.",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -20,7 +20,8 @@
         { "path": "$DOWNLOAD/**" },
         { "path": "$DOCUMENT/**" },
         { "path": "$DESKTOP/**" },
-        { "path": "$HOME/**" }
+        { "path": "$HOME/**" },
+        { "path": "**" }
       ]
     }
   ]

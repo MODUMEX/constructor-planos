@@ -114,8 +114,13 @@ export default function EditorPlano({
 
   /** el cuarto PMR llega más hondo que las cabinas: hay que encuadrarlo también */
   const profPmr = config.tipologia === 'PMR' ? profundidadDelLugar(config) : 0
+  /**
+   * El margen tiene que dar para la cota grande del claro, que se escribe 64 cm
+   * por encima del muro de fondo. Con 62 quedaba justo afuera del recorte y el
+   * número salía cortado por arriba.
+   */
   const caja = useMemo(
-    () => cajaDelPlano(tramos, marcos, prof, 62, profPmr),
+    () => cajaDelPlano(tramos, marcos, prof, 92, profPmr),
     [tramos, marcos, prof, profPmr],
   )
 

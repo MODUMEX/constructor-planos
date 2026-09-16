@@ -641,7 +641,6 @@ export default function App() {
         anchoOrinalCm: config.anchoOrinalCm,
         anchosOrinalCm: anchos,
         cierreMingitorio: !t.muroFin && cuantos > 0,
-        grosorPanelCm: Math.max(config.espesorMm / 10, 0.3),
         pais: proyecto.paisFabricacion,
       },
     )
@@ -700,7 +699,6 @@ export default function App() {
         anchoOrinalCm: config.anchoOrinalCm,
         anchosOrinalCm: config.anchosOrinalCm,
         cierreMingitorio: !t.muroFin && t.cabinas[t.cabinas.length - 1]?.tipo === 'orinal',
-        grosorPanelCm: Math.max(config.espesorMm / 10, 0.3),
         pais: proyecto.paisFabricacion,
       },
     )
@@ -891,11 +889,21 @@ export default function App() {
 
   const proyectoConAutor = { ...proyecto, creadoPor: usuario?.nombre ?? '' }
 
+  /**
+   * Baja el plano. Si algo falla al armarlo o al escribirlo hay que DECIRLO: sin
+   * esto el error se perdía y quedaba un archivo a medias que no abría.
+   */
   async function bajarPDF() {
-    const doc = generarPDF(proyectoConAutor)
-    const bytes = new Uint8Array(doc.output('arraybuffer'))
-    const ruta = await guardarArchivo(nombreArchivoPDF(proyecto), bytes, 'application/pdf', FILTRO_PDF)
-    setGuardado(ruta ? `Plano guardado en ${ruta}` : null)
+    try {
+      const doc = generarPDF(proyectoConAutor)
+      const bytes = new Uint8Array(doc.output('arraybuffer'))
+      if (bytes.length < 1000) throw new Error(`el PDF salió vacío (${bytes.length} bytes)`)
+      const ruta = await guardarArchivo(nombreArchivoPDF(proyecto), bytes, 'application/pdf', FILTRO_PDF)
+      setGuardado(ruta ? `Plano guardado en ${ruta}` : null)
+    } catch (e) {
+      setGuardado(null)
+      setBloqueo(`No se pudo guardar el plano: ${e instanceof Error ? e.message : String(e)}`)
+    }
   }
 
   async function bajarCSV() {
@@ -1045,7 +1053,6 @@ export default function App() {
           + Área nueva
         </button>
         <div className="sep" />
-        <span className="ayuda">Cada área se modula por su cuenta</span>
       </nav>
 
 

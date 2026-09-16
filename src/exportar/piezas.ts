@@ -167,10 +167,19 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
       })
     }
     for (let i = 0; i < n - 1; i++) {
-      // ninguna frontera del campo de orinales lleva pilastra: entre dos orinales
-      // va el mingitorio, y entre el último baño y el primer orinal, su panel
+      // entre dos orinales va el mingitorio, no pilastra
       if (fronteraDeOrinal(tramo, i + 1)) continue
-      piezas.push({ familia: 'PL', anchoCm: anchoDe(i + 1), altoCm: altoPil, subTipo: 'PLCEN', area })
+      // Donde termina la tira de baños y empieza el campo de orinales, la pilastra
+      // es LATERAL: cierra la tira, no divide dos cabinas.
+      const cierraLaTira =
+        tramo.cabinas[i].tipo !== 'orinal' && tramo.cabinas[i + 1].tipo === 'orinal'
+      piezas.push({
+        familia: 'PL',
+        anchoCm: anchoDe(i + 1),
+        altoCm: altoPil,
+        subTipo: cierraLaTira ? 'PLLAT' : 'PLCEN',
+        area,
+      })
     }
     // el campo de orinales no lleva pilastra de punta: es el mingitorio de cierre,
     // o nada si el último orinal da contra la pared

@@ -109,8 +109,6 @@ export interface OpcionesModulacion {
    * llega hasta la pared.
    */
   cierreMingitorio?: boolean
-  /** grueso del panel de cabina, en cm; es lo que separa el último baño del primer orinal */
-  grosorPanel?: number
   /** la tira ARRANCA en orinal y de ese lado no hay muro: también cierra con mingitorio */
   cierreMingitorioInicio?: boolean
   /** una cabina accesible: es una cabina con puerta ancha, no otra geometría */
@@ -172,15 +170,16 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
   if (cabinas < 1) return null
 
   /**
-   * En el campo de orinales NO hay pilastras ni puertas: solo los espacios y los
-   * mingitorios que los separan. Lo que separa al último baño del primer orinal
-   * es el PANEL de esa cabina, no una pilastra.
+   * Dentro del campo de orinales no hay pilastras: son los espacios y los
+   * mingitorios que los separan. Pero la tira de baños SÍ cierra con su pilastra
+   * lateral, que es de donde cuelga la puerta de la última cabina y donde se
+   * amarra su panel. El campo empieza después de esa pilastra.
    *
-   * Así que las fronteras que tocan un orinal salen del conteo de pilastras.
+   * Entonces las pilastras son: las dos de punta de la tira de baños más sus
+   * internas. Las fronteras del campo no cuentan.
    */
   const conCabinas = nEst + nAcc > 0
-  const fronterasOrinal = nMing > 0 ? (conCabinas ? nMing : nMing - 1) : 0
-  const internas = Math.max(0, cabinas - 1 - fronterasOrinal)
+  const internas = conCabinas ? nEst + nAcc - 1 : 0
   // los orinales no llevan puerta, así que no suman holgura de bisagra
   const objetivo = calcularClaroAjustado(o.claroCm, o.murosPilastra, nEst + nAcc)
   const dosMuros = o.murosPilastra >= 2
@@ -193,12 +192,9 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
   /** si alguno se pidió a medida, los orinales NO se ensanchan para cerrar */
   const orinalesAMedida = anchosOrinal.some((_, i) => (o.anchosOrinal?.[i] ?? 0) > 0)
   // N orinales llevan N−1 mingitorios entre ellos, y uno más si cierran contra
-  // un extremo sin muro. Ese último va en la pilastra de punta, que pasa a valer
-  // el grueso del mingitorio.
+  // un extremo sin muro.
   const cierreMG = o.cierreMingitorio === true && nMing > 0
-  // el panel de la última cabina, que es lo que separa los baños del campo de orinales
-  const panelAlCampo = conCabinas && nMing > 0 ? (o.grosorPanel ?? 0) : 0
-  const grosorMG = Math.max(0, nMing - 1) * GRUESO_MG + panelAlCampo
+  const grosorMG = Math.max(0, nMing - 1) * GRUESO_MG + (cierreMG ? GRUESO_MG : 0)
   const fijoMG = anchosOrinal.reduce((t, a) => t + a, 0) + grosorMG
 
   const deCatalogo = o.catalogoPuertas && o.catalogoPuertas.length ? o.catalogoPuertas : ANCHOS_PUERTA
@@ -216,12 +212,11 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
   const opInternas =
     internas > 0 ? (o.pilInternaFija && !unaClavada ? [o.pilInternaFija] : PILASTRAS_INTERNAS) : [0]
   const opExtremos = o.pilExtremoFija && !unaClavada ? [o.pilExtremoFija] : PILASTRAS_EXTREMO
-  // Las puntas del campo de orinales no llevan pilastra: son el mingitorio de
-  // cierre si no hay muro, o nada si el orinal da contra la pared. El arranque
-  // solo puede ser del campo cuando la tira es de puros orinales.
+  // Una tira de PUROS orinales no tiene pilastras: sus dos puntas son el
+  // mingitorio de cierre, si de ese lado no hay muro, o nada si da contra la pared.
   const arranqueOrinal = nMing > 0 && !conCabinas
   const opExtremo1 = arranqueOrinal ? [o.cierreMingitorioInicio ? GRUESO_MG : 0] : opExtremos
-  const opExtremo2 = nMing > 0 ? [cierreMG ? GRUESO_MG : 0] : opExtremos
+  const opExtremo2 = arranqueOrinal ? [cierreMG ? GRUESO_MG : 0] : opExtremos
   const objetivoAcc = nAcc > 0 ? (o.anchoAccesibleCm ?? 0) : 0
 
   type Candidato =
@@ -280,9 +275,11 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
     }
   }
   if (nAcc > 0 && objetivoAcc > 0 && clavadas[0] === null) clavadas[0] = mejor.ae1
-  // las puntas del campo de orinales no se negocian: mingitorio de cierre, o nada
-  if (nMing > 0) clavadas[clavadas.length - 1] = cierreMG ? GRUESO_MG : 0
-  if (arranqueOrinal) clavadas[0] = o.cierreMingitorioInicio ? GRUESO_MG : 0
+  // en una tira de puros orinales las puntas no se negocian: mingitorio, o nada
+  if (arranqueOrinal) {
+    clavadas[0] = o.cierreMingitorioInicio ? GRUESO_MG : 0
+    clavadas[clavadas.length - 1] = cierreMG ? GRUESO_MG : 0
+  }
   // Con una pilastra clavada a mano el reparto manda: es la única forma de que
   // las otras se acomoden en vez de copiarle la medida.
   const uniformeCalza = !unaClavada && cabe(objetivo - mejor.total, o.extremoAbierto, o.murosPilastra)
@@ -295,8 +292,10 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
     for (let i = 0; i < base.length; i++) if (clavadas[i]) base[i] = clavadas[i]!
     return base
   })()
-  if (nMing > 0) pilastras[pilastras.length - 1] = cierreMG ? GRUESO_MG : 0
-  if (arranqueOrinal) pilastras[0] = o.cierreMingitorioInicio ? GRUESO_MG : 0
+  if (arranqueOrinal) {
+    pilastras[0] = o.cierreMingitorioInicio ? GRUESO_MG : 0
+    pilastras[pilastras.length - 1] = cierreMG ? GRUESO_MG : 0
+  }
 
   // El total sale SIEMPRE de las pilastras que quedaron: el respaldo respeta la
   // que ella movió, así que el total del buscador ya no sirve.

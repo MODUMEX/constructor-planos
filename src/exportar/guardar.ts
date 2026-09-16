@@ -26,8 +26,12 @@ async function guardarConDialogo(nombre: string, datos: Uint8Array, filtros: Fil
     filters: filtros.map((f) => ({ name: f.nombre, extensions: f.extensiones })),
   })
   if (!ruta) return null
-  await writeFile(ruta, datos)
-  return ruta
+  // El diálogo de Windows devuelve lo que la persona haya escrito, y si le borró
+  // la extensión el archivo queda sin ella y no lo abre nada. Se le vuelve a poner.
+  const ext = filtros[0]?.extensiones[0]
+  const destino = ext && !ruta.toLowerCase().endsWith('.' + ext) ? `${ruta}.${ext}` : ruta
+  await writeFile(destino, datos)
+  return destino
 }
 
 function descargarEnNavegador(nombre: string, datos: BlobPart, tipo: string) {
