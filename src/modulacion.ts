@@ -165,8 +165,11 @@ export function modularConCatalogo(
 
   const cabinas: Cabina[] = []
   for (let i = 0; i < cantidad; i++) {
-    const izq = i === 0 ? pilastras[0] : pilastras[i] / 2
-    const der = i === cantidad - 1 ? pilastras[cantidad] : pilastras[i + 1] / 2
+    const { izq, der } = ladosDeCabina(
+      Array.from({ length: cantidad }, (_, k) => k >= cantidad - nMing),
+      (k) => pilastras[k],
+      i,
+    )
     const esAcc = conAcc && i === 0
     const esOrinal = i >= cantidad - nMing
     const puerta = esAcc ? (m.anchoPuertaAccesible ?? m.anchoPuerta) : m.anchoPuerta
@@ -286,8 +289,11 @@ export function reajustarConPuertas(
   pilastras.push(r.pilastras[r.pilastras.length - 1])
 
   const nuevas = cabinas.map((c, i) => {
-    const izq = i === 0 ? pilastras[0] : pilastras[i] / 2
-    const der = i === n - 1 ? pilastras[n] : pilastras[i + 1] / 2
+    const { izq, der } = ladosDeCabina(
+      cabinas.map((x) => x.tipo === 'orinal'),
+      (k) => pilastras[k],
+      i,
+    )
     const cuerpo = c.tipo === 'orinal' ? c.anchoCm : c.puerta.anchoCm
     return { ...c, anchoCm: izq + cuerpo + der }
   })
@@ -302,6 +308,27 @@ export function reajustarConPuertas(
 }
 
 /** cuántas pilastras lleva un tramo: una por divisor interno y una en cada extremo */
+/**
+ * Lo que cada cabina se lleva de las piezas que tiene a los lados.
+ *
+ * Una pilastra central la comparten las dos cabinas vecinas, media para cada
+ * una. Pero la LATERAL con la que cierra la tira de baños es entera de la tira:
+ * el campo de orinales empieza DESPUÉS de ella, no en su mitad. Si se reparte a
+ * medias queda dibujada a caballo sobre la frontera y se lee como una central.
+ */
+export function ladosDeCabina(
+  esOrinal: boolean[],
+  pilastra: (k: number) => number,
+  i: number,
+): { izq: number; der: number } {
+  const n = esOrinal.length
+  /** la frontera k cierra la tira de baños: baño a la izquierda, orinal a la derecha */
+  const cierra = (k: number) => k > 0 && k < n && !esOrinal[k - 1] && esOrinal[k]
+  const izq = i === 0 ? pilastra(0) : cierra(i) ? 0 : pilastra(i) / 2
+  const der = i === n - 1 ? pilastra(n) : cierra(i + 1) ? pilastra(i + 1) : pilastra(i + 1) / 2
+  return { izq, der }
+}
+
 /** entre dos orinales va un mingitorio, no una pilastra ni un panel de cabina */
 function entreOrinales(tramo: Tramo, i: number): boolean {
   return tramo.cabinas[i]?.tipo === 'orinal' && tramo.cabinas[i + 1]?.tipo === 'orinal'

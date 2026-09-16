@@ -1,6 +1,6 @@
 import type { Cabina, Config, Tramo } from './types'
 import { GRUESO_PILASTRA } from './catalog'
-import { anchoTotal } from './modulacion'
+import { anchoTotal, ladosDeCabina } from './modulacion'
 
 /** espesor con el que se dibuja la pared, en cm */
 export const ESPESOR_MURO = 12
@@ -42,12 +42,10 @@ export function profundidadDeTramo(tramo: Tramo, profundidadCm: number): number 
  * Esta es la que hay que mostrar sobre el orinal para que se entienda.
  */
 export function anchoDeOrinal(tramo: Tramo, i: number, anchoPilastraCm: number): number {
-  const n = tramo.cabinas.length
   const cab = tramo.cabinas[i]
   if (!cab) return 0
   const pil = (k: number) => tramo.pilastras?.[k] ?? anchoPilastraCm
-  const izq = i === 0 ? pil(0) : pil(i) / 2
-  const der = i === n - 1 ? pil(n) : pil(i + 1) / 2
+  const { izq, der } = ladosDeCabina(tramo.cabinas.map((c) => c.tipo === 'orinal'), pil, i)
   // a medios centímetros, como el resto de las medidas del plano: la cabina ya
   // viene redondeada así y sin esto un orinal pedido de 60 se leía 59.9
   return Math.round((cab.anchoCm - izq - der) * 2) / 2

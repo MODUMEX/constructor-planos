@@ -705,8 +705,15 @@ export default function EditorPlano({
                       // dibujarla de 1.27 cm la volvía invisible en planta.
                       const ancho = Math.max(tramo.pilastras?.[k] ?? config.anchoPilastraCm, grueso)
                       // en los extremos se corre hacia adentro para no invadir el muro
+                        // la lateral que cierra la tira de baños va entera adentro de la
+                        // tira, como las de punta: centrada se leería como una central
+                        const cierraLaTira = esMingitorio(tramo, k + 1) && !esMingitorio(tramo, k)
                       const centro =
-                        k === 0 ? u2 + ancho / 2 : k === cortes.length - 1 ? u2 - ancho / 2 : u2
+                        k === 0
+                          ? u2 + ancho / 2
+                          : k === cortes.length - 1 || cierraLaTira
+                            ? u2 - ancho / 2
+                            : u2
                       const a = pt(m, centro - ancho / 2, prof - grueso)
                       const b = pt(m, centro + ancho / 2, prof)
                       const extremo = k === 0 || k === cortes.length - 1

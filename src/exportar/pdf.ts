@@ -292,7 +292,11 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
         // cada pilastra con SU ancho de catálogo, el que eligió la modulación
         const anchoPil = Math.max(tramo.pilastras?.[k] ?? area.config.anchoPilastraCm, grueso)
         // en los extremos se corre hacia adentro para no invadir el muro
-        const centro = k === 0 ? u + anchoPil / 2 : k === cortes.length - 1 ? u - anchoPil / 2 : u
+        // la lateral que cierra la tira de baños va entera adentro de la tira,
+        // como las de punta: centrada se leería como una pilastra central
+        const cierraLaTira = esMingitorio(tramo, k + 1) && !esMingitorio(tramo, k)
+        const centro =
+          k === 0 ? u + anchoPil / 2 : k === cortes.length - 1 || cierraLaTira ? u - anchoPil / 2 : u
         const [ax, ay] = aHoja(e, pt(m, centro - anchoPil / 2, prof - grueso))
         const [bx, by] = aHoja(e, pt(m, centro + anchoPil / 2, prof))
         doc.rect(Math.min(ax, bx), Math.min(ay, by), Math.abs(bx - ax), Math.abs(by - ay), 'FD')
@@ -484,7 +488,11 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
       cortes.forEach((u, k) => {
         if (esMingitorio(tramo, k)) return
         const ancho = anchoPilDe(k)
-        const centro = k === 0 ? u + ancho / 2 : k === cortes.length - 1 ? u - ancho / 2 : u
+        // la lateral que cierra la tira de baños va entera adentro de la tira,
+        // como las de punta: centrada se leería como una pilastra central
+        const cierraLaTira = esMingitorio(tramo, k + 1) && !esMingitorio(tramo, k)
+        const centro =
+          k === 0 ? u + ancho / 2 : k === cortes.length - 1 || cierraLaTira ? u - ancho / 2 : u
         cotaEntre(doc, e, m, centro - ancho / 2, centro + ancho / 2, prof - 9, prof - 1, String(ancho), {
           size: 5.5,
           rot,
