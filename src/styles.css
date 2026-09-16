@@ -978,3 +978,8 @@ input[type="password"]::-ms-clear {
 .tab-area.on { border-color: var(--accent); background: var(--accent-soft); }
 .tab-area.on button { color: var(--text); }
 .tab-area.on button b { color: var(--accent); }
+
+/* un campo obligatorio que quedó en blanco: se marca al intentar avanzar */
+.campo.falta input,
+.campo.falta select { border-color: var(--bad); }
+.campo.falta label { color: var(--bad); }

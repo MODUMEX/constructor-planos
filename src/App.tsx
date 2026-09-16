@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Login from './components/Login'
 import PreviewTipologia from './components/PreviewTipologia'
 import EditorPlano, { formatear } from './components/EditorPlano'
-import { armarPedido, enviarPedido, erpConectado, type RespuestaERP } from './erp'
 import { generarCSV, nombreArchivoCSV } from './exportar/csv'
 import { generarPDF, nombreArchivoPDF } from './exportar/pdf'
 import { csvABytes, FILTRO_CSV, FILTRO_PDF, guardarArchivo } from './exportar/guardar'
@@ -167,9 +166,7 @@ export default function App() {
   /** qué área está a un clic de borrarse; se pregunta antes de sacarla */
   const [borrarArea, setBorrarArea] = useState<number | null>(null)
   const [moneda, setMoneda] = useState<'USD' | 'CRC'>('CRC')
-  const [respuesta, setRespuesta] = useState<RespuestaERP | null>(null)
-  const [enviando, setEnviando] = useState(false)
-  const [verPayload, setVerPayload] = useState(false)
+
   const [guardado, setGuardado] = useState<string | null>(null)
   const [tarifas, setTarifas] = useState<ResultadoTarifas | null>(null)
   const [verTarifas, setVerTarifas] = useState(demo && params.has('tarifas'))
@@ -196,6 +193,8 @@ export default function App() {
   const [verDuplicar, setVerDuplicar] = useState(false)
   // por qué se rechazó el último cambio de pilastra, para poder decírselo
   const [bloqueo, setBloqueo] = useState<string | null>(null)
+  /** si ya se le avisó que faltan datos del proyecto; se enciende al querer avanzar */
+  const [avisoDatos, setAvisoDatos] = useState(false)
   const [verProyectos, setVerProyectos] = useState(false)
   const [version, setVersion] = useState(VERSION_COMPILADA)
   const [actualizando, setActualizando] = useState<FaseActualizacion | null>(null)
@@ -323,6 +322,22 @@ export default function App() {
   useEffect(() => {
     if (!cotiza && paso === 8) setPaso(7)
   }, [cotiza, paso])
+
+  /**
+   * Los datos del proyecto que NO pueden faltar: sin ellos el plano sale con el
+   * cajetín a medias y la orden no se puede rastrear. Se piden antes de dejar
+   * el primer paso.
+   */
+  const faltanDatos = (
+    [
+      ['N° de plano', proyecto.numero],
+      ['Obra', proyecto.obra],
+      ['Ubicación', proyecto.ubicacion],
+      ['Distribuidor', proyecto.distribuidor || usuario?.distribuidorNombre || ''],
+    ] as const
+  )
+    .filter(([, valor]) => !String(valor ?? '').trim())
+    .map(([etiqueta]) => etiqueta)
 
   const area = proyecto.areas[activa]
   const config = area.config
@@ -875,21 +890,6 @@ export default function App() {
   const money = (v: number) =>
     `${simbolo}${v.toLocaleString('es-CR', { maximumFractionDigits: moneda === 'CRC' ? 0 : 2 })}`
 
-  const pedido = useMemo(
-    () =>
-      armarPedido(
-        { ...proyecto, creadoPor: usuario?.nombre ?? '' },
-        renglones,
-        {
-          neto: Number(neto.toFixed(2)),
-          descuento: Number(descuento.toFixed(2)),
-          iva: Number(iva.toFixed(2)),
-          total: Number(total.toFixed(2)),
-        },
-        moneda,
-      ),
-    [proyecto, renglones, neto, descuento, iva, total, moneda, usuario],
-  )
 
   const proyectoConAutor = { ...proyecto, creadoPor: usuario?.nombre ?? '' }
 
@@ -916,12 +916,6 @@ export default function App() {
     setGuardado(ruta ? `Orden de compra guardada en ${ruta}` : null)
   }
 
-  async function mandarAlErp() {
-    setEnviando(true)
-    setRespuesta(null)
-    setRespuesta(await enviarPedido(pedido))
-    setEnviando(false)
-  }
 
   // Tapa toda la aplicación mientras se instala una versión nueva. Va antes del
   // login para que también bloquee esa pantalla.
@@ -1132,7 +1126,15 @@ export default function App() {
             <button
               key={p.n}
               className={`paso ${paso === p.n ? 'activo' : ''} ${paso > p.n ? 'listo' : ''}`}
-              onClick={() => setPaso(p.n)}
+              onClick={() => {
+                // lo mismo que el botón Siguiente: primero los datos del proyecto
+                if (p.n > 1 && faltanDatos.length > 0) {
+                  setAvisoDatos(true)
+                  setPaso(1)
+                  return
+                }
+                setPaso(p.n)
+              }}
               disabled={!puedePasar(p.n)}
               type="button"
             >
@@ -1320,12 +1322,22 @@ export default function App() {
                     ))}
                   </div>
 
+                  {avisoDatos && faltanDatos.length > 0 && (
+                    <div className="aviso-caja" style={{ maxWidth: 720, marginBottom: 16 }}>
+                      <b>Falta llenar {faltanDatos.length === 1 ? 'un dato' : 'estos datos'}</b>
+                      <span>
+                        {faltanDatos.join(', ')}. Sin esto el plano sale con el cajetín a medias y la orden no
+                        se puede rastrear.
+                      </span>
+                    </div>
+                  )}
+
                   <div className="campos">
-                    <div className="campo">
+                    <div className={`campo${avisoDatos && !proyecto.numero.trim() ? ' falta' : ''}`}>
                       <label>N° de plano</label>
                       <input value={proyecto.numero} onChange={(e) => setProyecto({ ...proyecto, numero: e.target.value })} />
                     </div>
-                    <div className="campo">
+                    <div className={`campo${avisoDatos && !proyecto.obra.trim() ? ' falta' : ''}`}>
                       <label>Obra</label>
                       <input value={proyecto.obra} onChange={(e) => setProyecto({ ...proyecto, obra: e.target.value })} />
                     </div>
@@ -1333,11 +1345,11 @@ export default function App() {
                       <label>Cliente</label>
                       <input value={proyecto.cliente} onChange={(e) => setProyecto({ ...proyecto, cliente: e.target.value })} />
                     </div>
-                    <div className="campo">
+                    <div className={`campo${avisoDatos && !proyecto.ubicacion.trim() ? ' falta' : ''}`}>
                       <label>Ubicación</label>
                       <input value={proyecto.ubicacion} onChange={(e) => setProyecto({ ...proyecto, ubicacion: e.target.value })} />
                     </div>
-                    <div className="campo">
+                    <div className={`campo${avisoDatos && !(proyecto.distribuidor || usuario.distribuidorNombre || '').trim() ? ' falta' : ''}`}>
                       <label>Distribuidor</label>
                       {usuario.rol === 'Distribuidor' ? (
                         // un distribuidor no elige: sus planos salen a su nombre
@@ -1835,7 +1847,7 @@ export default function App() {
                 <>
                   <h2>Cotización y pedido</h2>
                   <p className="sub">
-                    Precio armado desde las piezas del plano. El pedido sale con el mismo detalle hacia el ERP.
+                    Precio armado desde las piezas del plano.
                   </p>
 
                   <div className={`aviso-caja ${tarifas?.deLaNube ? 'ok' : ''}`} style={{ maxWidth: 720, marginBottom: 16 }}>
@@ -1921,24 +1933,10 @@ export default function App() {
                     )}
                   </div>
 
-                  <div className="aviso-caja" style={{ maxWidth: 720 }}>
-                    <b>{erpConectado ? 'ERP conectado' : 'Paso al ERP listo, sin conectar'}</b>
-                    <span>
-                      {erpConectado
-                        ? 'El pedido se manda al endpoint configurado en VITE_ERP_URL.'
-                        : 'El envío responde local con un número simulado. Cuando IT confirme el ERP y las credenciales, se llena VITE_ERP_URL y el mismo pedido sale de verdad, sin cambiar nada más.'}
-                    </span>
-                  </div>
 
                   <div style={{ display: 'flex', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
-                    <button className="btn primario" onClick={mandarAlErp} disabled={enviando || renglones.length === 0}>
-                      {enviando ? 'Enviando…' : 'Enviar pedido al ERP'}
-                    </button>
-                    <button className="btn" onClick={bajarPDF}>Plano en PDF</button>
+                    <button className="btn primario" onClick={bajarPDF}>Plano en PDF</button>
                     <button className="btn" onClick={bajarCSV}>CSV para el CIP</button>
-                    <button className="btn" onClick={() => setVerPayload(!verPayload)}>
-                      {verPayload ? 'Ocultar' : 'Ver'} lo que se envía
-                    </button>
                   </div>
 
                   <div className="aviso-caja" style={{ marginTop: 16, maxWidth: 720 }}>
@@ -1957,14 +1955,7 @@ export default function App() {
                     </div>
                   )}
 
-                  {respuesta && (
-                    <div className={`aviso-caja ${respuesta.ok ? 'ok' : ''}`} style={{ marginTop: 16, maxWidth: 720 }}>
-                      <b>{respuesta.ok ? `Pedido ${respuesta.numeroPedido}` : 'No se envió'}</b>
-                      <span>{respuesta.mensaje}</span>
-                    </div>
-                  )}
 
-                  {verPayload && <pre className="payload" style={{ marginTop: 16 }}>{JSON.stringify(pedido, null, 2)}</pre>}
                 </>
               )}
             </div>
@@ -1980,7 +1971,15 @@ export default function App() {
             {paso < ultimoPaso ? (
               <button
                 className="btn primario"
-                onClick={() => (paso === 6 ? irAlPlano() : setPaso(paso + 1))}
+                onClick={() => {
+                  // del paso 1 no se sale con datos del proyecto en blanco
+                  if (paso === 1 && faltanDatos.length > 0) {
+                    setAvisoDatos(true)
+                    return
+                  }
+                  if (paso === 6) irAlPlano()
+                  else setPaso(paso + 1)
+                }}
               >
                 {paso === 6 ? 'Dibujar el plano →' : 'Siguiente →'}
               </button>
