@@ -23,9 +23,9 @@ export const MIN_CABINA_CM = 62
 /** ancho mínimo de una cabina accesible */
 export const MIN_ACCESIBLE_CM = 150
 
-export const PAISES: { id: Pais; nombre: string; nota: string }[] = [
-  { id: 'CR', nombre: 'Costa Rica', nota: 'Los colores del catálogo, en stock' },
-  { id: 'MX', nombre: 'México', nota: 'La lista de materia prima de la planta, con código' },
+export const PAISES: { id: Pais; nombre: string }[] = [
+  { id: 'CR', nombre: 'Costa Rica' },
+  { id: 'MX', nombre: 'México' },
 ]
 
 export function nombrePais(id: Pais): string {

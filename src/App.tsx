@@ -1316,7 +1316,6 @@ export default function App() {
                         type="button"
                       >
                         <b>{p.nombre}</b>
-                        <small>{p.nota}</small>
                       </button>
                     ))}
                   </div>

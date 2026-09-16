@@ -26,8 +26,13 @@ const HOJA = { w: 279.4, h: 215.9 } // carta horizontal, en mm
 const M = 8 // margen
 const CAJETIN_H = 30
 const PANEL_W = 74 // cuadro de piezas a la derecha
-/** aire entre la planta y el alzado, en cm de dibujo */
-const SEPARA_VISTAS = 60
+/**
+ * Aire entre la planta y el alzado, y espacio del rótulo debajo del piso, en
+ * MILÍMETROS de hoja. En centímetros de dibujo quedaban cortos al achicar la
+ * escala, y el rótulo terminaba encima del cajetín.
+ */
+const SEPARA_VISTAS_MM = 17
+const ROTULO_MM = 12
 /**
  * Alto del zoclo o de la pata al pie de la pilastra, en cm. Sale de la ficha
  * técnica: el alzado de LEEDER M1 lo acota como .10 m en los dos sistemas de
@@ -713,9 +718,10 @@ function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) 
   })
 
   const conZocloTxt = area.config.terminacion === 'ZOCLO' ? 'zoclo' : 'patas'
-  texto(doc, 'ALZADO', aX(largo / 2), pisoY + 9, { size: 7.5, bold: true, align: 'center', color: GRIS })
-  texto(doc, `Fijación a piso con ${conZocloTxt}`, aX(largo / 2), pisoY + 14, {
-    size: 5.8,
+  // Un solo renglón: en dos, el de abajo se metía en el cajetín.
+  texto(doc, `ALZADO  ·  fijación a piso con ${conZocloTxt}`, aX(largo / 2), pisoY + 8, {
+    size: 7,
+    bold: true,
     align: 'center',
     color: GRIS,
   })
@@ -912,11 +918,14 @@ export function generarPDF(proyecto: Proyecto, fecha = new Date().toLocaleDateSt
     // cae justo abajo de donde está arriba. Las dos vistas tienen que caber en
     // la hoja, así que la escala sale del alto de las dos juntas.
     const tramoPrincipal = area.tramos[tipologia(area.config.tipologia).principal]
-    const altoAlzado = alturasDe(area.config.modelo).pilastra + SEPARA_VISTAS + 16
     const conAlzado = !!tramoPrincipal && tramoPrincipal.cabinas.length > 0
-    const altoTotal = caja.h + (conAlzado ? altoAlzado : 0)
-    const k = Math.min(zonaW / caja.w, zonaH / altoTotal)
-    const arriba = M + (zonaH - altoTotal * k) / 2
+    const hPilastra = alturasDe(area.config.modelo).pilastra
+    // lo que ocupan las dos vistas en cm, y aparte lo que ocupan en mm el aire
+    // entre ellas y el rótulo de abajo
+    const altoDibujo = caja.h + (conAlzado ? hPilastra : 0)
+    const altoFijo = conAlzado ? SEPARA_VISTAS_MM + ROTULO_MM : 0
+    const k = Math.min(zonaW / caja.w, (zonaH - altoFijo) / altoDibujo)
+    const arriba = M + (zonaH - (altoDibujo * k + altoFijo)) / 2
     const e: Escala = {
       k,
       ox: M + (zonaW - caja.w * k) / 2 - caja.x * k,
@@ -925,7 +934,7 @@ export function generarPDF(proyecto: Proyecto, fecha = new Date().toLocaleDateSt
 
     murosYPiezas(doc, area, e, marcos)
     if (conAlzado) {
-      const piso = arriba + (caja.h + SEPARA_VISTAS + alturasDe(area.config.modelo).pilastra) * k
+      const piso = arriba + caja.h * k + SEPARA_VISTAS_MM + hPilastra * k
       alzado(doc, area, e, tramoPrincipal, piso)
     }
     cuadroDePiezas(doc, area, HOJA.w - M - PANEL_W, M + 6, PANEL_W)
