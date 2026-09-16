@@ -648,8 +648,13 @@ function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) 
     doc.circle(lado, aY(hPilastra - hPuerta / 2), 0.7, 'F')
   })
 
-  // el mingitorio entre orinales: la misma altura de su ficha, colgado del tope
+  /**
+   * El mingitorio NO cuelga del tope de la pilastra: arranca a 30 cm del piso,
+   * así que el de 150 termina a 180 y el de 120 termina a 150. Es la regla de
+   * obra, la misma para cualquier modelo de cabina.
+   */
   const mgAlto = area.config.mgAlturaCm
+  const mgPiso = 30
   cortes.forEach((u: number, k: number) => {
     if (!esMingitorio(tramo, k)) return
     // contra la pared no hay pieza; el de cierre sin muro sí
@@ -657,7 +662,7 @@ function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) 
     if (k === 0 && tramo.muroInicio) return
     const grueso = Math.max(area.config.espesorMm / 10, 0.3)
     doc.setFillColor(150, 150, 150)
-    doc.rect(aX(u - grueso / 2), aY(hPilastra), Math.max(grueso * e.k, 0.6), mgAlto * e.k, 'F')
+    doc.rect(aX(u - grueso / 2), aY(mgPiso + mgAlto), Math.max(grueso * e.k, 0.6), mgAlto * e.k, 'F')
   })
 
   // ---------- cotas de ancho, arriba ----------
@@ -704,7 +709,7 @@ function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) 
     if (!esMingitorio(tramo, k)) return
     if (k === cortes.length - 1 && tramo.muroFin) return
     if (k === 0 && tramo.muroInicio) return
-    cotaAlto(doc, e, aX(u) - 4, pisoY, hPilastra, hPilastra - mgAlto, `${mgAlto}`)
+    cotaAlto(doc, e, aX(u) - 4, pisoY, mgPiso + mgAlto, mgPiso, `${mgAlto}`)
   })
 
   const conZocloTxt = area.config.terminacion === 'ZOCLO' ? 'zoclo' : 'patas'
