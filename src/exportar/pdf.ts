@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf'
-import type { Area, Proyecto } from '../types'
+import type { Area, Cabina, Proyecto, Tramo } from '../types'
 import {
   acumulado, anchoDeOrinal, cajaDelPlano, cuartoPmr, esMingitorio, ESPESOR_MURO, marcosDe,
   PROF_ORINAL_CM,
@@ -8,7 +8,7 @@ import {
   profundidadDelLugar, pt, SOBRA_MURO_CM,
   type Marco,
 } from '../geometria'
-import { nombreHerraje, tipologia } from '../catalog'
+import { alturasDe, nombreHerraje, tipologia } from '../catalog'
 import { anchoTotal, ladosDeCabina } from '../modulacion'
 import { agrupar, modeloParaCsv, nombreLinea, nombreSistema, piezasDeArea } from './piezas'
 import { ALTO_ORINAL_CM, ALTO_REGADERA_CM, ALTO_WC_CM, ORINAL, REGADERA, WC } from '../assets/sanitarios'
@@ -26,6 +26,8 @@ const HOJA = { w: 279.4, h: 215.9 } // carta horizontal, en mm
 const M = 8 // margen
 const CAJETIN_H = 30
 const PANEL_W = 74 // cuadro de piezas a la derecha
+/** aire entre la planta y el alzado, en cm de dibujo */
+const SEPARA_VISTAS = 60
 
 const TINTA = 25
 const GRIS = 130
@@ -541,6 +543,108 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
   })
 }
 
+/**
+ * ALZADO: la tira vista de frente, debajo de la planta y a la misma escala, así
+ * que cada pieza cae justo abajo de donde está en la planta.
+ *
+ * Es lo que la planta no puede mostrar: las ALTURAS. La pilastra llega al piso
+ * y sube hasta su altura; la puerta y los paneles quedan colgados, con el hueco
+ * de abajo que resulta de la diferencia entre las dos. En LEEDER Estándar eso
+ * da 1.80 de pilastra, 1.50 de puerta y 0.30 de hueco, que es como viene en los
+ * planos de obra.
+ */
+function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) {
+  const n = tramo.cabinas.length
+  if (n === 0) return
+  const alturas = alturasDe(area.config.modelo)
+  const hPilastra = alturas.pilastra
+  const hPuerta = alturas.puerta
+  /** lo que queda del piso a la puerta: la pilastra baja hasta el suelo y la puerta no */
+  const hueco = Math.max(0, hPilastra - hPuerta)
+  const largo = anchoTotal(tramo.cabinas)
+  const acum = acumulado(tramo.cabinas)
+  const anchoPil = (j: number) => tramo.pilastras?.[j] ?? area.config.anchoPilastraCm
+
+  /** del alto en cm a la hoja: el piso es la base y se sube desde ahí */
+  const aY = (h: number) => pisoY - h * e.k
+  const aX = (u: number) => e.ox + u * e.k
+
+  // línea de piso
+  doc.setDrawColor(TINTA)
+  doc.setLineWidth(0.5)
+  doc.line(aX(-SOBRA_MURO_CM), pisoY, aX(largo + SOBRA_MURO_CM), pisoY)
+
+  // pilastras: del piso hasta arriba, con el ancho de su pieza
+  const cortes = [0, ...acum.slice(1), largo]
+  doc.setFillColor(120, 120, 120)
+  doc.setDrawColor(70)
+  doc.setLineWidth(0.25)
+  cortes.forEach((u: number, k: number) => {
+    if (esMingitorio(tramo, k)) return
+    const ancho = anchoPil(k)
+    const cierraLaTira = esMingitorio(tramo, k + 1) && !esMingitorio(tramo, k)
+    const centro =
+      k === 0 ? u + ancho / 2 : k === cortes.length - 1 || cierraLaTira ? u - ancho / 2 : u
+    doc.rect(aX(centro - ancho / 2), aY(hPilastra), ancho * e.k, hPilastra * e.k, 'FD')
+  })
+
+  // puertas y mingitorios, colgados a la altura que les toca
+  tramo.cabinas.forEach((cab: Cabina, i: number) => {
+    const u0 = acum[i]
+    const u1 = u0 + cab.anchoCm
+    const { izq, der } = ladosDeCabina(tramo.cabinas.map((x: Cabina) => x.tipo === 'orinal'), anchoPil, i)
+    if (cab.tipo === 'orinal') return
+    if (cab.puerta.tipo === 'ninguna') return
+    doc.setFillColor(248, 249, 251)
+    doc.setDrawColor(MARCA[0], MARCA[1], MARCA[2])
+    doc.setLineWidth(0.35)
+    const x = aX(u0 + izq)
+    const w = (u1 - der - (u0 + izq)) * e.k
+    doc.rect(x, aY(hPilastra), w, hPuerta * e.k, 'FD')
+    // la manija, del lado que abre
+    const lado = cab.puerta.mano === 'der' ? x + 3 : x + w - 3
+    doc.setFillColor(MARCA[0], MARCA[1], MARCA[2])
+    doc.circle(lado, aY(hPilastra - hPuerta / 2), 0.7, 'F')
+  })
+
+  // el mingitorio entre orinales: la misma altura de su ficha, colgado del tope
+  const mgAlto = area.config.mgAlturaCm
+  cortes.forEach((u: number, k: number) => {
+    if (!esMingitorio(tramo, k)) return
+    // contra la pared no hay pieza; el de cierre sin muro sí
+    if (k === cortes.length - 1 && tramo.muroFin) return
+    if (k === 0 && tramo.muroInicio) return
+    const grueso = Math.max(area.config.espesorMm / 10, 0.3)
+    doc.setFillColor(150, 150, 150)
+    doc.rect(aX(u - grueso / 2), aY(hPilastra), Math.max(grueso * e.k, 0.6), mgAlto * e.k, 'F')
+  })
+
+  // ---------- cotas de altura, al costado ----------
+  // Las cotas van en milímetros de hoja, no en centímetros de dibujo: en un plano
+  // ancho la escala es chica y separarlas "10 cm" las dejaba una encima de otra.
+  const xCota = aX(largo + SOBRA_MURO_CM) + 7
+  cotaAlto(doc, e, xCota, pisoY, hPuerta + hueco, hueco, `${hPuerta}`)
+  if (hueco > 0) cotaAlto(doc, e, xCota, pisoY, hueco, 0, `${hueco}`)
+  cotaAlto(doc, e, xCota + 9, pisoY, hPilastra, 0, `${hPilastra}`)
+
+  texto(doc, 'ALZADO', aX(largo / 2), pisoY + 9, { size: 7.5, bold: true, align: 'center', color: GRIS })
+}
+
+/** una cota vertical del alzado: de `desde` a `hasta` centímetros sobre el piso */
+function cotaAlto(doc: jsPDF, e: Escala, x: number, pisoY: number, hasta: number, desde: number, etiqueta: string) {
+  const y0 = pisoY - desde * e.k
+  const y1 = pisoY - hasta * e.k
+  if (Math.abs(y1 - y0) < 0.6) return
+  doc.setDrawColor(COTA[0], COTA[1], COTA[2])
+  doc.setFillColor(COTA[0], COTA[1], COTA[2])
+  doc.setLineWidth(0.22)
+  doc.line(x, y0, x, y1)
+  flecha(doc, x, y0, Math.PI / 2)
+  flecha(doc, x, y1, -Math.PI / 2)
+  texto(doc, etiqueta, x - 1.5, (y0 + y1) / 2, { size: 6, align: 'center', angle: 90, color: COTA })
+}
+
+
 function cuadroDePiezas(doc: jsPDF, area: Area, x: number, y: number, w: number) {
   const renglones = agrupar(piezasDeArea(area), area.config).sort((a, b) => a.subTipo.localeCompare(b.subTipo))
   texto(doc, 'CUADRO DE PIEZAS', x, y, { size: 7, bold: true })
@@ -694,14 +798,27 @@ export function generarPDF(proyecto: Proyecto, fecha = new Date().toLocaleDateSt
 
     const zonaW = HOJA.w - M * 2 - PANEL_W - 6
     const zonaH = HOJA.h - M * 2 - CAJETIN_H - 6
-    const k = Math.min(zonaW / caja.w, zonaH / caja.h)
+
+    // Debajo de la planta va el ALZADO, a la MISMA escala, así que cada pieza
+    // cae justo abajo de donde está arriba. Las dos vistas tienen que caber en
+    // la hoja, así que la escala sale del alto de las dos juntas.
+    const tramoPrincipal = area.tramos[tipologia(area.config.tipologia).principal]
+    const altoAlzado = alturasDe(area.config.modelo).pilastra + SEPARA_VISTAS + 16
+    const conAlzado = !!tramoPrincipal && tramoPrincipal.cabinas.length > 0
+    const altoTotal = caja.h + (conAlzado ? altoAlzado : 0)
+    const k = Math.min(zonaW / caja.w, zonaH / altoTotal)
+    const arriba = M + (zonaH - altoTotal * k) / 2
     const e: Escala = {
       k,
       ox: M + (zonaW - caja.w * k) / 2 - caja.x * k,
-      oy: M + (zonaH - caja.h * k) / 2 - caja.y * k,
+      oy: arriba - caja.y * k,
     }
 
     murosYPiezas(doc, area, e, marcos)
+    if (conAlzado) {
+      const piso = arriba + (caja.h + SEPARA_VISTAS + alturasDe(area.config.modelo).pilastra) * k
+      alzado(doc, area, e, tramoPrincipal, piso)
+    }
     cuadroDePiezas(doc, area, HOJA.w - M - PANEL_W, M + 6, PANEL_W)
     cajetin(doc, proyecto, area, idx + 1, lista.length, fecha)
 
