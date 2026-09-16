@@ -691,7 +691,13 @@ export function generarPDF(proyecto: Proyecto, fecha = new Date().toLocaleDateSt
   return doc
 }
 
+/**
+ * El nombre del archivo. Los pedazos vacíos NO dejan su guión: un proyecto sin
+ * número ni obra daba "Plano--proyecto.pdf", con el guión doble en medio.
+ */
 export function nombreArchivoPDF(proyecto: Proyecto): string {
-  const obra = (proyecto.obra || 'proyecto').replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-')
-  return `Plano-${proyecto.numero}-${obra}.pdf`
+  const limpio = (s: string) => s.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-')
+  const partes = ['Plano', limpio(proyecto.numero || ''), limpio(proyecto.obra || '')].filter(Boolean)
+  if (partes.length === 1) partes.push('proyecto')
+  return partes.join('-') + '.pdf'
 }
