@@ -20,6 +20,8 @@ const AGARRE_CM = 9
  * 1,27 cm, que a la escala del plano no llega ni a un píxel; antes el piso era
  * de 3 y las piezas se veían mucho más gordas de lo que son.
  */
+/** a 45° abierta, la punta de la hoja cae a este factor del ancho en cada eje */
+const ABIERTA_45 = Math.SQRT1_2
 const MIN_PIEZA_PX = 1.5
 
 export function formatear(cm: number, unidad: 'cm' | 'in'): string {
@@ -430,8 +432,8 @@ export default function EditorPlano({
                 const dir = cab.puerta.mano === 'der' ? -1 : 1
                 const hoja = cab.puerta.anchoCm
                 const pivote = pt(m, pivU, prof)
-                const abre = cab.puerta.apertura === 'afuera' ? prof + hoja * 0.72 : prof - hoja * 0.72
-                const extremo = pt(m, pivU + dir * hoja * 0.72, abre)
+                const abre = cab.puerta.apertura === 'afuera' ? prof + hoja * ABIERTA_45 : prof - hoja * ABIERTA_45
+                const extremo = pt(m, pivU + dir * hoja * ABIERTA_45, abre)
                 const centro = pt(m, (u0 + u1) / 2, prof * 0.42)
                 // la cota de la puerta va en horizontal, centrada en el vano
                 const cotaPuerta = pt(m, (u0 + caraIzq + (u1 - caraDer)) / 2, prof)
@@ -781,7 +783,7 @@ export default function EditorPlano({
                         // la puerta del cuarto abre hacia el pasillo, no hacia adentro
                         const pivote = pt(m, u, pieza.desdeCm)
                         const cerrada = pt(m, u, pieza.hastaCm)
-                        const extremo = pt(m, u + largoPieza * 0.72, pieza.desdeCm + largoPieza * 0.72)
+                        const extremo = pt(m, u + largoPieza * ABIERTA_45, pieza.desdeCm + largoPieza * ABIERTA_45)
                         return (
                           <g key={pieza.tipo}>
                             <path

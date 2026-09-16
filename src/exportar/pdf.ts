@@ -38,6 +38,9 @@ const TINTA_COTA: [number, number, number] = [25, 25, 25]
 /** arco de barrido de la puerta */
 const ARCO: [number, number, number] = [143, 163, 196]
 
+/** a 45° abierta, la punta de la hoja cae a este factor del ancho en cada eje */
+const ABIERTA_45 = Math.SQRT1_2
+
 interface Escala {
   k: number
   ox: number
@@ -57,13 +60,23 @@ function texto(doc: jsPDF, s: string, x: number, y: number, opts: { size?: numbe
   doc.text(s, x, y, { align: opts.align ?? 'left', angle: opts.angle })
 }
 
-/** arco aproximado con segmentos: jsPDF no tiene primitiva de arco */
+/**
+ * Arco aproximado con segmentos: jsPDF no tiene primitiva de arco.
+ *
+ * Se barre SIEMPRE por el lado corto. Los ángulos salen de atan2, que va de
+ * −180° a 180°, y un barrido que cruzaba esa costura daba la vuelta larga: una
+ * puerta que abre 45° se dibujaba con un arco de 315°, casi la circunferencia
+ * entera. Le pasaba a las que abren hacia adentro.
+ */
 function arco(doc: jsPDF, cx: number, cy: number, r: number, desde: number, hasta: number) {
   const pasos = 14
+  let barrido = hasta - desde
+  while (barrido > Math.PI) barrido -= 2 * Math.PI
+  while (barrido < -Math.PI) barrido += 2 * Math.PI
   let px = cx + r * Math.cos(desde)
   let py = cy + r * Math.sin(desde)
   for (let i = 1; i <= pasos; i++) {
-    const a = desde + ((hasta - desde) * i) / pasos
+    const a = desde + (barrido * i) / pasos
     const x = cx + r * Math.cos(a)
     const y = cy + r * Math.sin(a)
     doc.line(px, py, x, y)
@@ -361,9 +374,9 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
         const dir = cab.puerta.mano === 'der' ? -1 : 1
         const hoja = cab.puerta.anchoCm
         const afuera = cab.puerta.apertura === 'afuera'
-        const vFin = afuera ? prof + hoja * 0.72 : prof - hoja * 0.72
+        const vFin = afuera ? prof + hoja * ABIERTA_45 : prof - hoja * ABIERTA_45
         const [pxx, pyy] = aHoja(e, pt(m, pivU, prof))
-        const [exx, eyy] = aHoja(e, pt(m, pivU + dir * hoja * 0.72, vFin))
+        const [exx, eyy] = aHoja(e, pt(m, pivU + dir * hoja * ABIERTA_45, vFin))
         const [cxx, cyy] = aHoja(e, pt(m, pivU + dir * hoja, prof))
 
         doc.setDrawColor(ARCO[0], ARCO[1], ARCO[2])
@@ -398,7 +411,7 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
           // la puerta del cuarto abre hacia el pasillo, no hacia adentro
           const [pxx, pyy] = aHoja(e, pt(m, u, pieza.desdeCm))
           const [cxx, cyy] = aHoja(e, pt(m, u, pieza.hastaCm))
-          const [exx, eyy] = aHoja(e, pt(m, u + largoPieza * 0.72, pieza.desdeCm + largoPieza * 0.72))
+          const [exx, eyy] = aHoja(e, pt(m, u + largoPieza * ABIERTA_45, pieza.desdeCm + largoPieza * ABIERTA_45))
           doc.setDrawColor(ARCO[0], ARCO[1], ARCO[2])
           doc.setLineWidth(0.2)
           doc.setLineDashPattern([1.2, 1], 0)
@@ -538,7 +551,7 @@ function cuadroDePiezas(doc: jsPDF, area: Area, x: number, y: number, w: number)
   doc.line(x, fila, x + w, fila)
   fila += 4
 
-  const nombre: Record<string, string> = { PT: 'Puerta', PN: 'Panel', PL: 'Pilastra', MG: 'Divisor orinal' }
+  const nombre: Record<string, string> = { PT: 'Puerta', PN: 'Panel', PL: 'Pilastra', MG: 'Mingitorio' }
   const esp = area.config.espesorMm
   for (const r of renglones) {
     texto(doc, r.subTipo, cols[0], fila, { size: 6 })

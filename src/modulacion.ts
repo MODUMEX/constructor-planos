@@ -535,8 +535,8 @@ export function bom(
   if (config.orinales > 1) {
     renglones.push({
       sku: `${codigoLinea}-MG${config.mgAnchoCm ?? 60}${config.mgAlturaCm}`,
-      descripcion: `Divisor de orinal ${config.mgAnchoCm ?? 60} × ${config.mgAlturaCm} cm`,
-      tipo: 'Divisor',
+      descripcion: `Mingitorio ${config.mgAnchoCm ?? 60} × ${config.mgAlturaCm} cm`,
+      tipo: 'Mingitorio',
       cantidad: config.orinales - 1,
       precioUnit: precioPieza({ familia: 'MG', anchoCm: config.mgAnchoCm ?? 60, altoCm: config.mgAlturaCm }, opciones),
       tarifaReal: true,
