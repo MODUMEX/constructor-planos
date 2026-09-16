@@ -538,11 +538,22 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
           vTexto: prof - 22,
         })
 
-        // el panel divisor va a la derecha de la cabina; su cota, en vertical
+        // El divisor de la derecha, acotado a lo hondo. El mingitorio entre dos
+        // orinales lleva su fondo —el que eligió el cliente, 45 o 60— con cota de
+        // verdad, igual que las pilastras: antes salía como un número suelto.
         if (i < nCab - 1 && cuarto?.indice !== i) {
           const profDiv = profundidadDeDivisor(tramo, i, prof, area.config.mgAnchoCm)
-          const [nx, ny] = aHoja(e, pt(m, u1 + 7, profDiv / 2))
-          texto(doc, String(profDiv), nx, ny, { size: 5.5, align: 'center', angle: rot + 90, color: COTA })
+          const esMg = esMingitorio(tramo, i + 1)
+          if (esMg) {
+            cotaEnV(doc, e, m, 0, profDiv, u1 + 9, u1, String(profDiv), {
+              size: 5.5,
+              rot,
+              uTexto: u1 + 12,
+            })
+          } else {
+            const [nx, ny] = aHoja(e, pt(m, u1 + 7, profDiv / 2))
+            texto(doc, String(profDiv), nx, ny, { size: 5.5, align: 'center', angle: rot + 90, color: COTA })
+          }
         }
       })
     }
@@ -637,15 +648,49 @@ function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) 
     doc.rect(aX(u - grueso / 2), aY(hPilastra), Math.max(grueso * e.k, 0.6), mgAlto * e.k, 'F')
   })
 
-  // ---------- cotas de altura, al costado ----------
-  // Las cotas van en milímetros de hoja, no en centímetros de dibujo: en un plano
-  // ancho la escala es chica y separarlas "10 cm" las dejaba una encima de otra.
-  const xCota = aX(largo + SOBRA_MURO_CM) + 7
+  // ---------- cotas de ancho, arriba ----------
+  // La misma cadena de piezas que lleva la planta. Se repite acá porque el
+  // alzado se lee solo, como en los planos de obra.
+  const yPiezas = aY(hPilastra) - 5
+  const yTotal = yPiezas - 7
+  cortes.forEach((u: number, k: number) => {
+    if (esMingitorio(tramo, k)) return
+    const ancho = anchoPil(k)
+    const cierraLaTira = esMingitorio(tramo, k + 1) && !esMingitorio(tramo, k)
+    const centro =
+      k === 0 ? u + ancho / 2 : k === cortes.length - 1 || cierraLaTira ? u - ancho / 2 : u
+    cotaAncho(doc, aX(centro - ancho / 2), aX(centro + ancho / 2), yPiezas, `${ancho}`)
+  })
+  tramo.cabinas.forEach((cab: Cabina, i: number) => {
+    const u0 = acum[i]
+    const u1 = u0 + cab.anchoCm
+    const { izq, der } = ladosDeCabina(tramo.cabinas.map((x: Cabina) => x.tipo === 'orinal'), anchoPil, i)
+    const medida = cab.tipo === 'orinal' ? anchoDeOrinal(tramo, i, area.config.anchoPilastraCm) : cab.puerta.anchoCm
+    if (cab.tipo !== 'orinal' && cab.puerta.tipo === 'ninguna') return
+    cotaAncho(doc, aX(u0 + izq), aX(u1 - der), yPiezas, `${medida}`)
+  })
+  cotaAncho(doc, aX(0), aX(largo), yTotal, `${tramo.claroCm && tramo.claroCm > 0 ? tramo.claroCm : largo} cm`, true)
+
+  // ---------- cotas de altura ----------
+  // Van A LA PAR de los cubículos, no después del campo de orinales: es donde
+  // se leen en los planos de obra. Solo la de la pilastra se corre hacia afuera.
+  // Se separan en milímetros de hoja y no en centímetros de dibujo: en un plano
+  // ancho la escala es chica y quedaban una encima de otra.
+  const finBanos = (() => {
+    const ultima = tramo.cabinas.map((c: Cabina) => c.tipo !== 'orinal').lastIndexOf(true)
+    return ultima < 0 ? largo : acum[ultima] + tramo.cabinas[ultima].anchoCm
+  })()
+  const xCota = aX(finBanos) + 5
   cotaAlto(doc, e, xCota, pisoY, hPuerta + hueco, hueco, `${hPuerta}`)
   if (hueco > 0) cotaAlto(doc, e, xCota, pisoY, hueco, 0, `${hueco}`)
-  cotaAlto(doc, e, xCota + 9, pisoY, hPilastra, 0, `${hPilastra}`)
+  cotaAlto(doc, e, aX(largo + SOBRA_MURO_CM) + 8, pisoY, hPilastra, 0, `${hPilastra}`)
   // los 10 cm del zoclo o de la pata, del otro lado para no encimarse
   cotaAlto(doc, e, aX(-SOBRA_MURO_CM) - 7, pisoY, ALTO_BASE_CM, 0, `${ALTO_BASE_CM}`)
+  // el alto del mingitorio que eligió el cliente, sobre el primero que haya
+  const uMing = cortes.find((_: number, k: number) => esMingitorio(tramo, k) && k > 0 && k < cortes.length - 1)
+  if (uMing !== undefined) {
+    cotaAlto(doc, e, aX(uMing) - 4, pisoY, hPilastra, hPilastra - mgAlto, `${mgAlto}`)
+  }
 
   const conZocloTxt = area.config.terminacion === 'ZOCLO' ? 'zoclo' : 'patas'
   texto(doc, 'ALZADO', aX(largo / 2), pisoY + 9, { size: 7.5, bold: true, align: 'center', color: GRIS })
@@ -653,6 +698,24 @@ function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) 
     size: 5.8,
     align: 'center',
     color: GRIS,
+  })
+}
+
+/** una cota horizontal del alzado, entre dos puntos ya en la hoja */
+function cotaAncho(doc: jsPDF, x0: number, x1: number, y: number, etiqueta: string, fuerte = false) {
+  if (Math.abs(x1 - x0) < 0.6) return
+  const color = fuerte ? TINTA_COTA : COTA
+  doc.setDrawColor(color[0], color[1], color[2])
+  doc.setFillColor(color[0], color[1], color[2])
+  doc.setLineWidth(0.22)
+  doc.line(x0, y, x1, y)
+  flecha(doc, x0, y, Math.PI)
+  flecha(doc, x1, y, 0)
+  texto(doc, etiqueta, (x0 + x1) / 2, y - 1.6, {
+    size: fuerte ? 8 : 5.8,
+    bold: fuerte,
+    align: 'center',
+    color,
   })
 }
 
