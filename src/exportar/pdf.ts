@@ -708,13 +708,15 @@ function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) 
   cotaAlto(doc, e, aX(largo + SOBRA_MURO_CM) + 8, pisoY, hPilastra, 0, `${hPilastra}`)
   // los 10 cm del zoclo o de la pata, del otro lado para no encimarse
   cotaAlto(doc, e, aX(-SOBRA_MURO_CM) - 7, pisoY, ALTO_BASE_CM, 0, `${ALTO_BASE_CM}`)
-  // El alto del mingitorio que eligió el cliente, en CADA uno de los que se
-  // dibujan: la misma condición que arriba, así que ninguno queda sin su cota.
+  // Cada mingitorio con SUS dos medidas: el alto de la pieza y los 30 cm que
+  // quedan del piso a su borde de abajo. Van una arriba de la otra en la misma
+  // línea, así que se leen juntas.
   cortes.forEach((u: number, k: number) => {
     if (!esMingitorio(tramo, k)) return
     if (k === cortes.length - 1 && tramo.muroFin) return
     if (k === 0 && tramo.muroInicio) return
     cotaAlto(doc, e, aX(u) - 4, pisoY, mgPiso + mgAlto, mgPiso, `${mgAlto}`)
+    cotaAlto(doc, e, aX(u) - 4, pisoY, mgPiso, 0, `${mgPiso}`)
   })
 
   const conZocloTxt = area.config.terminacion === 'ZOCLO' ? 'zoclo' : 'patas'
