@@ -28,6 +28,12 @@ const CAJETIN_H = 30
 const PANEL_W = 74 // cuadro de piezas a la derecha
 /** aire entre la planta y el alzado, en cm de dibujo */
 const SEPARA_VISTAS = 60
+/**
+ * Alto del zoclo o de la pata al pie de la pilastra, en cm. Sale de la ficha
+ * técnica: el alzado de LEEDER M1 lo acota como .10 m en los dos sistemas de
+ * fijación a piso.
+ */
+const ALTO_BASE_CM = 10
 
 const TINTA = 25
 const GRIS = 130
@@ -586,6 +592,18 @@ function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) 
     const centro =
       k === 0 ? u + ancho / 2 : k === cortes.length - 1 || cierraLaTira ? u - ancho / 2 : u
     doc.rect(aX(centro - ancho / 2), aY(hPilastra), ancho * e.k, hPilastra * e.k, 'FD')
+    // el zoclo o la pata al pie, los 10 cm que acota la ficha
+    const conZoclo = area.config.terminacion === 'ZOCLO'
+    const anchoBase = conZoclo ? ancho : Math.min(ancho, 6)
+    doc.setFillColor(200, 203, 208)
+    doc.rect(
+      aX(centro - anchoBase / 2),
+      aY(ALTO_BASE_CM),
+      anchoBase * e.k,
+      ALTO_BASE_CM * e.k,
+      'FD',
+    )
+    doc.setFillColor(120, 120, 120)
   })
 
   // puertas y mingitorios, colgados a la altura que les toca
@@ -626,8 +644,16 @@ function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) 
   cotaAlto(doc, e, xCota, pisoY, hPuerta + hueco, hueco, `${hPuerta}`)
   if (hueco > 0) cotaAlto(doc, e, xCota, pisoY, hueco, 0, `${hueco}`)
   cotaAlto(doc, e, xCota + 9, pisoY, hPilastra, 0, `${hPilastra}`)
+  // los 10 cm del zoclo o de la pata, del otro lado para no encimarse
+  cotaAlto(doc, e, aX(-SOBRA_MURO_CM) - 7, pisoY, ALTO_BASE_CM, 0, `${ALTO_BASE_CM}`)
 
+  const conZocloTxt = area.config.terminacion === 'ZOCLO' ? 'zoclo' : 'patas'
   texto(doc, 'ALZADO', aX(largo / 2), pisoY + 9, { size: 7.5, bold: true, align: 'center', color: GRIS })
+  texto(doc, `Fijación a piso con ${conZocloTxt}`, aX(largo / 2), pisoY + 14, {
+    size: 5.8,
+    align: 'center',
+    color: GRIS,
+  })
 }
 
 /** una cota vertical del alzado: de `desde` a `hasta` centímetros sobre el piso */
