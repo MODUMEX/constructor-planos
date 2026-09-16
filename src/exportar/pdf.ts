@@ -9,7 +9,7 @@ import {
   type Marco,
 } from '../geometria'
 import { nombreHerraje, tipologia } from '../catalog'
-import { anchoTotal } from '../modulacion'
+import { anchoTotal, ladosDeCabina } from '../modulacion'
 import { agrupar, modeloParaCsv, nombreLinea, nombreSistema, piezasDeArea } from './piezas'
 import { ALTO_ORINAL_CM, ALTO_REGADERA_CM, ALTO_WC_CM, ORINAL, REGADERA, WC } from '../assets/sanitarios'
 import { marcaDeAgua, ponerLogo, portada } from './portada'
@@ -366,10 +366,10 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
       // La puerta cuelga de la PILASTRA, no del límite de la cabina: ese límite
       // cae en el centro de la pilastra, así que hay que correrse hasta su cara.
       // Las de los extremos van enteras dentro de su cabina.
-      const nCab = tramo.cabinas.length
       const anchoPil = (j: number) => tramo.pilastras?.[j] ?? area.config.anchoPilastraCm
-      const caraIzq = i === 0 ? anchoPil(0) : anchoPil(i) / 2
-      const caraDer = i === nCab - 1 ? anchoPil(nCab) : anchoPil(i + 1) / 2
+      // la puerta cuelga de la CARA de la pilastra: con la lateral que cierra la
+      // tira hay que tomarla entera, o el pivote cae dentro de la pieza
+      const { izq: caraIzq, der: caraDer } = ladosDeCabina(tramo.cabinas.map((x) => x.tipo === 'orinal'), anchoPil, i)
 
       // puerta: hoja a 45° y arco de barrido. La del cuarto accesible no va acá:
       // va en su divisor, sobre la profundidad, porque al cuarto se entra por el costado.
@@ -511,8 +511,7 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
         if (cuarto?.indice === i) return
         const u0 = acum[i]
         const u1 = u0 + cab.anchoCm
-        const izq = i === 0 ? anchoPilDe(0) : anchoPilDe(i) / 2
-        const der = i === nCab - 1 ? anchoPilDe(nCab) : anchoPilDe(i + 1) / 2
+        const { izq, der } = ladosDeCabina(tramo.cabinas.map((x) => x.tipo === 'orinal'), anchoPilDe, i)
         // El orinal no lleva puerta, pero sí tiene su medida, que NO es la de su
         // cabina: la cabina se lleva además media pilastra de cada lado.
         if (cab.tipo === 'orinal') {

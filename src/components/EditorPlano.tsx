@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import type { Cabina, Config, Pais, Tramo } from '../types'
 import { ANCHOS_PILASTRA, puertasPosibles, tipologia } from '../catalog'
-import { anchoTotal, minimoDe, nuevaCabina, puertaSugerida, snap, cierraConMingitorio } from '../modulacion'
+import { anchoTotal, minimoDe, nuevaCabina, puertaSugerida, snap, cierraConMingitorio, ladosDeCabina } from '../modulacion'
 import { medidaCercana, PILASTRAS_INTERNAS, PUERTA_ACCESIBLE_MIN } from '../modulador'
 import { Grupo, Item, Menu, Raya } from './Menu'
 import {
@@ -422,10 +422,10 @@ export default function EditorPlano({
                 // La puerta cuelga de la PILASTRA, no del límite de la cabina: el
                 // límite cae en el centro de la pilastra, así que hay que correrse
                 // hasta su cara. Las de los extremos van enteras dentro de su cabina.
-                const n = tramo.cabinas.length
                 const anchoPil = (j: number) => tramo.pilastras?.[j] ?? config.anchoPilastraCm
-                const caraIzq = i === 0 ? anchoPil(0) : anchoPil(i) / 2
-                const caraDer = i === n - 1 ? anchoPil(n) : anchoPil(i + 1) / 2
+                // la puerta cuelga de la CARA de la pilastra: con la lateral que cierra
+                // la tira hay que tomarla entera, o el pivote cae dentro de la pieza
+                const { izq: caraIzq, der: caraDer } = ladosDeCabina(tramo.cabinas.map((x) => x.tipo === 'orinal'), anchoPil, i)
 
                 // pivote de la puerta y hoja
                 const pivU = cab.puerta.mano === 'der' ? u1 - caraDer : u0 + caraIzq
