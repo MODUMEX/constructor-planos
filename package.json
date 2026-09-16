@@ -17,7 +17,8 @@
     "exe": "tauri build",
     "probar-modulador": "esbuild scripts/probar-modulador.ts --bundle --platform=node --format=esm --outfile=.modulador.mjs --log-level=warning && node .modulador.mjs",
     "probar-orinales": "esbuild scripts/probar-orinales.ts --bundle --platform=node --format=esm --outfile=.orinales.mjs --log-level=warning && node .orinales.mjs",
-    "generar-regadera": "node scripts/generar-regadera.mjs"
+    "generar-regadera": "node scripts/generar-regadera.mjs",
+    "probar-odoo": "esbuild scripts/probar-odoo.ts --bundle --platform=node --format=esm --outfile=.odoo.mjs --log-level=warning && node .odoo.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",
