@@ -242,3 +242,12 @@ export function puedeColoresReservados(u: Usuario | null): boolean {
 export function puedeDistribuidores(u: Usuario | null): boolean {
   return esAdmin(u) || u?.rol === 'Vendedor'
 }
+
+/**
+ * Autorizar una cotización y mandarla a Odoo. El distribuidor la arma y la ve,
+ * pero no la autoriza. Esto es solo la pantalla: la regla de verdad está en la
+ * base (el disparador de cotizacion) y en la Edge Function.
+ */
+export function puedeAutorizar(u: Usuario | null): boolean {
+  return esAdmin(u) || u?.rol === 'Vendedor'
+}

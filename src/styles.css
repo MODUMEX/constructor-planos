@@ -983,3 +983,16 @@ input[type="password"]::-ms-clear {
 .campo.falta input,
 .campo.falta select { border-color: var(--bad); }
 .campo.falta label { color: var(--bad); }
+
+/* el motivo del rechazo, escrito en la misma fila de la lista de proyectos */
+.motivo {
+  font-size: 12px;
+  padding: 4px 8px;
+  border: 1px solid var(--linea, #c9ccd4);
+  border-radius: 6px;
+  width: 190px;
+  margin-right: 6px;
+}
+
+/* el detalle bajo el estado de la cotización: el N° de Odoo, el vencimiento */
+td .ayuda { font-size: 11px; color: var(--text-3); margin-top: 2px; }

@@ -6,8 +6,12 @@ import { generarCSV, nombreArchivoCSV } from './exportar/csv'
 import { generarPDF, nombreArchivoPDF } from './exportar/pdf'
 import { generarCotizacionPDF, nombreArchivoCotizacion } from './exportar/cotizacion'
 import { csvABytes, FILTRO_CSV, FILTRO_PDF, guardarArchivo } from './exportar/guardar'
+import { abrirProyecto } from './proyectos'
+import {
+  autorizar as autorizarEnOdoo, cuadran, guardarCotizacion, lineasParaOdoo, rechazar as rechazarCotizacion,
+} from './odoo/enviar'
 import { esAdmin, IVA_CR, puedeCatalogos, puedeColoresReservados, puedeDistribuidores, puedeUsuarios, type Usuario } from './auth'
-import type { Area, Cabina, Config, Pais, Proyecto, TipoCabina, TipologiaId, Tramo } from './types'
+import type { Area, Cabina, Config, Moneda, Pais, Proyecto, TipoCabina, TipologiaId, Tramo } from './types'
 import {
   ACABADOS, acabadoEsElColor, alturasDe, anchosPanel, claroAjustado, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, mgMedidas, MODELOS,
   PAISES, etiquetaTier, nombreHerraje, nombreModelo, tierDeColor, TIPOLOGIAS, tipologia, tipologiaEspejo,
@@ -911,6 +915,61 @@ export default function App() {
     }
   }
 
+  /**
+   * Autoriza la cotización de un proyecto guardado y la manda a Odoo.
+   *
+   * Congela lo que se autoriza: abre el proyecto, arma las piezas con su precio,
+   * las guarda como cotización y recién entonces las manda. Si la plata de las
+   * piezas no coincide con la de la cotización de pantalla, frena.
+   */
+  async function autorizarProyecto(p: { proyectoId: number; codigo: string }) {
+    const abierto = await abrirProyecto(usuario, p.proyectoId)
+    if (!abierto.ok || !abierto.dato) return { ok: false, mensaje: abierto.mensaje }
+    const suyo = abierto.dato
+
+    const region = distribuidores.find((d) => d.nombre === suyo.distribuidor)?.region ?? null
+    if (region !== 'Costa Rica') {
+      return {
+        ok: false,
+        mensaje: `A Odoo solo va lo de Costa Rica. "${suyo.distribuidor || 'sin distribuidor'}" es de ${region ?? 'región sin definir'}.`,
+      }
+    }
+    const moneda: Moneda = 'CRC'
+    const precios = { moneda, tipoCambio: TC, tarifas: tarifas?.tabla, pais: suyo.paisFabricacion }
+
+    const { lineas, faltan } = lineasParaOdoo(suyo, precios)
+    if (faltan.length) return { ok: false, mensaje: `No se puede mandar: ${faltan.join(' · ')}` }
+    if (!lineas.length) return { ok: false, mensaje: 'El proyecto no tiene piezas que cotizar.' }
+
+    // el mismo cálculo que ve el vendedor en la pantalla de cotización
+    const dePantalla = suyo.areas.flatMap((a) => bom(a.tramos, a.config, precios))
+    const cuadra = cuadran(lineas, dePantalla)
+    if (!cuadra.ok) return { ok: false, mensaje: cuadra.mensaje }
+
+    const config = suyo.areas[0]?.config
+    const guardada = await guardarCotizacion(usuario, {
+      proyectoId: p.proyectoId,
+      numero: suyo.numero,
+      distribuidorId: Number(distribuidores.find((d) => d.nombre === suyo.distribuidor)?.distribuidorId) || null,
+      moneda,
+      tipoCambio: TC,
+      descuentoPct: usuario?.descuento ?? 0,
+      ivaPct: usuario?.ivaPorcentaje ?? IVA_CR,
+      pais: suyo.paisFabricacion,
+      modelo: config?.modelo ?? '',
+      tier: tierDeColor(config?.color ?? '', suyo.paisFabricacion),
+    }, lineas)
+    if (!guardada.ok || !guardada.dato) return { ok: false, mensaje: guardada.mensaje }
+
+    const enviada = await autorizarEnOdoo(usuario, guardada.dato.cotizacionId, lineas)
+    return { ok: enviada.ok, mensaje: enviada.mensaje }
+  }
+
+  async function rechazarProyecto(cotizacionId: number, motivo: string) {
+    const r = await rechazarCotizacion(usuario, cotizacionId, motivo)
+    return { ok: r.ok, mensaje: r.mensaje }
+  }
+
   async function bajarCSV() {
     const bytes = csvABytes(generarCSV(proyectoConAutor))
     const ruta = await guardarArchivo(nombreArchivoCSV(proyecto), bytes, 'text/csv;charset=utf-8', FILTRO_CSV)
@@ -1090,6 +1149,8 @@ export default function App() {
             setPaso(7)
           }}
           onCambiarNumero={(numero) => setProyecto({ ...proyecto, numero })}
+          onAutorizar={autorizarProyecto}
+          onRechazar={rechazarProyecto}
           onCerrar={() => setVerProyectos(false)}
         />
       )}

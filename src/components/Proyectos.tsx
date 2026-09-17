@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { Usuario } from '../auth'
+import { puedeAutorizar, type Usuario } from '../auth'
 import type { Proyecto } from '../types'
 import {
   abrirProyecto, borrarProyecto, codigoDe, guardarProyecto, listarProyectos, REVISIONES,
   siguienteNumero, type ProyectoEnLista, type Revision,
 } from '../proyectos'
+import { estadosDeCotizacion, type EstadoCotizacion } from '../odoo/enviar'
 
 /**
  * Guardar y abrir proyectos. Cada revisión es su propia fila, así que sacar la
@@ -20,6 +21,9 @@ interface Props {
   onAbrir: (p: Proyecto) => void
   onCambiarNumero: (numero: string) => void
   onCerrar: () => void
+  /** autoriza la cotización del proyecto y la manda a Odoo; lo arma App */
+  onAutorizar: (p: ProyectoEnLista) => Promise<Aviso>
+  onRechazar: (cotizacionId: number, motivo: string) => Promise<Aviso>
 }
 
 interface Aviso {
@@ -33,7 +37,9 @@ function fecha(iso: string): string {
   return d.toLocaleString('es-CR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-export default function Proyectos({ usuario, proyecto, onAbrir, onCambiarNumero, onCerrar }: Props) {
+export default function Proyectos({
+  usuario, proyecto, onAbrir, onCambiarNumero, onCerrar, onAutorizar, onRechazar,
+}: Props) {
   const [pestana, setPestana] = useState<'abrir' | 'guardar'>('abrir')
   const [lista, setLista] = useState<ProyectoEnLista[]>([])
   const [cargando, setCargando] = useState(true)
@@ -42,6 +48,11 @@ export default function Proyectos({ usuario, proyecto, onAbrir, onCambiarNumero,
   const [revision, setRevision] = useState<Revision>('A')
   const [confirmarBorrado, setConfirmarBorrado] = useState<number | null>(null)
   const [busqueda, setBusqueda] = useState('')
+  const [cotizaciones, setCotizaciones] = useState<Map<number, EstadoCotizacion>>(new Map())
+  const [confirmarEnvio, setConfirmarEnvio] = useState<number | null>(null)
+  const [rechazando, setRechazando] = useState<number | null>(null)
+  const [motivo, setMotivo] = useState('')
+  const autoriza = puedeAutorizar(usuario)
 
   const recargar = useCallback(async () => {
     setCargando(true)
@@ -53,6 +64,9 @@ export default function Proyectos({ usuario, proyecto, onAbrir, onCambiarNumero,
       return
     }
     setLista(r.dato ?? [])
+    // el estado de la cotización va aparte: si falla, la lista igual sirve
+    const c = await estadosDeCotizacion(usuario)
+    setCotizaciones(new Map((c.dato ?? []).map((x) => [x.proyectoId, x])))
   }, [usuario])
 
   useEffect(() => {
@@ -109,6 +123,27 @@ export default function Proyectos({ usuario, proyecto, onAbrir, onCambiarNumero,
     setTrabajando(false)
     setAviso({ ok: r.ok, mensaje: r.ok ? `Se borró la revisión ${p.codigo}.` : r.mensaje })
     setConfirmarBorrado(null)
+    if (r.ok) await recargar()
+  }
+
+  async function autorizar(p: ProyectoEnLista) {
+    setTrabajando(true)
+    setAviso(null)
+    const r = await onAutorizar(p)
+    setTrabajando(false)
+    setConfirmarEnvio(null)
+    setAviso(r)
+    if (r.ok) await recargar()
+  }
+
+  async function rechazar(cotizacionId: number) {
+    setTrabajando(true)
+    setAviso(null)
+    const r = await onRechazar(cotizacionId, motivo)
+    setTrabajando(false)
+    setRechazando(null)
+    setMotivo('')
+    setAviso(r)
     if (r.ok) await recargar()
   }
 
@@ -189,18 +224,35 @@ export default function Proyectos({ usuario, proyecto, onAbrir, onCambiarNumero,
                         <th>Obra</th>
                         <th>Cliente</th>
                         <th>Estado</th>
+                        <th>Cotización</th>
                         <th>Actualizado</th>
                         <th />
                       </tr>
                     </thead>
                     <tbody>
-                      {filtrada.map((p) => (
+                      {filtrada.map((p) => {
+                        const cot = cotizaciones.get(p.proyectoId)
+                        const enviada = cot?.estado === 'Enviada'
+                        return (
                         <tr key={p.proyectoId}>
                           <td className="num">{p.numeroPlano}</td>
                           <td className="num">{p.revision}</td>
                           <td style={{ fontWeight: 600 }}>{p.obra}</td>
                           <td>{p.cliente}</td>
                           <td>{p.estado}</td>
+                          <td>
+                            {cot ? (
+                              <>
+                                <span className={`chip ${enviada ? 'on' : ''}`}>{cot.estado}</span>
+                                {cot.odooOrderName && <div className="ayuda">Odoo {cot.odooOrderName}</div>}
+                                {cot.estado === 'Rechazada' && cot.venceEl && (
+                                  <div className="ayuda">vence {fecha(cot.venceEl)}</div>
+                                )}
+                              </>
+                            ) : (
+                              <span className="sub">sin cotizar</span>
+                            )}
+                          </td>
                           <td className="num">{fecha(p.actualizadoEl)}</td>
                           <td className="der">
                             {confirmarBorrado === p.proyectoId ? (
@@ -213,8 +265,57 @@ export default function Proyectos({ usuario, proyecto, onAbrir, onCambiarNumero,
                                   Sí
                                 </button>
                               </>
+                            ) : confirmarEnvio === p.proyectoId ? (
+                              <>
+                                <span className="aviso-inline">¿Mandar {p.codigo} a Odoo? Después queda bloqueada.</span>
+                                <button className="btn plano chico" onClick={() => setConfirmarEnvio(null)}>
+                                  No
+                                </button>
+                                <button className="btn chico" onClick={() => void autorizar(p)} disabled={trabajando}>
+                                  {trabajando ? 'Mandando…' : 'Sí, autorizar'}
+                                </button>
+                              </>
+                            ) : rechazando === p.proyectoId && cot ? (
+                              <>
+                                <input
+                                  className="motivo"
+                                  placeholder="¿Por qué se rechaza?"
+                                  value={motivo}
+                                  onChange={(e) => setMotivo(e.target.value)}
+                                  autoFocus
+                                />
+                                <button className="btn plano chico" onClick={() => { setRechazando(null); setMotivo('') }}>
+                                  Cancelar
+                                </button>
+                                <button
+                                  className="btn chico"
+                                  onClick={() => void rechazar(cot.cotizacionId)}
+                                  disabled={trabajando || !motivo.trim()}
+                                >
+                                  Rechazar
+                                </button>
+                              </>
                             ) : (
                               <>
+                                {autoriza && !enviada && (
+                                  <button
+                                    className="btn chico primario"
+                                    onClick={() => setConfirmarEnvio(p.proyectoId)}
+                                    disabled={trabajando}
+                                    title="Congela la cotización y la manda a Odoo como presupuesto"
+                                  >
+                                    Autorizar
+                                  </button>
+                                )}
+                                {autoriza && cot && cot.estado === 'Pendiente' && (
+                                  <button
+                                    className="btn plano chico"
+                                    onClick={() => setRechazando(p.proyectoId)}
+                                    disabled={trabajando}
+                                  >
+                                    Rechazar
+                                  </button>
+                                )}
                                 <button className="btn chico" onClick={() => void abrir(p)} disabled={trabajando}>
                                   Abrir
                                 </button>
@@ -229,7 +330,8 @@ export default function Proyectos({ usuario, proyecto, onAbrir, onCambiarNumero,
                             )}
                           </td>
                         </tr>
-                      ))}
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
