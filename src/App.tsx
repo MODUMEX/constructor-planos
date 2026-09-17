@@ -20,6 +20,7 @@ import {
 import { medidaCercana } from './modulador'
 import VistaRender from './components/VistaRender'
 import ColoresMexico from './components/ColoresMexico'
+import CampoNumero from './components/CampoNumero'
 import Usuarios from './components/Usuarios'
 import Solicitudes from './components/Solicitudes'
 import { contarSolicitudes } from './solicitudes'
@@ -1734,7 +1735,7 @@ export default function App() {
                   <div className="campos">
                     <div className="campo">
                       <label>Claro disponible (cm)</label>
-                      <input type="number" value={claroCm} onChange={(e) => setClaroCm(Number(e.target.value))} />
+                      <CampoNumero value={claroCm} onChange={setClaroCm} min={30} max={3000} />
                       <span className="ayuda">Medida de pared a pared del tramo principal</span>
                     </div>
                     <div className="campo">
@@ -1772,7 +1773,11 @@ export default function App() {
                         {llevaAccesible && (
                           <div className="campo">
                             <label>Ancho de la accesible (cm)</label>
-                            <input type="number" value={config.anchoAccesibleCm} onChange={(e) => setConfig({ anchoAccesibleCm: Number(e.target.value) })} />
+                            <CampoNumero
+                              value={config.anchoAccesibleCm}
+                              onChange={(n) => setConfig({ anchoAccesibleCm: n })}
+                              min={100} max={300}
+                            />
                             <span className="ayuda">Se respeta al modular</span>
                           </div>
                         )}
@@ -1782,19 +1787,19 @@ export default function App() {
                       <>
                         <div className="campo">
                           <label>Ancho del cuarto PMR (cm)</label>
-                          <input
-                            type="number" min={150} max={300} step={1}
+                          <CampoNumero
                             value={config.anchoPmrCuartoCm ?? 162}
-                            onChange={(e) => setConfig({ anchoPmrCuartoCm: Math.max(100, Number(e.target.value) || 162) })}
+                            onChange={(n) => setConfig({ anchoPmrCuartoCm: n })}
+                            min={100} max={400}
                           />
                           <span className="ayuda">Lo que el cuarto ocupa del claro</span>
                         </div>
                         <div className="campo">
                           <label>Profundidad del lugar (cm)</label>
-                          <input
-                            type="number" min={config.profundidadCm} step={1}
+                          <CampoNumero
                             value={config.profundidadLugarCm ?? config.profundidadCm}
-                            onChange={(e) => setConfig({ profundidadLugarCm: Number(e.target.value) || config.profundidadCm })}
+                            onChange={(n) => setConfig({ profundidadLugarCm: n })}
+                            min={config.profundidadCm} max={600}
                           />
                           <span className="ayuda">Hasta el fondo del baño, no de la cabina: el divisor llega hasta ahí</span>
                         </div>
@@ -1863,10 +1868,10 @@ export default function App() {
                         </div>
                         <div className="campo">
                           <label>Ancho de cada orinal (cm)</label>
-                          <input
-                            type="number"
+                          <CampoNumero
                             value={config.anchoOrinalCm ?? 60}
-                            onChange={(e) => setConfig({ anchoOrinalCm: Number(e.target.value), anchosOrinalCm: undefined })}
+                            onChange={(n) => setConfig({ anchoOrinalCm: n, anchosOrinalCm: undefined })}
+                            min={30} max={120}
                           />
                           <span className="ayuda">Lo normal son 60; vale para todos</span>
                         </div>
