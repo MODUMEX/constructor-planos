@@ -4,6 +4,7 @@ import PreviewTipologia from './components/PreviewTipologia'
 import EditorPlano, { formatear } from './components/EditorPlano'
 import { generarCSV, nombreArchivoCSV } from './exportar/csv'
 import { generarPDF, nombreArchivoPDF } from './exportar/pdf'
+import { generarCotizacionPDF, nombreArchivoCotizacion } from './exportar/cotizacion'
 import { csvABytes, FILTRO_CSV, FILTRO_PDF, guardarArchivo } from './exportar/guardar'
 import { esAdmin, IVA_CR, puedeCatalogos, puedeColoresReservados, puedeDistribuidores, puedeUsuarios, type Usuario } from './auth'
 import type { Area, Cabina, Config, Pais, Proyecto, TipoCabina, TipologiaId, Tramo } from './types'
@@ -914,6 +915,28 @@ export default function App() {
     const bytes = csvABytes(generarCSV(proyectoConAutor))
     const ruta = await guardarArchivo(nombreArchivoCSV(proyecto), bytes, 'text/csv;charset=utf-8', FILTRO_CSV)
     setGuardado(ruta ? `Orden de compra guardada en ${ruta}` : null)
+  }
+
+  /** La cotización en PDF, la que el distribuidor le lleva al cliente. */
+  async function bajarCotizacion() {
+    try {
+      const doc = generarCotizacionPDF(proyectoConAutor, {
+        renglones,
+        moneda,
+        descuentoPct: usuario?.descuento ?? 0,
+        ivaPct: ivaPorcentaje,
+        vendedor: usuario?.nombre ?? '',
+      })
+      const bytes = new Uint8Array(doc.output('arraybuffer'))
+      if (bytes.length < 1000) throw new Error(`el PDF salió vacío (${bytes.length} bytes)`)
+      const ruta = await guardarArchivo(
+        nombreArchivoCotizacion(proyecto), bytes, 'application/pdf', FILTRO_PDF,
+      )
+      setGuardado(ruta ? `Cotización guardada en ${ruta}` : null)
+    } catch (e) {
+      setGuardado(null)
+      setBloqueo(`No se pudo guardar la cotización: ${e instanceof Error ? e.message : String(e)}`)
+    }
   }
 
 
@@ -1935,15 +1958,17 @@ export default function App() {
 
 
                   <div style={{ display: 'flex', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
-                    <button className="btn primario" onClick={bajarPDF}>Plano en PDF</button>
+                    <button className="btn primario" onClick={bajarCotizacion}>Cotización en PDF</button>
+                    <button className="btn" onClick={bajarPDF}>Plano en PDF</button>
                     <button className="btn" onClick={bajarCSV}>CSV para el CIP</button>
                   </div>
 
                   <div className="aviso-caja" style={{ marginTop: 16, maxWidth: 720 }}>
                     <b>Qué lleva cada archivo</b>
                     <span>
-                      El <b>PDF</b> trae una hoja por área con el plano a escala, las cotas, el cuadro de piezas y el
-                      cajetín. El <b>CSV</b> es el que se arrastra a la pestaña Capturar del CIP: mismas columnas y
+                      La <b>cotización</b> es la que se le pasa al cliente: los renglones con su precio, el total y las
+                      condiciones. El <b>plano</b> trae una hoja por área a escala, con las cotas, el cuadro de piezas y
+                      el cajetín. El <b>CSV</b> es el que se arrastra a la pestaña Capturar del CIP: mismas columnas y
                       mismo SKU largo que emite el Constructor de hoy.
                     </span>
                   </div>

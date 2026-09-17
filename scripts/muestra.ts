@@ -6,6 +6,8 @@
 import { writeFileSync } from 'node:fs'
 import { generarPDF, nombreArchivoPDF } from '../src/exportar/pdf'
 import { generarCSV, nombreArchivoCSV } from '../src/exportar/csv'
+import { generarCotizacionPDF, nombreArchivoCotizacion } from '../src/exportar/cotizacion'
+import { bom } from '../src/modulacion'
 import { crearTramos, nuevoId } from '../src/modulacion'
 import { espesorPorLinea } from '../src/catalog'
 import type { Area, Config, Proyecto, TipologiaId } from '../src/types'
@@ -80,5 +82,15 @@ writeFileSync(rutaPdf, Buffer.from(pdf.output('arraybuffer')))
 const rutaCsv = `${salida}/${nombreArchivoCSV(proyecto)}`
 writeFileSync(rutaCsv, '﻿' + generarCSV(proyecto), 'utf8')
 
+// la cotización, con las mismas tarifas de respaldo que usa la app sin nube
+const renglones = proyecto.areas.flatMap((a) =>
+  bom(a.tramos, a.config, { moneda: 'CRC', tipoCambio: 510, pais: proyecto.paisFabricacion }))
+const cot = generarCotizacionPDF(proyecto, {
+  renglones, moneda: 'CRC', descuentoPct: 12, ivaPct: 13, vendedor: 'Dayanna Lizano', numero: 'COT-1042',
+})
+const rutaCot = `${salida}/${nombreArchivoCotizacion(proyecto, 'COT-1042')}`
+writeFileSync(rutaCot, Buffer.from(cot.output('arraybuffer')))
+
 console.log('PDF :', rutaPdf)
+console.log('COT :', rutaCot)
 console.log('CSV :', rutaCsv)
