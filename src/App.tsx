@@ -15,7 +15,9 @@ import type { Area, Cabina, Config, Moneda, Pais, Proyecto, TipoCabina, Tipologi
 import {
   ACABADOS, acabadoEsElColor, alturasDe, anchosPanel, claroAjustado, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, mgMedidas, MODELOS,
   PAISES, etiquetaTier, nombreHerraje, nombreModelo, tierDeColor, TIPOLOGIAS, tipologia, tipologiaEspejo,
+  ANCHOS_PILASTRA,
 } from './catalog'
+import { medidaCercana } from './modulador'
 import VistaRender from './components/VistaRender'
 import ColoresMexico from './components/ColoresMexico'
 import Usuarios from './components/Usuarios'
@@ -387,9 +389,11 @@ export default function App() {
    * de la modulación, la que no existe en las demás tipologías.
    */
   const divisorPmr = (() => {
-    const panel = config.anchoPanelDivisorPmrCm ?? 100
+    const panel = config.profundidadCm
     const puerta = config.puertaAccesibleCm ?? 90
-    return { panel, puerta, frente: Math.round((profLugar - panel - puerta) * 10) / 10 }
+    const sobra = Math.round((profLugar - panel - puerta) * 10) / 10
+    const pilastra = sobra > 0 ? medidaCercana(ANCHOS_PILASTRA, sobra) : 0
+    return { panel, puerta, sobra, pilastra }
   })()
   // los paneles grandes no existen en todos los modelos
   const panelesDelModelo = anchosPanel(config.modelo)
@@ -1795,22 +1799,31 @@ export default function App() {
                           <span className="ayuda">Hasta el fondo del baño, no de la cabina: el divisor llega hasta ahí</span>
                         </div>
                         <div className="campo">
-                          <label>Panel del divisor (cm)</label>
-                          <input
-                            type="number" min={30} max={200} step={1}
-                            value={config.anchoPanelDivisorPmrCm ?? 100}
-                            onChange={(e) => setConfig({ anchoPanelDivisorPmrCm: Math.max(30, Number(e.target.value) || 100) })}
-                          />
+                          <label>Divisor del cuarto</label>
+                          <div className="reparto">
+                            panel {divisorPmr.panel} + puerta {divisorPmr.puerta}
+                            {divisorPmr.pilastra > 0 && ` + pilastra ${divisorPmr.pilastra}`}
+                            {' = '}{divisorPmr.panel + divisorPmr.puerta + divisorPmr.pilastra} cm
+                          </div>
                           <span className="ayuda">
-                            Sobre {profLugar} cm de fondo: panel {divisorPmr.panel} + puerta {divisorPmr.puerta} + frente{' '}
-                            {divisorPmr.frente}
+                            El panel es el mismo de las demás cabinas. Lo que sobra del fondo lo cubren la puerta y una
+                            pilastra contra el muro.
                           </span>
                         </div>
-                        {divisorPmr.frente < 0 && (
+                        {divisorPmr.sobra < 0 && (
                           <div className="campo">
                             <span className="aviso-inline">
-                              El panel y la puerta ya se pasan {Math.abs(divisorPmr.frente)} cm del fondo del lugar:
-                              subí la profundidad o bajá el panel.
+                              El panel de {divisorPmr.panel} y la puerta de {divisorPmr.puerta} se pasan{' '}
+                              {Math.abs(divisorPmr.sobra)} cm del fondo: subí la profundidad del lugar o achicá la puerta.
+                            </span>
+                          </div>
+                        )}
+                        {divisorPmr.sobra > 0 && divisorPmr.pilastra !== divisorPmr.sobra && (
+                          <div className="campo">
+                            <span className="aviso-inline">
+                              {divisorPmr.pilastra === 0
+                                ? `Sobran ${divisorPmr.sobra} cm y la pilastra más chica del catálogo es de ${ANCHOS_PILASTRA[0]}.`
+                                : `La pilastra más cercana es de ${divisorPmr.pilastra} cm y el hueco es de ${divisorPmr.sobra}.`}
                             </span>
                           </div>
                         )}

@@ -1,6 +1,7 @@
 import type { Cabina, Config, Tramo } from './types'
-import { GRUESO_PILASTRA } from './catalog'
+import { ANCHOS_PILASTRA, GRUESO_PILASTRA } from './catalog'
 import { anchoTotal, ladosDeCabina } from './modulacion'
+import { medidaCercana } from './modulador'
 
 /** espesor con el que se dibuja la pared, en cm */
 export const ESPESOR_MURO = 12
@@ -172,7 +173,7 @@ export const GRUESO = GRUESO_PILASTRA
  * costado. Es lo que hace que el inodoro quede girado.
  */
 export interface PiezaDivisorPmr {
-  tipo: 'panel' | 'puerta' | 'frente'
+  tipo: 'panel' | 'puerta' | 'pilastra'
   desdeCm: number
   hastaCm: number
 }
@@ -191,6 +192,10 @@ export interface CuartoPmr {
   /** con muro (P+) o con panel (PP) del lado de afuera */
   cierre: 'muros' | 'panel'
   divisor: PiezaDivisorPmr[]
+  /** la pilastra con la que el divisor cierra contra el muro del fondo */
+  pilastraCm: number
+  /** qué avisar cuando el divisor no cierra justo contra el fondo */
+  aviso: string | null
 }
 
 /** la profundidad del lugar, que nunca puede ser menor que la de la cabina */
@@ -214,18 +219,23 @@ export function cuartoPmr(tramo: Tramo, config: Config): CuartoPmr | null {
   const desde = acumulado(tramo.cabinas)[i]
   const prof = profundidadDelLugar(config)
 
-  const panel = Math.max(0, config.anchoPanelDivisorPmrCm ?? 100)
+  // El panel del divisor NO se pide aparte: es el mismo panel que llevan las
+  // demás cabinas. Lo que sobra del fondo lo cubren la puerta y una pilastra
+  // contra el muro.
+  const panel = config.profundidadCm
   const puerta = Math.max(0, config.puertaAccesibleCm ?? cab.puerta.anchoCm ?? 90)
-  // el frente cierra lo que sobra; si el panel y la puerta ya se pasan del
-  // fondo no se inventa una pieza negativa: queda en cero y el aviso lo da la
-  // configuración, que es donde el vendedor puede corregirlo
-  const frente = Math.max(0, Math.round((prof - panel - puerta) * 10) / 10)
+  const sobra = Math.round((prof - panel - puerta) * 10) / 10
+  // la pilastra sale de una medida de catálogo, no de lo que sobre pelado
+  const pilastra = sobra > 0 ? medidaCercana(ANCHOS_PILASTRA, sobra) : 0
+  // si la pieza de catálogo no da justo, se dice: es un dato de fabricación,
+  // no un redondeo que se pueda tapar
+  const falta = Math.round((sobra - pilastra) * 10) / 10
 
   const divisor: PiezaDivisorPmr[] = []
   let v = 0
-  for (const [tipo, largo] of [['panel', panel], ['puerta', puerta], ['frente', frente]] as const) {
+  for (const [tipo, largo] of [['panel', panel], ['puerta', puerta], ['pilastra', pilastra]] as const) {
     if (largo <= 0) continue
-    divisor.push({ tipo, desdeCm: v, hastaCm: Math.min(v + largo, prof) })
+    divisor.push({ tipo, desdeCm: v, hastaCm: v + largo })
     v += largo
   }
 
@@ -238,5 +248,30 @@ export function cuartoPmr(tramo: Tramo, config: Config): CuartoPmr | null {
     profCabinasCm: config.profundidadCm,
     cierre: config.cierrePmr ?? 'muros',
     divisor,
+    pilastraCm: pilastra,
+    aviso: avisoDelDivisor(prof, panel, puerta, pilastra, sobra, falta),
   }
+}
+
+/** Qué decirle al vendedor cuando el divisor no cierra contra el fondo. */
+function avisoDelDivisor(
+  prof: number, panel: number, puerta: number, pilastra: number, sobra: number, falta: number,
+): string | null {
+  if (sobra < 0) {
+    return `El divisor se pasa ${(-sobra).toFixed(1)} cm del fondo: el panel de ${panel} y la puerta de ${puerta}`
+      + ` suman más que los ${prof} cm del lugar. Achicá la puerta o agrandá el fondo.`
+  }
+  if (sobra === 0) {
+    return `El divisor cierra justo con el panel y la puerta, sin pilastra contra el muro.`
+      + ` Si la lleva, achicá la puerta.`
+  }
+  if (pilastra === 0) {
+    return `Sobran ${sobra.toFixed(1)} cm para la pilastra del divisor y la más chica del catálogo`
+      + ` es de ${ANCHOS_PILASTRA[0]} cm.`
+  }
+  if (falta !== 0) {
+    return `La pilastra del divisor quedó de ${pilastra} cm y el hueco es de ${sobra.toFixed(1)}:`
+      + ` ${falta > 0 ? `faltan ${falta.toFixed(1)} cm` : `sobran ${(-falta).toFixed(1)} cm`}.`
+  }
+  return null
 }

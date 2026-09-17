@@ -88,6 +88,8 @@ export function modularConCatalogo(
     anchosOrinalCm?: (number | null | undefined)[]
     /** la tira termina en orinal y de ese lado no hay muro: cierra con mingitorio */
     cierreMingitorio?: boolean
+    /** el cuarto PMR arranca la tira y cierra contra el muro, sin pilastra */
+    sinPilastraInicio?: boolean
     /** la tira arranca en orinal sin muro de ese lado: también cierra con mingitorio */
     cierreMingitorioInicio?: boolean
     pais?: Pais
@@ -109,6 +111,7 @@ export function modularConCatalogo(
     anchosOrinal: extra?.anchosOrinalCm,
     cierreMingitorio: extra?.cierreMingitorio,
     cierreMingitorioInicio: extra?.cierreMingitorioInicio,
+    sinPilastraInicio: extra?.sinPilastraInicio,
     catalogoPuertas: anchosPuerta(extra?.pais ?? 'CR'),
     anchoAccesibleCm: extra?.anchoAccesibleMinCm,
     murosPilastra,
@@ -437,12 +440,17 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
       muroFin: t.muroFin,
     }
     const muros = murosT
+    // El cuarto PMR arranca contra el muro SIN pilastra: ese muro no se come el
+    // medio centímetro de herraje, así que tampoco cuenta para el claro ajustado.
+    const sinPilastraInicio = config.tipologia === 'PMR' && conAccesible && esPrincipal
+    const murosConPilastra = Math.max(0, murosT - (sinPilastraInicio ? 1 : 0))
     // La cabina accesible ya no tiene camino aparte: es una cabina con puerta
     // ancha, así que sale del mismo buscador que las demás.
     // Si el cliente pidió una medida de puerta, esa manda: el buscador solo
     // puede mover las pilastras. Es la regla del negocio, no una preferencia.
-    const conCatalogo = modularConCatalogo(claroTramo, soloOrinales ? cant : total, muros, muros < 2, { puerta: config.puertaCm, puertaAccesible: config.puertaAccesibleCm }, {
+    const conCatalogo = modularConCatalogo(claroTramo, soloOrinales ? cant : total, murosConPilastra, muros < 2, { puerta: config.puertaCm, puertaAccesible: config.puertaAccesibleCm }, {
       accesible: conAccesible && esPrincipal,
+      sinPilastraInicio,
       anchoAccesibleMinCm: anchoAccesibleDe(config),
       mingitorios: soloOrinales ? cant : ming,
       anchoOrinalCm: config.anchoOrinalCm,

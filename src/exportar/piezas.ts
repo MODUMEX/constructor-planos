@@ -1,6 +1,7 @@
 import type { Area, Cabina, Config, Tramo } from '../types'
 import { alturasDe, nombreModelo, tipologia } from '../catalog'
 import { cierraConMingitorio, fronteraDeOrinal } from '../modulacion'
+import { cuartoPmr } from '../geometria'
 
 /**
  * Piezas del proyecto con el SubTipo que espera el CIP.
@@ -157,7 +158,10 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
     // En el campo de orinales no hay pilastras: solo los espacios y los
     // mingitorios que los separan. La pilastra de arranque solo va si esa
     // frontera no es del campo.
-    if (!omitirPilastraInicial && !fronteraDeOrinal(tramo, 0)) {
+    // El cuarto PMR arranca contra el muro y lo cierra ese muro, no una
+    // pilastra: la que lleva es la del divisor, contra el muro del fondo.
+    const arrancaElCuarto = config.tipologia === 'PMR' && tramo.cabinas[0]?.tipo === 'accesible'
+    if (!omitirPilastraInicial && !fronteraDeOrinal(tramo, 0) && !arrancaElCuarto) {
       piezas.push({
         familia: 'PL',
         anchoCm: anchoDe(0),
@@ -173,11 +177,14 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
       // es LATERAL: cierra la tira, no divide dos cabinas.
       const cierraLaTira =
         tramo.cabinas[i].tipo !== 'orinal' && tramo.cabinas[i + 1].tipo === 'orinal'
+      // La que sale del cuarto PMR tampoco divide dos cabinas: cierra el cuarto
+      // y arranca la tira, así que es LATERAL.
+      const salaDelCuarto = config.tipologia === 'PMR' && tramo.cabinas[i].tipo === 'accesible'
       piezas.push({
         familia: 'PL',
         anchoCm: anchoDe(i + 1),
         altoCm: altoPil,
-        subTipo: cierraLaTira ? 'PLLAT' : 'PLCEN',
+        subTipo: cierraLaTira || salaDelCuarto ? 'PLLAT' : 'PLCEN',
         area,
       })
     }
@@ -197,11 +204,34 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
   return piezas
 }
 
+/**
+ * La pilastra con la que el divisor del cuarto PMR cierra contra el muro del
+ * fondo. No sale de la tira sino de la profundidad: el divisor es panel +
+ * puerta + esta pilastra, y sin ella el despiece no cierra el cuarto.
+ */
+function pilastraDelDivisor(area: Area): Pieza[] {
+  if (area.config.tipologia !== 'PMR') return []
+  const salida: Pieza[] = []
+  for (const tramo of area.tramos) {
+    const cuarto = cuartoPmr(tramo, area.config)
+    if (!cuarto || cuarto.pilastraCm <= 0) continue
+    salida.push({
+      familia: 'PL',
+      anchoCm: cuarto.pilastraCm,
+      altoCm: altoPilastra(area.config),
+      subTipo: 'PLLATMUR',
+      area: area.nombre,
+    })
+  }
+  return salida
+}
+
 export function piezasDeArea(area: Area): Pieza[] {
   const tipo = tipologia(area.config.tipologia)
   const piezas = area.tramos.flatMap((t, i) =>
     piezasDeTramo(t, area.config, area.nombre, tipo.esquinaCompartida && i !== tipo.principal),
   )
+  piezas.push(...pilastraDelDivisor(area))
 
   // orinales sueltos de un baño mixto: N orinales llevan N−1 divisores.
   // En un área de solo orinales los divisores ya salieron de las propias cabinas.

@@ -111,6 +111,12 @@ export interface OpcionesModulacion {
   cierreMingitorio?: boolean
   /** la tira ARRANCA en orinal y de ese lado no hay muro: también cierra con mingitorio */
   cierreMingitorioInicio?: boolean
+  /**
+   * El arranque de la tira NO lleva pilastra. Es el cuarto PMR: cierra contra
+   * el muro, y la pilastra que lleva es la de su divisor, contra el fondo. Sin
+   * esto la modulación reservaba un ancho que después no se fabricaba.
+   */
+  sinPilastraInicio?: boolean
   /** una cabina accesible: es una cabina con puerta ancha, no otra geometría */
   accesible?: boolean
   /**
@@ -215,7 +221,9 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
   // Una tira de PUROS orinales no tiene pilastras: sus dos puntas son el
   // mingitorio de cierre, si de ese lado no hay muro, o nada si da contra la pared.
   const arranqueOrinal = nMing > 0 && !conCabinas
-  const opExtremo1 = arranqueOrinal ? [o.cierreMingitorioInicio ? GRUESO_MG : 0] : opExtremos
+  const opExtremo1 = arranqueOrinal
+    ? [o.cierreMingitorioInicio ? GRUESO_MG : 0]
+    : o.sinPilastraInicio ? [0] : opExtremos
   const opExtremo2 = arranqueOrinal ? [cierreMG ? GRUESO_MG : 0] : opExtremos
   const objetivoAcc = nAcc > 0 ? (o.anchoAccesibleCm ?? 0) : 0
 
@@ -280,6 +288,7 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
     clavadas[0] = o.cierreMingitorioInicio ? GRUESO_MG : 0
     clavadas[clavadas.length - 1] = cierreMG ? GRUESO_MG : 0
   }
+  if (o.sinPilastraInicio) clavadas[0] = 0
   // Con una pilastra clavada a mano el reparto manda: es la única forma de que
   // las otras se acomoden en vez de copiarle la medida.
   const uniformeCalza = !unaClavada && cabe(objetivo - mejor.total, o.extremoAbierto, o.murosPilastra)
@@ -296,6 +305,7 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
     pilastras[0] = o.cierreMingitorioInicio ? GRUESO_MG : 0
     pilastras[pilastras.length - 1] = cierreMG ? GRUESO_MG : 0
   }
+  if (o.sinPilastraInicio) pilastras[0] = 0
 
   // El total sale SIEMPRE de las pilastras que quedaron: el respaldo respeta la
   // que ella movió, así que el total del buscador ya no sirve.
