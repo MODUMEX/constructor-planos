@@ -4,6 +4,11 @@ name: Publicar version de escritorio
 # Compila el instalador en Windows, lo firma y lo publica en Releases junto con
 # latest.json, que es el archivo que la aplicacion instalada consulta para
 # saber si hay una version mas nueva.
+#
+# tauri-action SOLO compila y firma. La publicacion la hace gh, porque la
+# subida propia de la accion fallaba a mitad de camino (v2.41.0 dejo el
+# release sin firma ni latest.json; v2.42.0 murio con "Error creating asset
+# temp dir"). Las dos veces se arreglo relanzando, o sea que no era el codigo.
 
 on:
   push:
@@ -34,32 +39,96 @@ jobs:
 
       - run: npm ci
 
+      # Sin tagName la accion no crea release ni sube nada: solo compila y firma.
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
-        with:
-          tagName: ${{ github.ref_name }}
-          releaseName: Constructor de Planos v__VERSION__
-          releaseBody: |
-            Descarga el instalador `.exe` y ejecutalo.
 
-            A partir de esta version la aplicacion se actualiza sola: al abrirla
-            avisa cuando hay una version nueva y la instala si aceptas.
-          releaseDraft: false
-          prerelease: false
-
-      # Sube una copia del instalador con un nombre FIJO, para poder repartir
-      # siempre el mismo enlace (en la web o por WhatsApp) sin cambiarlo en
-      # cada version:
-      #   .../releases/latest/download/Constructor-de-Planos-Instalador.exe
-      - name: Copia con nombre fijo para el enlace de descarga
+      - name: Publicar el release con gh
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $exe = Get-ChildItem src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1
+          $ErrorActionPreference = 'Stop'
+          $tag = $env:GITHUB_REF_NAME
+          $version = $tag.TrimStart('v')
+
+          $nsis = 'src-tauri/target/release/bundle/nsis'
+          $exe = Get-ChildItem "$nsis/*-setup.exe" | Select-Object -First 1
           if (-not $exe) { throw "no se genero el instalador NSIS" }
-          Copy-Item $exe.FullName "Constructor-de-Planos-Instalador.exe"
-          gh release upload $env:GITHUB_REF_NAME "Constructor-de-Planos-Instalador.exe" --clobber
+          $sig = Get-ChildItem "$nsis/*-setup.exe.sig" | Select-Object -First 1
+          if (-not $sig) { throw "no se genero la firma del instalador" }
+          Write-Host "instalador: $($exe.Name) ($([math]::Round($exe.Length/1MB,2)) MB)"
+
+          # GitHub cambia los espacios del nombre por puntos al guardar el
+          # archivo: la URL del actualizador tiene que usar ESE nombre.
+          $nombreEnGitHub = $exe.Name -replace ' ', '.'
+          $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$tag/$nombreEnGitHub"
+
+          # El latest.json lo armamos aca: es lo que la app instalada consulta
+          # para saber si hay version nueva, y sin el no se entera de nada.
+          # Las DOS claves de plataforma, iguales, tal como las publicaba
+          # tauri-action: segun la version, el actualizador busca una u otra.
+          $plataforma = [ordered]@{
+            signature = (Get-Content $sig.FullName -Raw).Trim()
+            url       = $url
+          }
+          $latest = [ordered]@{
+            version   = $version
+            notes     = "Descarga el instalador .exe y ejecutalo. La aplicacion se actualiza sola."
+            pub_date  = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ')
+            platforms = [ordered]@{
+              'windows-x86_64'      = $plataforma
+              'windows-x86_64-nsis' = $plataforma
+            }
+          }
+          # SIN BOM: Set-Content -Encoding utf8 le mete la marca al principio y
+          # entonces el archivo deja de ser JSON valido. El actualizador no lo
+          # puede leer y la app nunca se entera de que hay version nueva.
+          $json = $latest | ConvertTo-Json -Depth 5
+          [IO.File]::WriteAllText((Join-Path $PWD 'latest.json'), $json, (New-Object Text.UTF8Encoding $false))
+          Write-Host "latest.json -> $version"
+          # y se comprueba que de verdad se pueda leer
+          Get-Content 'latest.json' -Raw | ConvertFrom-Json | Out-Null
+
+          # una copia con nombre FIJO, para repartir siempre el mismo enlace:
+          #   .../releases/latest/download/Constructor-de-Planos-Instalador.exe
+          Copy-Item $exe.FullName 'Constructor-de-Planos-Instalador.exe'
+
+          $cuerpo = "Descarga el instalador .exe y ejecutalo.`n`nA partir de esta version la aplicacion se actualiza sola: al abrirla avisa cuando hay una version nueva y la instala si aceptas."
+
+          # Si el release ya existe -un reintento, o una etiqueta vuelta a
+          # subir- se reutiliza en vez de fallar.
+          gh release view $tag 2>$null | Out-Null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --title "Constructor de Planos v$version" --notes $cuerpo
+            if ($LASTEXITCODE -ne 0) { throw "no se pudo crear el release $tag" }
+          } else {
+            Write-Host "el release $tag ya existe: se le suben los archivos"
+          }
+
+          # --clobber para que un reintento pise lo que haya quedado a medias
+          gh release upload $tag "$($exe.FullName)" "$($sig.FullName)" 'latest.json' 'Constructor-de-Planos-Instalador.exe' --clobber
+          if ($LASTEXITCODE -ne 0) { throw "fallo la subida de los archivos" }
+
+      # Que el release quedo COMPLETO no se da por sentado: las dos veces que
+      # fallo, el .exe estaba y faltaban la firma y el latest.json, que es
+      # justo lo que hace que la app vea la version nueva.
+      - name: Comprobar que no falte nada
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = $env:GITHUB_REF_NAME
+          $nombres = @(gh release view $tag --json assets --jq '.assets[].name')
+          Write-Host "archivos publicados:"
+          $nombres | ForEach-Object { Write-Host "  $_" }
+          foreach ($necesario in @('latest.json', 'Constructor-de-Planos-Instalador.exe')) {
+            if ($nombres -notcontains $necesario) { throw "falta $necesario en el release $tag" }
+          }
+          if (-not ($nombres | Where-Object { $_ -like '*-setup.exe' })) { throw "falta el instalador" }
+          if (-not ($nombres | Where-Object { $_ -like '*-setup.exe.sig' })) { throw "falta la firma" }
+          Write-Host "el release $tag esta completo"
