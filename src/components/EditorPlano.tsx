@@ -879,6 +879,13 @@ export default function EditorPlano({
         const cab = t?.cabinas[menu.indice]
         if (!t || !cab) return null
         const cerrar = () => setMenu(null)
+        // El orinal apaga la puerta porque no lleva. Al volver a un tipo que sí
+        // la lleva hay que devolvérsela: si no, la cabina queda sin puerta y no
+        // hay forma de darse cuenta salvo mirando el dibujo.
+        const dejandoElOrinal = (tipo: Cabina['tipo']): Partial<Cabina> =>
+          cab.tipo === 'orinal'
+            ? { tipo, puerta: { ...cab.puerta, tipo: 'puerta' } }
+            : { tipo }
         return (
           <Menu
             pos={{ x: menu.x, y: menu.y }}
@@ -921,16 +928,16 @@ export default function EditorPlano({
             </Item>
             <Raya />
             <Grupo>Tipo de cabina</Grupo>
-            <Item activo={cab.tipo === 'normal'} onClick={() => { cambiarCabina(menu.tramoId, menu.indice, { tipo: 'normal' }); cerrar() }}>Inodoro</Item>
+            <Item activo={cab.tipo === 'normal'} onClick={() => { cambiarCabina(menu.tramoId, menu.indice, dejandoElOrinal('normal')); cerrar() }}>Inodoro</Item>
             <Item
               activo={cab.tipo === 'accesible'}
               disabled={cab.anchoCm < 150 && cab.tipo !== 'accesible'}
-              onClick={() => { cambiarCabina(menu.tramoId, menu.indice, { tipo: 'accesible' }); cerrar() }}
+              onClick={() => { cambiarCabina(menu.tramoId, menu.indice, dejandoElOrinal('accesible')); cerrar() }}
             >
               Accesible {cab.anchoCm < 150 && cab.tipo !== 'accesible' ? '(necesita 150 cm)' : ''}
             </Item>
             <Item activo={cab.tipo === 'vacia'} onClick={() => { cambiarCabina(menu.tramoId, menu.indice, { tipo: 'vacia' }); cerrar() }}>Vacía</Item>
-            <Item activo={cab.tipo === 'regadera'} onClick={() => { cambiarCabina(menu.tramoId, menu.indice, { tipo: 'regadera' }); cerrar() }}>Regadera</Item>
+            <Item activo={cab.tipo === 'regadera'} onClick={() => { cambiarCabina(menu.tramoId, menu.indice, dejandoElOrinal('regadera')); cerrar() }}>Regadera</Item>
             <Item activo={cab.tipo === 'orinal'} onClick={() => { cambiarCabina(menu.tramoId, menu.indice, { tipo: 'orinal', puerta: { ...cab.puerta, tipo: 'ninguna' } }); cerrar() }}>Orinal</Item>
             <Raya />
             <Grupo>Puerta</Grupo>
