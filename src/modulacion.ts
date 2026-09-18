@@ -90,11 +90,74 @@ export function modularConCatalogo(
     cierreMingitorio?: boolean
     /** el cuarto PMR arranca la tira y cierra contra el muro, sin pilastra */
     sinPilastraInicio?: boolean
+    /**
+     * El ancho del CUARTO PMR. Si viene, el cuarto se planta en esa medida y
+     * solo se modula el resto del claro.
+     */
+    cuartoPmrCm?: number
     /** la tira arranca en orinal sin muro de ese lado: también cierra con mingitorio */
     cierreMingitorioInicio?: boolean
     pais?: Pais
   },
 ): { cabinas: Cabina[]; pilastras: number[]; canaletaCm: number; ajuste: Tramo['ajuste']; mensaje: string; avisoAccesible?: string } | null {
+  // ------------------------------------------------------------------
+  // El cuarto PMR no negocia su ancho.
+  //
+  // Va acá adentro y no en quien llama, porque la tira se vuelve a modular por
+  // varios caminos —crear el área, cambiar una puerta, arrastrar una pilastra,
+  // tocar un orinal— y la regla tiene que valer en todos. Cuando vivía solo en
+  // crearTramos, bastaba con cambiar cualquier medida para que el cuarto
+  // perdiera la suya y le reapareciera la pilastra contra el muro.
+  // ------------------------------------------------------------------
+  const cuartoCm = extra?.cuartoPmrCm ?? 0
+  if (cuartoCm > 0) {
+    const cuarto = nuevaCabina(cuartoCm, 'accesible')
+    if (fijar?.puertaAccesible) {
+      cuarto.puerta = { ...cuarto.puerta, anchoCm: fijar.puertaAccesible }
+    }
+    const nResto = cantidad - 1
+    if (nResto <= 0) {
+      return { cabinas: [cuarto], pilastras: [0, 0], canaletaCm: 0, ajuste: 'exacto', mensaje: 'Solo el cuarto' }
+    }
+    // Las fronteras del resto están corridas una posición: la 0 de la tira
+    // entera es el muro del cuarto, y ahí no va pilastra.
+    const corrida = (l?: (number | null | undefined)[]) => (l ? l.slice(1) : undefined)
+    const delResto = modularConCatalogo(
+      claroCm - cuartoCm,
+      nResto,
+      // del lado del cuarto no hay muro sino la pilastra que lo cierra
+      Math.max(0, murosPilastra - 1),
+      extremoAbierto,
+      {
+        ...fijar,
+        puertaAccesible: undefined,
+        pilastraIndice: fijar?.pilastraIndice != null ? fijar.pilastraIndice - 1 : undefined,
+        pilastras: corrida(fijar?.pilastras),
+      },
+      {
+        ...extra,
+        accesible: false,
+        anchoAccesibleMinCm: undefined,
+        cuartoPmrCm: 0,
+        // "sin pilastra al inicio" es del MURO del cuarto, no del arranque del
+        // resto: ahí va justo la pilastra que cierra el cuarto. Sin esto quedaba
+        // en cero y la tira arrancaba pegada al cuarto.
+        sinPilastraInicio: false,
+      },
+    )
+    if (!delResto) return null
+    return {
+      cabinas: [cuarto, ...delResto.cabinas],
+      pilastras: [0, ...delResto.pilastras],
+      canaletaCm: delResto.canaletaCm,
+      ajuste: delResto.ajuste,
+      mensaje: delResto.mensaje,
+      avisoAccesible: claroCm - cuartoCm < 0
+        ? `El cuarto de ${cuartoCm} cm no cabe en un claro de ${claroCm}.`
+        : undefined,
+    }
+  }
+
   const conAcc = extra?.accesible === true
   const nMing = extra?.mingitorios ?? 0
   const anchoOrinal = extra?.anchoOrinalCm && extra.anchoOrinalCm > 0 ? extra.anchoOrinalCm : 60
@@ -258,9 +321,31 @@ export function reajustarConPuertas(
   claroCm: number,
   murosPilastra: number,
   extremoAbierto: boolean,
+  /** el cuarto PMR, que se planta y deja modular solo el resto */
+  cuartoPmrCm = 0,
 ): { cabinas: Cabina[]; pilastras: number[]; canaletaCm: number; ajuste: Tramo['ajuste']; mensaje: string } | null {
   const n = cabinas.length
   if (n === 0) return null
+
+  // El cuarto PMR no entra en el reparto: se planta con su medida y se ajusta
+  // el resto. Es la misma regla que en modularConCatalogo, y tiene que valer
+  // también al cambiar una puerta.
+  if (cuartoPmrCm > 0 && cabinas[0]?.tipo === 'accesible') {
+    if (n === 1) {
+      return { cabinas: [{ ...cabinas[0], anchoCm: cuartoPmrCm }], pilastras: [0, 0], canaletaCm: 0, ajuste: 'exacto', mensaje: 'Solo el cuarto' }
+    }
+    const resto = reajustarConPuertas(
+      cabinas.slice(1), claroCm - cuartoPmrCm, Math.max(0, murosPilastra - 1), extremoAbierto,
+    )
+    if (!resto) return null
+    return {
+      cabinas: [{ ...cabinas[0], anchoCm: cuartoPmrCm }, ...resto.cabinas],
+      pilastras: [0, ...resto.pilastras],
+      canaletaCm: resto.canaletaCm,
+      ajuste: resto.ajuste,
+      mensaje: resto.mensaje,
+    }
+  }
 
   const cuerpos = cabinas.map((c) => (c.tipo === 'orinal' ? c.anchoCm : c.puerta.anchoCm))
   const conPuerta = cabinas.filter((c) => c.tipo !== 'orinal').length
@@ -465,50 +550,6 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
     const sinPilastraInicio = config.tipologia === 'PMR' && conAccesible && esPrincipal
     const murosConPilastra = Math.max(0, murosT - (sinPilastraInicio ? 1 : 0))
 
-    // ------------------------------------------------------------------
-    // PMR: el ancho del cuarto NO se negocia.
-    //
-    // Antes el cuarto salía del mismo buscador que las cabinas y competía con
-    // ellas por el claro: nunca llegaba a su medida, y para acercarse el
-    // buscador inflaba las pilastras de al lado hasta 100 cm, que ya no es una
-    // pilastra. Ahora el cuarto se planta en lo que pidió el vendedor y solo
-    // el RESTO del claro se modula con las reglas de siempre.
-    // ------------------------------------------------------------------
-    if (sinPilastraInicio) {
-      const anchoCuarto = anchoAccesibleDe(config)
-      const resto = claroTramo - anchoCuarto
-      const cuarto = nuevaCabina(anchoCuarto, 'accesible')
-      cuarto.puerta = { ...cuarto.puerta, anchoCm: config.puertaAccesibleCm ?? cuarto.puerta.anchoCm }
-      const nResto = Math.max(0, total - 1)
-      if (nResto === 0) {
-        return { ...base, cabinas: [cuarto], pilastras: [0, 0] }
-      }
-      // La tira del resto no arranca contra un muro sino contra la pilastra que
-      // cierra el cuarto, así que de este lado no hay herraje de muro.
-      const murosResto = t.muroFin ? 1 : 0
-      const delResto = modularConCatalogo(
-        resto, nResto, murosResto, murosResto < 1,
-        { puerta: config.puertaCm },
-        { mingitorios: ming, anchoOrinalCm: config.anchoOrinalCm, anchosOrinalCm: config.anchosOrinalCm,
-          cierreMingitorio: !t.muroFin && ming > 0, pais },
-      )
-      if (delResto) {
-        return {
-          ...base,
-          cabinas: [cuarto, ...delResto.cabinas],
-          // la frontera 0 es el muro del cuarto, sin pilastra; de ahí en
-          // adelante mandan las que eligió el buscador para el resto
-          pilastras: [0, ...delResto.pilastras],
-          canaletaCm: delResto.canaletaCm,
-          ajuste: delResto.ajuste,
-          mensaje: delResto.mensaje,
-          avisoAccesible: resto < 0
-            ? `El cuarto de ${anchoCuarto} cm no cabe en un claro de ${claroTramo}.`
-            : undefined,
-        }
-      }
-      return { ...base, cabinas: [cuarto, ...modular(resto, nResto)] }
-    }
     // La cabina accesible ya no tiene camino aparte: es una cabina con puerta
     // ancha, así que sale del mismo buscador que las demás.
     // Si el cliente pidió una medida de puerta, esa manda: el buscador solo
@@ -523,6 +564,8 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
       // si la tira termina en orinal y de ese lado no hay muro, cierra con mingitorio
       cierreMingitorio: !t.muroFin && (soloOrinales ? cant : ming) > 0,
       cierreMingitorioInicio: soloOrinales && !t.muroInicio,
+      // el cuarto PMR se planta y solo se modula el resto
+      cuartoPmrCm: sinPilastraInicio ? anchoAccesibleDe(config) : 0,
       pais,
     })
     if (!conCatalogo) {

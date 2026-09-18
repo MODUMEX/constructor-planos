@@ -605,7 +605,10 @@ export default function App() {
       i === indice ? { ...c, puerta: { ...c.puerta, anchoCm: anchoPuertaCm } } : c,
     )
     const muros = (t.muroInicio ? 1 : 0) + (t.muroFin ? 1 : 0)
-    const r = reajustarConPuertas(cabinas, t.claroCm, muros, muros < 2)
+    const r = reajustarConPuertas(
+      cabinas, t.claroCm, muros, muros < 2,
+      config.tipologia === 'PMR' && llevaAccesible ? anchoAccesibleDe(config) : 0,
+    )
     setArea({
       tramos: area.tramos.map((x) =>
         x.id !== tramoId
@@ -666,6 +669,8 @@ export default function App() {
       {
         accesible: llevaAccesible,
         anchoAccesibleMinCm: anchoAccesibleDe(config),
+        // el cuarto PMR no negocia su ancho, tampoco al volver a modular
+        cuartoPmrCm: config.tipologia === 'PMR' && llevaAccesible ? anchoAccesibleDe(config) : 0,
         mingitorios: cuantos,
         anchoOrinalCm: config.anchoOrinalCm,
         anchosOrinalCm: anchos,
@@ -723,6 +728,8 @@ export default function App() {
       {
         accesible: llevaAccesible,
         anchoAccesibleMinCm: anchoAccesibleDe(config),
+        // el cuarto PMR no negocia su ancho, tampoco al volver a modular
+        cuartoPmrCm: config.tipologia === 'PMR' && llevaAccesible ? anchoAccesibleDe(config) : 0,
         // los orinales de la tira: sin esto el buscador los trata como baños con puerta
         mingitorios: t.cabinas.filter((c) => c.tipo === 'orinal').length,
         anchoOrinalCm: config.anchoOrinalCm,
@@ -1820,6 +1827,15 @@ export default function App() {
                             <span className="aviso-inline">
                               El panel de {divisorPmr.panel} y la puerta de {divisorPmr.puerta} se pasan{' '}
                               {Math.abs(divisorPmr.sobra)} cm del fondo: subí la profundidad del lugar o achicá la puerta.
+                            </span>
+                          </div>
+                        )}
+                        {divisorPmr.sobra === 0 && (
+                          <div className="campo">
+                            <span className="aviso-inline">
+                              El panel de {divisorPmr.panel} y la puerta de {divisorPmr.puerta} cierran justo los{' '}
+                              {profLugar} cm y no queda pilastra. La puerta del cuarto cuelga de la pilastra, nunca de
+                              un panel: achicá la puerta o subí la profundidad del lugar.
                             </span>
                           </div>
                         )}
