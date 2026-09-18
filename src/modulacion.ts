@@ -323,13 +323,33 @@ export function ladosDeCabina(
   esOrinal: boolean[],
   pilastra: (k: number) => number,
   i: number,
+  /**
+   * La primera cabina es el CUARTO PMR. Su pilastra no se parte entre los dos
+   * lados: cierra el cuarto y arranca la tira, así que va entera del lado de la
+   * cabina. Partida, el dibujo se come media pilastra del cuarto y el cuarto
+   * deja de medir lo que dice su cota.
+   */
+  arrancaElCuarto = false,
 ): { izq: number; der: number } {
   const n = esOrinal.length
   /** la frontera k cierra la tira de baños: baño a la izquierda, orinal a la derecha */
   const cierra = (k: number) => k > 0 && k < n && !esOrinal[k - 1] && esOrinal[k]
-  const izq = i === 0 ? pilastra(0) : cierra(i) ? 0 : pilastra(i) / 2
-  const der = i === n - 1 ? pilastra(n) : cierra(i + 1) ? pilastra(i + 1) : pilastra(i + 1) / 2
+  /** la frontera que sale del cuarto PMR: entera de la cabina siguiente */
+  const delCuarto = (k: number) => arrancaElCuarto && k === 1
+  const izq = i === 0 ? pilastra(0)
+    : cierra(i) ? 0
+      : delCuarto(i) ? pilastra(i)
+        : pilastra(i) / 2
+  const der = i === n - 1 ? pilastra(n)
+    : cierra(i + 1) ? pilastra(i + 1)
+      : delCuarto(i + 1) ? 0
+        : pilastra(i + 1) / 2
   return { izq, der }
+}
+
+/** si la tira arranca con el cuarto PMR, que no comparte su pilastra */
+export function arrancaElCuartoPmr(tramo: Tramo, config: Config): boolean {
+  return config.tipologia === 'PMR' && tramo.cabinas[0]?.tipo === 'accesible'
 }
 
 /** entre dos orinales va un mingitorio, no una pilastra ni un panel de cabina */

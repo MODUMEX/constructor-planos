@@ -9,7 +9,7 @@ import {
   type Marco,
 } from '../geometria'
 import { alturasDe, nombreHerraje, tipologia } from '../catalog'
-import { anchoTotal, ladosDeCabina } from '../modulacion'
+import { anchoTotal, arrancaElCuartoPmr, ladosDeCabina } from '../modulacion'
 import { agrupar, modeloParaCsv, nombreLinea, nombreSistema, piezasDeArea } from './piezas'
 import { ALTO_ORINAL_CM, ALTO_REGADERA_CM, ALTO_WC_CM, ORINAL, REGADERA, WC } from '../assets/sanitarios'
 import { marcaDeAgua, ponerLogo, portada } from './portada'
@@ -382,7 +382,7 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
       const anchoPil = (j: number) => tramo.pilastras?.[j] ?? area.config.anchoPilastraCm
       // la puerta cuelga de la CARA de la pilastra: con la lateral que cierra la
       // tira hay que tomarla entera, o el pivote cae dentro de la pieza
-      const { izq: caraIzq, der: caraDer } = ladosDeCabina(tramo.cabinas.map((x) => x.tipo === 'orinal'), anchoPil, i)
+      const { izq: caraIzq, der: caraDer } = ladosDeCabina(tramo.cabinas.map((x) => x.tipo === 'orinal'), anchoPil, i, arrancaElCuartoPmr(tramo, area.config))
 
       // puerta: hoja a 45° y arco de barrido. La del cuarto accesible no va acá:
       // va en su divisor, sobre la profundidad, porque al cuarto se entra por el costado.
@@ -526,7 +526,7 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
         if (cuarto?.indice === i) return
         const u0 = acum[i]
         const u1 = u0 + cab.anchoCm
-        const { izq, der } = ladosDeCabina(tramo.cabinas.map((x) => x.tipo === 'orinal'), anchoPilDe, i)
+        const { izq, der } = ladosDeCabina(tramo.cabinas.map((x) => x.tipo === 'orinal'), anchoPilDe, i, arrancaElCuartoPmr(tramo, area.config))
         // El orinal no lleva puerta, pero sí tiene su medida, que NO es la de su
         // cabina: la cabina se lleva además media pilastra de cada lado.
         if (cab.tipo === 'orinal') {
@@ -640,7 +640,7 @@ function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) 
   tramo.cabinas.forEach((cab: Cabina, i: number) => {
     const u0 = acum[i]
     const u1 = u0 + cab.anchoCm
-    const { izq, der } = ladosDeCabina(tramo.cabinas.map((x: Cabina) => x.tipo === 'orinal'), anchoPil, i)
+    const { izq, der } = ladosDeCabina(tramo.cabinas.map((x: Cabina) => x.tipo === 'orinal'), anchoPil, i, arrancaElCuartoPmr(tramo, area.config))
     if (cab.tipo === 'orinal') return
     if (cab.puerta.tipo === 'ninguna') return
     doc.setFillColor(248, 249, 251)
@@ -688,7 +688,7 @@ function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) 
   tramo.cabinas.forEach((cab: Cabina, i: number) => {
     const u0 = acum[i]
     const u1 = u0 + cab.anchoCm
-    const { izq, der } = ladosDeCabina(tramo.cabinas.map((x: Cabina) => x.tipo === 'orinal'), anchoPil, i)
+    const { izq, der } = ladosDeCabina(tramo.cabinas.map((x: Cabina) => x.tipo === 'orinal'), anchoPil, i, arrancaElCuartoPmr(tramo, area.config))
     const medida = cab.tipo === 'orinal' ? anchoDeOrinal(tramo, i, area.config.anchoPilastraCm) : cab.puerta.anchoCm
     if (cab.tipo !== 'orinal' && cab.puerta.tipo === 'ninguna') return
     cotaAncho(doc, aX(u0 + izq), aX(u1 - der), yPiezas, `${medida}`)
