@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { aprobarSolicitud, listarSolicitudes, rechazarSolicitud, type FichaNueva, type Solicitud } from '../solicitudes'
 import type { Rol, Usuario } from '../auth'
 import { PAISES_DISTRIBUIDOR, REGIONES, type Distribuidor, type Region } from '../distribuidores'
+import CampoNumero from './CampoNumero'
 
 /**
  * Las cuentas que alguien pidió desde la pantalla de entrada.
@@ -209,10 +210,10 @@ export default function Solicitudes({ usuario, distribuidores, onCerrar, onResue
                       </div>
                       <div className="campo">
                         <label>Descuento (%)</label>
-                        <input
-                          type="number" min={0} max={100} step="0.01"
+                        <CampoNumero
                           value={o.ficha.descuento ?? 0}
-                          onChange={(e) => cambiarFicha(s, { descuento: e.target.value === '' ? 0 : Number(e.target.value) })}
+                          onChange={(n) => cambiarFicha(s, { descuento: n })}
+                          min={0} max={100} step={0.01}
                         />
                       </div>
                       <div className="campo">

@@ -42,18 +42,31 @@ export default function CampoNumero({
   const dentroDelRango = (n: number) =>
     (min === undefined || n >= min) && (max === undefined || n <= max)
 
+  /**
+   * Con decimales el campo NO puede ser `type="number"`.
+   *
+   * El navegador rechaza los valores a medio escribir: al teclear el punto de
+   * "12.5", `value` llega vacío y el campo se borra solo. Con texto la coma o
+   * el punto se pueden escribir tranquilos, y el filtro de abajo deja pasar
+   * solo lo que puede ser un número. Los campos de centímetros son enteros, así
+   * que ahí se queda el número de siempre, con sus flechitas.
+   */
+  const conDecimales = step < 1
+
   return (
     <input
       id={id}
       className={className}
-      type="number"
+      type={conDecimales ? 'text' : 'number'}
+      inputMode="decimal"
       min={min}
       max={max}
       step={step}
       value={texto}
       onFocus={() => { escribiendo.current = true }}
       onChange={(e) => {
-        const v = e.target.value
+        // en modo texto se filtra a mano: dígitos, un separador y el signo
+        const v = conDecimales ? e.target.value.replace(/[^\d.,-]/g, '').replace(',', '.') : e.target.value
         setTexto(v)
         if (v.trim() === '') return
         const n = Number(v)

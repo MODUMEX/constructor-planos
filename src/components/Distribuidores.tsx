@@ -5,6 +5,7 @@ import {
 } from '../distribuidores'
 import type { Usuario } from '../auth'
 import Ojo from './Ojo'
+import CampoNumero from './CampoNumero'
 
 /**
  * Alta y edición de distribuidores. Es lo que el Constructor viejo tenía en su
@@ -182,10 +183,10 @@ export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Pr
                 </div>
                 <div className="campo">
                   <label>Descuento (%)</label>
-                  <input
-                    type="number" min={0} max={100} step="0.01"
+                  <CampoNumero
                     value={edita.descuento ?? 0}
-                    onChange={(e) => campo('descuento', e.target.value === '' ? 0 : Number(e.target.value))}
+                    onChange={(n) => campo('descuento', n)}
+                    min={0} max={100} step={0.01}
                   />
                   <span className="ayuda">Cae automático en su cotización</span>
                 </div>
