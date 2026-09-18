@@ -787,10 +787,13 @@ export default function EditorPlano({
                       const medio = pt(m, u, (pieza.desdeCm + pieza.hastaCm) / 2)
 
                       if (pieza.tipo === 'puerta') {
-                        // la puerta del cuarto abre hacia el pasillo, no hacia adentro
-                        const pivote = pt(m, u, pieza.desdeCm)
-                        const cerrada = pt(m, u, pieza.hastaCm)
-                        const extremo = pt(m, u + largoPieza * ABIERTA_45, pieza.desdeCm + largoPieza * ABIERTA_45)
+                        // La puerta del cuarto abre hacia el pasillo, y cuelga de la
+                        // PILASTRA del divisor, que va después de ella. Una puerta no se
+                        // cuelga nunca de un panel: por eso el pivote es el extremo de
+                        // la pilastra, no el del panel.
+                        const pivote = pt(m, u, pieza.hastaCm)
+                        const cerrada = pt(m, u, pieza.desdeCm)
+                        const extremo = pt(m, u + largoPieza * ABIERTA_45, pieza.hastaCm - largoPieza * ABIERTA_45)
                         return (
                           <g key={pieza.tipo}>
                             <path

@@ -425,10 +425,12 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
       for (const pieza of cuarto.divisor) {
         const largoPieza = pieza.hastaCm - pieza.desdeCm
         if (pieza.tipo === 'puerta') {
-          // la puerta del cuarto abre hacia el pasillo, no hacia adentro
-          const [pxx, pyy] = aHoja(e, pt(m, u, pieza.desdeCm))
-          const [cxx, cyy] = aHoja(e, pt(m, u, pieza.hastaCm))
-          const [exx, eyy] = aHoja(e, pt(m, u + largoPieza * ABIERTA_45, pieza.desdeCm + largoPieza * ABIERTA_45))
+          // La puerta del cuarto abre hacia el pasillo, y cuelga de la PILASTRA
+          // del divisor, que va después de ella. Una puerta no se cuelga nunca
+          // de un panel: por eso el pivote es el extremo de la pilastra.
+          const [pxx, pyy] = aHoja(e, pt(m, u, pieza.hastaCm))
+          const [cxx, cyy] = aHoja(e, pt(m, u, pieza.desdeCm))
+          const [exx, eyy] = aHoja(e, pt(m, u + largoPieza * ABIERTA_45, pieza.hastaCm - largoPieza * ABIERTA_45))
           doc.setDrawColor(ARCO[0], ARCO[1], ARCO[2])
           doc.setLineWidth(0.2)
           doc.setLineDashPattern([1.2, 1], 0)

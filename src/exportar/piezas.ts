@@ -131,11 +131,15 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
           area,
         })
       } else {
+        // El panel del divisor del cuarto PMR tampoco divide dos cabinas: es la
+        // pared del cuarto, así que va LATERAL, igual que la pilastra que lo
+        // acompaña.
+        const esDelCuarto = config.tipologia === 'PMR' && cab.tipo === 'accesible'
         piezas.push({
           familia: 'PN',
           anchoCm: config.profundidadCm,
           altoCm: altoPanel,
-          subTipo: esUltima ? 'PNLAT' : 'PNCEN',
+          subTipo: esUltima || esDelCuarto ? 'PNLAT' : 'PNCEN',
           area,
         })
       }

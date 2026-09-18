@@ -223,7 +223,10 @@ export function cuartoPmr(tramo: Tramo, config: Config): CuartoPmr | null {
   // demás cabinas. Lo que sobra del fondo lo cubren la puerta y una pilastra
   // contra el muro.
   const panel = config.profundidadCm
-  const puerta = Math.max(0, config.puertaAccesibleCm ?? cab.puerta.anchoCm ?? 90)
+  // La puerta la manda la CABINA, no la configuración: así el menú del plano
+  // sirve de verdad. Antes ganaba config.puertaAccesibleCm, que siempre tiene
+  // valor, y cambiar la puerta sobre el dibujo no movía nada.
+  const puerta = Math.max(0, cab.puerta.anchoCm || config.puertaAccesibleCm || 90)
   const sobra = Math.round((prof - panel - puerta) * 10) / 10
   // la pilastra sale de una medida de catálogo, no de lo que sobre pelado
   const pilastra = sobra > 0 ? medidaCercana(ANCHOS_PILASTRA, sobra) : 0
