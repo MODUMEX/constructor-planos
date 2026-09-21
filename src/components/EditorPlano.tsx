@@ -635,6 +635,22 @@ export default function EditorPlano({
                               <title>Mingitorio de cierre — arrastra para cambiar el ancho del orinal</title>
                             </rect>
                           )}
+                          {/* La mampara de cierre también lleva su fondo. Era la única
+                              que se quedaba sin cota: las internas la tienen desde
+                              siempre y esta se dibujaba muda, aunque puede medir
+                              distinto que las demás. */}
+                          {verCotas && cierraMingitorio && (() => {
+                            const c = pt(m, largo, profCierre * 0.5)
+                            return (
+                              <text
+                                x={c.x} y={c.y} textAnchor="middle" fontSize={14} fill="#7f8fa3"
+                                pointerEvents="none"
+                                transform={`rotate(${horizontal ? -90 : 0} ${c.x} ${c.y})`}
+                              >
+                                {formatear(profCierre, unidad)}
+                              </text>
+                            )
+                          })()}
                         </g>
                       )
                     })()}

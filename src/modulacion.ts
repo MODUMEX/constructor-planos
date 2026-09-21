@@ -470,6 +470,29 @@ export function cierraConMingitorio(tramo: Tramo): boolean {
 }
 
 /**
+ * El claro que ocupa un campo de solo orinales. Acá el claro NO se pide: lo
+ * define la cantidad de orinales y su ancho, porque la tira no lleva pilastras
+ * que puedan absorber una diferencia. Son los espacios, las mamparas que los
+ * separan, la de cierre si ese lado no topa contra pared, y el herraje de los
+ * muros que sí toca.
+ */
+export function claroDeOrinales(
+  cantidad: number,
+  anchoOrinalCm: number,
+  muroInicio: boolean,
+  muroFin: boolean,
+): number {
+  const muros = (muroInicio ? 1 : 0) + (muroFin ? 1 : 0)
+  return (
+    cantidad * anchoOrinalCm +
+    Math.max(0, cantidad - 1) * GRUESO_MG_CM +
+    (muroFin ? 0 : GRUESO_MG_CM) +
+    (muroInicio ? 0 : GRUESO_MG_CM) +
+    muros
+  )
+}
+
+/**
  * La mampara que va a la DERECHA de la cabina `i`, o null si ahí no va ninguna.
  *
  * Va contando cuántas la preceden en la tira para poder pedir la medida que el
@@ -552,12 +575,7 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
     const anchoOrinal = config.anchoOrinalCm && config.anchoOrinalCm > 0 ? config.anchoOrinalCm : 60
     // Un área de solo orinales no lleva pilastras: son los espacios y los
     // mingitorios que los separan, más el de cierre si ese lado no tiene muro.
-    const claroOrinales =
-      cant * anchoOrinal +
-      Math.max(0, cant - 1) * GRUESO_MG_CM +
-      (t.muroFin ? 0 : GRUESO_MG_CM) +
-      (t.muroInicio ? 0 : GRUESO_MG_CM) +
-      murosT
+    const claroOrinales = claroDeOrinales(cant, anchoOrinal, t.muroInicio, t.muroFin)
     const claroTramo = soloOrinales ? claroOrinales : esPrincipal ? claroCm : LARGO_SECUNDARIO_CM
     const base = {
       id: nuevoId('tramo'),

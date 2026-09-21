@@ -26,7 +26,7 @@ import Solicitudes from './components/Solicitudes'
 import { contarSolicitudes } from './solicitudes'
 import { coloresMxPara, slugRenderMx } from './coloresMx'
 import { fotoDe, fotosHerraje, faltanFotosHerraje, terminacionesDe } from './renders'
-import { anchoAccesibleDe, anchoTotal, bom, crearTramos, modularConCatalogo, nuevoId, reajustarConPuertas, totalBOM } from './modulacion'
+import { anchoAccesibleDe, anchoTotal, bom, claroDeOrinales, crearTramos, modularConCatalogo, nuevoId, reajustarConPuertas, totalBOM } from './modulacion'
 import { anchoDeOrinal } from './geometria'
 import { cargarTarifas, type ResultadoTarifas } from './tarifas'
 import { buscarActualizacion, type FaseActualizacion } from './actualizar'
@@ -395,6 +395,12 @@ export default function App() {
     if (nOrinales <= 0) return 0
     const t = tipologia(config.tipologia)
     return t.tramos[t.principal].muroFin ? nOrinales - 1 : nOrinales
+  })()
+  /** el claro que ocupa un campo de solo orinales: la misma cuenta que la modulación */
+  const claroOrinalesCm = (() => {
+    const t = tipologia(config.tipologia)
+    const tr = t.tramos[t.principal]
+    return claroDeOrinales(nOrinales, config.anchoOrinalCm ?? 60, tr.muroInicio, tr.muroFin)
   })()
   /**
    * La profundidad del lugar: la pared contra la que corre el divisor del
@@ -1758,11 +1764,23 @@ export default function App() {
                     Dando el claro y la cantidad, el reparto lo hace la app. Después se ajusta arrastrando sobre el plano.
                   </p>
                   <div className="campos">
+                    {/* En un campo de solo orinales el claro NO se pide: lo define la
+                        cantidad y su ancho, porque la tira no lleva pilastras que
+                        puedan absorber una diferencia. Pedirlo era engañoso: lo que
+                        se escribía ahí se descartaba. */}
+                    {esSoloOrinales(config.tipologia) ? (
+                      <div className="campo">
+                        <label>Claro que ocupa</label>
+                        <div className="reparto">{claroOrinalesCm.toFixed(2)} cm</div>
+                        <span className="ayuda">Lo calcula la app: {nOrinales} × {config.anchoOrinalCm ?? 60} + mamparas + muros</span>
+                      </div>
+                    ) : (
                     <div className="campo">
                       <label>Claro disponible (cm)</label>
                       <CampoNumero value={claroCm} onChange={setClaroCm} min={30} max={3000} />
                       <span className="ayuda">Medida de pared a pared del tramo principal</span>
                     </div>
+                    )}
                     <div className="campo">
                       {/* en un área de solo orinales lo que se cuenta son mingitorios:
                           no hay cabinas, y llamarlas así fue lo que confundió */}
