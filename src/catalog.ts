@@ -448,13 +448,34 @@ export const TIPOLOGIAS: Tipologia[] = [
   },
   {
     id: 'ORINALES',
-    nombre: 'Solo orinales',
-    descripcion: 'Área de orinales con divisores, sin cabinas.',
+    nombre: 'Orinales, cierra con mampara',
+    descripcion: 'Tira de orinales contra una pared; el otro extremo lo cierra la mampara del último orinal.',
     tramos: [{ orientacion: 'horizontal', muroInicio: true, muroFin: false, nombre: 'Tira de orinales' }],
     esquinaCompartida: false,
     principal: 0,
   },
+  {
+    id: 'ORINALES_ENTRE_MUROS',
+    nombre: 'Orinales entre muros',
+    descripcion: 'Tira de orinales cerrada por pared en los dos extremos.',
+    tramos: [{ orientacion: 'horizontal', muroInicio: true, muroFin: true, nombre: 'Tira de orinales' }],
+    esquinaCompartida: false,
+    principal: 0,
+  },
 ]
+
+/**
+ * Las tipologías que son SOLO orinales: no llevan cabinas, la cantidad que da
+ * el vendedor son mingitorios y lo que los separa son mamparas MG, no paneles.
+ *
+ * Se diferencian en cómo cierra el extremo que no topa contra pared: en
+ * `ORINALES` lo cierra la mampara del último orinal y en `ORINALES_ENTRE_MUROS`
+ * no hace falta porque hay pared de los dos lados. Eso el modulador ya lo
+ * deduce de `muroInicio` y `muroFin`, así que no lleva ninguna regla aparte.
+ */
+export function esSoloOrinales(id: TipologiaId): boolean {
+  return id === 'ORINALES' || id === 'ORINALES_ENTRE_MUROS'
+}
 
 /**
  * La tipología que resulta de espejar: la recta con muro izquierdo pasa a ser

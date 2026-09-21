@@ -109,6 +109,7 @@ export type TipologiaId =
   | 'ISLA'
   | 'PMR'
   | 'ORINALES'
+  | 'ORINALES_ENTRE_MUROS'
 
 export type Terminacion = 'ZOCLO' | 'PATAS'
 

@@ -3,7 +3,7 @@ import {
   LARGO_SECUNDARIO_CM,
 } from './catalog'
 import type { Cabina, Config, Moneda, Pais, Tramo, TipologiaId, RenglonBOM } from './types'
-import { alturasDe, tipologia, tierDeColor } from './catalog'
+import { alturasDe, esSoloOrinales, tipologia, tierDeColor } from './catalog'
 import { ajustarPilastras, GRUESO_MG_PIEZA, modularTira } from './modulador'
 import { precioPieza, type TablaTarifas } from './tarifas'
 
@@ -506,7 +506,7 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
   // En el PMR el cuarto accesible ES la tipología: no es una pregunta aparte,
   // va siempre. En las demás lo decide el vendedor.
   const conAccesible = tipologiaId === 'PMR' || config.llevaAccesible === true
-  const soloOrinales = tipologiaId === 'ORINALES'
+  const soloOrinales = esSoloOrinales(tipologiaId)
   /**
    * Los orinales se suman APARTE de las cabinas y van a un costado, como en el
    * Constructor viejo: la cantidad que pidió el vendedor son baños cerrados, y

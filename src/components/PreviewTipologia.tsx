@@ -120,6 +120,22 @@ export default function PreviewTipologia({ id, size = 148 }: { id: TipologiaId; 
             ))}
           </>
         )
+      // igual que la anterior pero con pared al final: el último orinal no
+      // necesita mampara de cierre porque topa contra el muro
+      case 'ORINALES_ENTRE_MUROS':
+        return (
+          <>
+            <Muro x={6} y={12} w={108} h={5} />
+            <Muro x={6} y={17} w={5} h={22} />
+            <Muro x={109} y={17} w={5} h={22} />
+            {[0, 1, 2, 3].map((i) => (
+              <g key={i}>
+                <rect x={11 + i * 24.5} y={17} width={2.4} height={22} fill={PIEZA} />
+                <ellipse cx={11 + i * 24.5 + 12.2} cy={22} rx={5} ry={3.4} fill="none" stroke={MURO} strokeWidth={1.1} />
+              </g>
+            ))}
+          </>
+        )
     }
   }
 

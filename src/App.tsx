@@ -15,7 +15,7 @@ import type { Area, Cabina, Config, Moneda, Pais, Proyecto, TipoCabina, Tipologi
 import {
   ACABADOS, acabadoEsElColor, alturasDe, anchosPanel, claroAjustado, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, mgMedidas, MODELOS,
   PAISES, etiquetaTier, nombreHerraje, nombreModelo, tierDeColor, TIPOLOGIAS, tipologia, tipologiaEspejo,
-  ANCHOS_PILASTRA,
+  ANCHOS_PILASTRA, esSoloOrinales,
 } from './catalog'
 import { medidaCercana } from './modulador'
 import VistaRender from './components/VistaRender'
@@ -366,7 +366,7 @@ export default function App() {
    * tira crecería sola en cada pasada.
    */
   const banosDe = (t?: Tramo) =>
-    config.tipologia === 'ORINALES'
+    esSoloOrinales(config.tipologia)
       ? (t?.cabinas.length ?? 0)
       : (t?.cabinas.filter((c) => c.tipo !== 'orinal').length ?? 0)
   const cantidad = config.cabinasPedidas ?? (tramoPrincipal ? banosDe(tramoPrincipal) : 4)
@@ -378,6 +378,12 @@ export default function App() {
   const llevaAccesible = config.tipologia === 'PMR' || config.llevaAccesible === true
   /** el área es un CUARTO accesible, no una cabina accesible en la tira */
   const esPmrCuarto = config.tipologia === 'PMR'
+  /**
+   * Cuántos orinales tiene el área. En las tipologías con cabinas los orinales
+   * van aparte y los cuenta `config.orinales`; en las de solo orinales, la
+   * cantidad que da el vendedor SON los orinales, así que sale de `cantidad`.
+   */
+  const nOrinales = esSoloOrinales(config.tipologia) ? cantidad : config.orinales
   /**
    * La profundidad del lugar: la pared contra la que corre el divisor del
    * cuarto. Si no se puso, se arranca con la de la cabina para no dibujar algo
@@ -574,7 +580,7 @@ export default function App() {
     const t = area.tramos[tipologia(config.tipologia).principal]
     // en un área de solo orinales el claro lo calcula la app, así que ahí lo
     // que se compara es la cantidad
-    const soloOrinales = config.tipologia === 'ORINALES'
+    const soloOrinales = esSoloOrinales(config.tipologia)
     // se comparan los BAÑOS, no las cabinas: los orinales van aparte y si se
     // contaran acá el plano se daría por viejo siempre y se remodularía solo,
     // borrando lo que ella hubiera movido a mano
@@ -1746,13 +1752,25 @@ export default function App() {
                       <span className="ayuda">Medida de pared a pared del tramo principal</span>
                     </div>
                     <div className="campo">
-                      <label>Cantidad de cabinas</label>
+                      {/* en un área de solo orinales lo que se cuenta son mingitorios:
+                          no hay cabinas, y llamarlas así fue lo que confundió */}
+                      <label>{esSoloOrinales(config.tipologia) ? 'Cantidad de orinales' : 'Cantidad de cabinas'}</label>
                       <select value={cantidad} onChange={(e) => setCantidad(Number(e.target.value))}>
                         {CANTIDADES.map((n) => (
                           <option key={n} value={n}>{n}</option>
                         ))}
                       </select>
+                      {esSoloOrinales(config.tipologia) && (
+                        <span className="ayuda">
+                          {config.tipologia === 'ORINALES'
+                            ? `Lleva ${cantidad} mamparas: una entre cada par y otra que cierra la punta`
+                            : `Lleva ${Math.max(0, cantidad - 1)} mamparas, solo entre orinal y orinal`}
+                        </span>
+                      )}
                     </div>
+                    {/* la profundidad de cabina no aplica sin cabinas: el fondo de la
+                        tira lo da la mampara, que se elige más abajo */}
+                    {!esSoloOrinales(config.tipologia) && (
                     <div className="campo">
                       <label>Profundidad de cabina (cm)</label>
                       <select value={config.profundidadCm} onChange={(e) => setConfig({ profundidadCm: Number(e.target.value) })}>
@@ -1762,13 +1780,16 @@ export default function App() {
                       </select>
                       <span className="ayuda">Es el ancho del panel divisor: solo las medidas que se fabrican</span>
                     </div>
+                    )}
                     {/*
                       En un cuarto PMR la accesible no se pregunta: el cuarto ES la
                       accesible. Y no lleva "ancho de la accesible" sino el ancho del
                       cuarto más la profundidad del lugar, porque se modula a lo ancho
                       y a lo hondo.
+                      En un área de solo orinales tampoco: no hay cabinas que hacer
+                      accesibles.
                     */}
-                    {!esPmrCuarto && (
+                    {!esPmrCuarto && !esSoloOrinales(config.tipologia) && (
                       <>
                         <div className="campo">
                           <label>¿Lleva cabina accesible?</label>
@@ -1861,6 +1882,11 @@ export default function App() {
                         </div>
                       </>
                     )}
+                    {/* La pregunta es para las tipologías con cabinas, donde los
+                        orinales van APARTE, a un costado. En un área de solo
+                        orinales no tiene sentido —todo son orinales— y dejarla
+                        visible fue lo que escondió las medidas de la mampara. */}
+                    {!esSoloOrinales(config.tipologia) && (
                     <div className="campo">
                       <label>¿Lleva orinales?</label>
                       <select
@@ -1871,8 +1897,10 @@ export default function App() {
                         <option value="si">Sí</option>
                       </select>
                     </div>
-                    {config.orinales > 0 && (
+                    )}
+                    {(config.orinales > 0 || esSoloOrinales(config.tipologia)) && (
                       <>
+                        {!esSoloOrinales(config.tipologia) && (
                         <div className="campo">
                           <label>Cantidad de orinales</label>
                           <select value={config.orinales} onChange={(e) => setConfig({ orinales: Number(e.target.value) })}>
@@ -1882,6 +1910,7 @@ export default function App() {
                           </select>
                           <span className="ayuda">{config.orinales > 1 ? `Lleva ${config.orinales - 1} divisores` : 'Sin divisores'}</span>
                         </div>
+                        )}
                         <div className="campo">
                           <label>Ancho de cada orinal (cm)</label>
                           <CampoNumero
@@ -1900,7 +1929,7 @@ export default function App() {
                         <div className="campo" style={{ gridColumn: '1 / -1' }}>
                           <label>Ancho de cada uno por separado (cm)</label>
                           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                            {Array.from({ length: config.orinales }, (_, i) => (
+                            {Array.from({ length: nOrinales }, (_, i) => (
                               <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
                                 <span className="ayuda">Orinal {i + 1}</span>
                                 <input
@@ -1910,7 +1939,7 @@ export default function App() {
                                   value={config.anchosOrinalCm?.[i] ?? ''}
                                   onChange={(e) => {
                                     const lista = Array.from(
-                                      { length: config.orinales },
+                                      { length: nOrinales },
                                       (_, k) => config.anchosOrinalCm?.[k] ?? null,
                                     )
                                     lista[i] = e.target.value === '' ? null : Number(e.target.value)

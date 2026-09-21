@@ -1,5 +1,5 @@
 import type { Area, Cabina, Config, Tramo } from '../types'
-import { alturasDe, nombreModelo, tipologia } from '../catalog'
+import { alturasDe, esSoloOrinales, nombreModelo, tipologia } from '../catalog'
 import { cierraConMingitorio, fronteraDeOrinal } from '../modulacion'
 import { cuartoPmr } from '../geometria'
 
@@ -239,7 +239,7 @@ export function piezasDeArea(area: Area): Pieza[] {
 
   // orinales sueltos de un baño mixto: N orinales llevan N−1 divisores.
   // En un área de solo orinales los divisores ya salieron de las propias cabinas.
-  const soloOrinales = area.config.tipologia === 'ORINALES'
+  const soloOrinales = esSoloOrinales(area.config.tipologia)
   // Desde que los orinales entran en la tira, sus mamparas ya salieron con ellos.
   // Esta suma queda SOLO para los proyectos guardados antes de eso, que traen la
   // cantidad en la configuración pero no los orinales dibujados.
