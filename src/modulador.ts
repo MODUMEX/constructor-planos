@@ -21,8 +21,18 @@ import {
   claroAjustado as calcularClaroAjustado,
 } from './catalog'
 
-/** las internas son las gruesas; las de extremo, las delgadas */
-export const PILASTRAS_INTERNAS = ANCHOS_PILASTRA.filter((a) => a >= 24)
+/**
+ * Cualquier medida del catálogo puede ir entre dos puertas; las de extremo son
+ * las delgadas.
+ *
+ * Antes las internas arrancaban en 24 y eso dejaba claros sin solución: con un
+ * claro de 323 entre muros y puerta de 60 el objetivo son 327, y tres internas
+ * de 24 más dos extremos de 10 dan 332 como MÍNIMO. El reparto no encontraba
+ * nada y la tira salía pasada 5 cm. El despiece real de ese baño cierra con una
+ * interna de 19, y el de CERVECERÍA Mujeres lleva una de 17: planta ya usa las
+ * chicas adentro.
+ */
+export const PILASTRAS_INTERNAS = ANCHOS_PILASTRA
 export const PILASTRAS_EXTREMO = ANCHOS_PILASTRA.filter((a) => a <= 24)
 
 /**
@@ -306,6 +316,12 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
   if (o.sinPilastraInicio) clavadas[0] = 0
   // Con una pilastra clavada a mano el reparto manda: es la única forma de que
   // las otras se acomoden en vez de copiarle la medida.
+  //
+  // Se probó que el reparto mandara SIEMPRE, para imitar cómo arma planta —las
+  // chicas contra el muro y las del medio acomodándose—, y rompió los dos
+  // despieces reales: el reparto lleva los extremos a la medida mínima (10) y
+  // planta no hace eso (en CERVECERÍA Hombres usó 24 y 12). La tendencia existe
+  // pero es más suave que "las mínimas afuera", así que no se codifica.
   const uniformeCalza = !unaClavada && cabe(objetivo - mejor.total, o.extremoAbierto, o.murosPilastra)
   const repartidas = uniformeCalza
     ? null

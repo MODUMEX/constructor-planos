@@ -15,6 +15,13 @@ interface Caso {
   murosPilastra: number
   /** lo que dice el despiece del plano ya fabricado */
   esperado: { puerta: number; pilastras: number[] }
+  /**
+   * Solo se exige que la tira CIERRE en el mismo total, no que salgan las
+   * mismas piezas. Es para los claros donde el catálogo da varias soluciones
+   * exactas y planta eligió una por costumbre y no por regla: pedir las piezas
+   * exactas sería codificar una preferencia que no existe.
+   */
+  soloTotal?: boolean
 }
 
 const CASOS: Caso[] = [
@@ -29,6 +36,15 @@ const CASOS: Caso[] = [
     puertas: 3,
     murosPilastra: 2,
     esperado: { puerta: 60, pilastras: [30, 30, 17, 15] },
+  },
+  {
+    // Claro de 323 entre muros con puerta de 60. Salía pasado 9 cm porque las
+    // internas arrancaban en 24 y el mínimo con esa restricción era 332.
+    nombre: 'Claro 323 · 4 cabinas (2 muros)',
+    puertas: 4,
+    murosPilastra: 2,
+    esperado: { puerta: 60, pilastras: [10, 24, 19, 24, 10] },
+    soloTotal: true,
   },
 ]
 
@@ -53,11 +69,11 @@ for (const c of CASOS) {
   console.log(`  ajuste:          ${r.mensaje}`)
 
   const puertaOk = r.anchoPuerta === c.esperado.puerta
-  const pilOk = ordenado(r.pilastras) === ordenado(c.esperado.pilastras)
+  const pilOk = c.soloTotal || ordenado(r.pilastras) === ordenado(c.esperado.pilastras)
   const totalOk = r.total === totalReal
   if (puertaOk && pilOk && totalOk) {
     bien++
-    console.log('  → REPRODUCE el despiece')
+    console.log(c.soloTotal ? '  → CIERRA en el total del despiece' : '  → REPRODUCE el despiece')
   } else {
     const fallas = [
       !puertaOk ? 'puerta' : '',

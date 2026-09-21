@@ -872,6 +872,37 @@ export default function EditorPlano({
                   </g>
                 )
               })()}
+
+              {/* La tira no cabe en el claro: se marca en rojo sobre el dibujo.
+                  Solo con ajuste 'falta', que es el único caso en que las piezas
+                  SE PASAN. Quedarse corto no se marca: sale 'canaleta' cuando lo
+                  rellena una canaleta, y un extremo abierto ya trae sus 5 cm de
+                  juego metidos en `cabe()`, así que ahí tampoco se pinta nada.
+                  No se rotula el ancho de la franja porque el dibujo usa anchos
+                  a ejes y la cifra real de cuánto se pasa está en el mensaje. */}
+              {tramo.ajuste === 'falta' && tramo.cabinas.length > 0 && (() => {
+                const a = pt(m, 0, -ESPESOR_MURO)
+                const b = pt(m, largo, prof)
+                const aviso = pt(m, largo / 2, prof + 34)
+                const rot = horizontal ? 0 : m.ay > 0 ? 90 : -90
+                return (
+                  <g pointerEvents="none">
+                    <rect
+                      x={Math.min(a.x, b.x)} y={Math.min(a.y, b.y)}
+                      width={Math.abs(b.x - a.x)} height={Math.abs(b.y - a.y)}
+                      fill="#cc2f2f" fillOpacity={0.07}
+                      stroke="#cc2f2f" strokeWidth={2} strokeDasharray="8 5"
+                    />
+                    <text
+                      x={aviso.x} y={aviso.y} textAnchor="middle" fontSize={15}
+                      fill="#cc2f2f" fontWeight={600}
+                      transform={rot ? `rotate(${rot} ${aviso.x} ${aviso.y})` : undefined}
+                    >
+                      {tramo.mensaje || 'Las piezas no caben en el claro'}
+                    </text>
+                  </g>
+                )
+              })()}
             </g>
           )
         })}
