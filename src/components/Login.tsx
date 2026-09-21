@@ -56,7 +56,7 @@ export default function Login({ onEntrar }: { onEntrar: (u: Usuario) => void }) 
           <p className="lema">
             {pidiendo
               ? 'Pedí una cuenta y un administrador te habilita el acceso.'
-              : 'Diseño, cotización y pedido de mamparas sanitarias.'}
+              : 'Diseño de mamparas sanitarias.'}
           </p>
         </div>
 
