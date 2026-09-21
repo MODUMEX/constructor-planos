@@ -1,5 +1,5 @@
 import type { Area, Cabina, Config, Tramo } from '../types'
-import { alturasDe, esSoloOrinales, nombreModelo, tipologia } from '../catalog'
+import { alturasDe, esSoloOrinales, mamparaDe, nombreModelo, tipologia } from '../catalog'
 import { cierraConMingitorio, fronteraDeOrinal } from '../modulacion'
 import { cuartoPmr } from '../geometria'
 
@@ -96,6 +96,13 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
   const alto = alturas.puerta
   const altoPanel = alturas.panel
   const altoPil = altoPilastra(config)
+  /**
+   * Qué número de mampara va saliendo. Se cuenta aparte del índice de cabina
+   * porque en un baño mixto los orinales arrancan después de las cabinas, y la
+   * lista de medidas que llena el vendedor va numerada desde la primera
+   * mampara, no desde la primera cabina.
+   */
+  let nMg = 0
 
   tramo.cabinas.forEach((cab, i) => {
     const contraMuro = (i === 0 && tramo.muroInicio) || (i === n - 1 && tramo.muroFin)
@@ -123,11 +130,12 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
         : !esUltima || !tramo.muroFin
     if (llevaDivisor) {
       if (cab.tipo === 'orinal') {
+        const mg = mamparaDe(config, nMg++)
         piezas.push({
           familia: 'MG',
-          anchoCm: config.mgAnchoCm ?? 60,
-          altoCm: config.mgAlturaCm,
-          subTipo: config.mgAlturaCm >= 150 ? 'MG150' : 'MG120',
+          anchoCm: mg.anchoCm,
+          altoCm: mg.altoCm,
+          subTipo: mg.altoCm >= 150 ? 'MG150' : 'MG120',
           area,
         })
       } else {
@@ -249,11 +257,12 @@ export function piezasDeArea(area: Area): Pieza[] {
   )
   const divisores = soloOrinales || enLaTira > 0 ? 0 : Math.max(0, area.config.orinales - 1)
   for (let i = 0; i < divisores; i++) {
+    const mg = mamparaDe(area.config, i)
     piezas.push({
       familia: 'MG',
-      anchoCm: area.config.mgAnchoCm ?? 60,
-      altoCm: area.config.mgAlturaCm,
-      subTipo: area.config.mgAlturaCm >= 150 ? 'MG150' : 'MG120',
+      anchoCm: mg.anchoCm,
+      altoCm: mg.altoCm,
+      subTipo: mg.altoCm >= 150 ? 'MG150' : 'MG120',
       area: area.nombre,
     })
   }

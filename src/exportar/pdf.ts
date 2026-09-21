@@ -8,8 +8,8 @@ import {
   profundidadDelLugar, pt, SOBRA_MURO_CM,
   type Marco,
 } from '../geometria'
-import { alturasDe, nombreHerraje, tipologia } from '../catalog'
-import { anchoTotal, arrancaElCuartoPmr, ladosDeCabina } from '../modulacion'
+import { alturasDe, mamparaDe, nombreHerraje, tipologia } from '../catalog'
+import { anchoTotal, arrancaElCuartoPmr, ladosDeCabina, mamparaEn } from '../modulacion'
 import { agrupar, modeloParaCsv, nombreLinea, nombreSistema, piezasDeArea } from './piezas'
 import { ALTO_ORINAL_CM, ALTO_REGADERA_CM, ALTO_WC_CM, ORINAL, REGADERA, WC } from '../assets/sanitarios'
 import { marcaDeAgua, ponerLogo, portada } from './portada'
@@ -327,7 +327,7 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
       const dibujarPanel = (!esUltima || !tramo.muroFin) && cuarto?.indice !== i
       if (dibujarPanel) {
         // entre dos orinales el divisor es una mampara, con su propio fondo
-        const profDiv = profundidadDeDivisor(tramo, i, prof, area.config.mgAnchoCm)
+        const profDiv = profundidadDeDivisor(tramo, i, prof, mamparaEn(tramo, area.config, i)?.anchoCm)
         doc.setFillColor(TINTA, TINTA, TINTA)
         const [ax, ay] = aHoja(e, pt(m, u1 - grueso / 2, 0))
         const [bx, by] = aHoja(e, pt(m, u1 + grueso / 2, profDiv))
@@ -549,7 +549,7 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
         // orinales lleva su fondo —el que eligió el cliente, 45 o 60— con cota de
         // verdad, igual que las pilastras: antes salía como un número suelto.
         if (i < nCab - 1 && cuarto?.indice !== i) {
-          const profDiv = profundidadDeDivisor(tramo, i, prof, area.config.mgAnchoCm)
+          const profDiv = profundidadDeDivisor(tramo, i, prof, mamparaEn(tramo, area.config, i)?.anchoCm)
           const esMg = esMingitorio(tramo, i + 1)
           if (esMg) {
             cotaEnV(doc, e, m, 0, profDiv, u1 + 9, u1, String(profDiv), {
@@ -568,7 +568,8 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
       // frontera es la punta de la tira. Sin esto era el único que se quedaba
       // sin su cota de fondo.
       if (esMingitorio(tramo, nCab) && !tramo.muroFin) {
-        const fondoMg = area.config.mgAnchoCm ?? 60
+        // el de cierre es la mampara que va a la derecha de la última cabina
+        const fondoMg = mamparaEn(tramo, area.config, nCab - 1)?.anchoCm ?? mamparaDe(area.config, 0).anchoCm
         cotaEnV(doc, e, m, 0, fondoMg, largo + 9, largo, String(fondoMg), {
           size: 5.5,
           rot,
@@ -660,13 +661,17 @@ function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) 
    * así que el de 150 termina a 180 y el de 120 termina a 150. Es la regla de
    * obra, la misma para cualquier modelo de cabina.
    */
-  const mgAlto = area.config.mgAlturaCm
   const mgPiso = 30
   cortes.forEach((u: number, k: number) => {
     if (!esMingitorio(tramo, k)) return
     // contra la pared no hay pieza; el de cierre sin muro sí
     if (k === cortes.length - 1 && tramo.muroFin) return
     if (k === 0 && tramo.muroInicio) return
+    // Cada mampara cuelga a SU altura: ya no tienen por qué ser todas iguales.
+    // Las fronteras van corridas una posición respecto de las cabinas —la k
+    // separa la k−1 de la k—, así que la mampara de esta frontera es la que va
+    // a la derecha de la cabina anterior.
+    const mgAlto = (mamparaEn(tramo, area.config, k - 1) ?? mamparaDe(area.config, 0)).altoCm
     const grueso = Math.max(area.config.espesorMm / 10, 0.3)
     doc.setFillColor(150, 150, 150)
     doc.rect(aX(u - grueso / 2), aY(mgPiso + mgAlto), Math.max(grueso * e.k, 0.6), mgAlto * e.k, 'F')
@@ -717,6 +722,7 @@ function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) 
     if (!esMingitorio(tramo, k)) return
     if (k === cortes.length - 1 && tramo.muroFin) return
     if (k === 0 && tramo.muroInicio) return
+    const mgAlto = (mamparaEn(tramo, area.config, k - 1) ?? mamparaDe(area.config, 0)).altoCm
     cotaAlto(doc, e, aX(u) - 4, pisoY, mgPiso + mgAlto, mgPiso, `${mgAlto}`)
     cotaAlto(doc, e, aX(u) - 4, pisoY, mgPiso, 0, `${mgPiso}`)
   })

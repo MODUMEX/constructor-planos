@@ -164,6 +164,16 @@ export interface Config {
   mgAlturaCm: number
   /** ancho de la mampara de mingitorio; la ficha da 45 y 60, y los viejos van con 60 */
   mgAnchoCm?: number
+  /**
+   * La medida de CADA mampara, en orden, como "45x120". Lo que se cotiza y se
+   * fabrica de un campo de orinales son las mamparas, no el hueco entre ellas:
+   * por eso se eligen una por una y el ancho del orinal se deja en paz.
+   *
+   * La que quede vacía toma `mgAnchoCm` × `mgAlturaCm`, que siguen siendo la
+   * medida general del área. Cuántas hay depende del layout: entre muros son
+   * una menos que los orinales, y cerrando con mampara son una por orinal.
+   */
+  mamparasMG?: (string | null)[]
 
   // ---------- cuarto PMR ----------
   // El cuarto accesible no es una cabina más ancha: es un CUARTO, y se modula

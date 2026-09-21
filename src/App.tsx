@@ -385,6 +385,18 @@ export default function App() {
    */
   const nOrinales = esSoloOrinales(config.tipologia) ? cantidad : config.orinales
   /**
+   * Cuántas mamparas lleva el área. Es lo que de verdad se fabrica y se cotiza
+   * de un campo de orinales: el hueco entre ellas no es una pieza.
+   *
+   * Sale de la misma regla que usa la modulación: una entre cada par, y una más
+   * si la tira termina en orinal contra un extremo sin muro.
+   */
+  const nMamparas = (() => {
+    if (nOrinales <= 0) return 0
+    const t = tipologia(config.tipologia)
+    return t.tramos[t.principal].muroFin ? nOrinales - 1 : nOrinales
+  })()
+  /**
    * La profundidad del lugar: la pared contra la que corre el divisor del
    * cuarto. Si no se puso, se arranca con la de la cabina para no dibujar algo
    * imposible, y el vendedor la corrige.
@@ -1921,42 +1933,54 @@ export default function App() {
                           <span className="ayuda">Lo normal son 60; vale para todos</span>
                         </div>
                         {/*
-                          No tienen que medir todos lo mismo: acá se le da la medida a
-                          cada uno. El que quede en blanco toma el ancho general de
-                          arriba. En cuanto uno lleva medida pedida, los orinales dejan
-                          de ensancharse para cerrar el claro: eso lo hacen las pilastras.
+                          Lo que se elige una por una son las MAMPARAS, que es lo que
+                          se fabrica: el hueco que queda entre ellas no es una pieza.
+                          La que quede en "la general" toma la medida del selector de
+                          abajo. Antes acá iban los anchos de cada orinal, que no le
+                          interesan a nadie y además dejaban meter números negativos.
                         */}
+                        {nMamparas > 0 && (
                         <div className="campo" style={{ gridColumn: '1 / -1' }}>
-                          <label>Ancho de cada uno por separado (cm)</label>
-                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                            {Array.from({ length: nOrinales }, (_, i) => (
+                          <label>Mampara entre cada orinal</label>
+                          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                            {Array.from({ length: nMamparas }, (_, i) => (
                               <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-                                <span className="ayuda">Orinal {i + 1}</span>
-                                <input
-                                  type="number"
-                                  style={{ width: 78 }}
-                                  placeholder={String(config.anchoOrinalCm ?? 60)}
-                                  value={config.anchosOrinalCm?.[i] ?? ''}
+                                <span className="ayuda">
+                                  {i === nMamparas - 1 && config.tipologia === 'ORINALES'
+                                    ? 'Cierre'
+                                    : `Mampara ${i + 1}`}
+                                </span>
+                                <select
+                                  style={{ width: 118 }}
+                                  value={config.mamparasMG?.[i] ?? ''}
                                   onChange={(e) => {
                                     const lista = Array.from(
-                                      { length: nOrinales },
-                                      (_, k) => config.anchosOrinalCm?.[k] ?? null,
+                                      { length: nMamparas },
+                                      (_, k) => config.mamparasMG?.[k] ?? null,
                                     )
-                                    lista[i] = e.target.value === '' ? null : Number(e.target.value)
-                                    setConfig({ anchosOrinalCm: lista.some((x) => x != null) ? lista : undefined })
+                                    lista[i] = e.target.value === '' ? null : e.target.value
+                                    setConfig({ mamparasMG: lista.some((x) => x != null) ? lista : undefined })
                                   }}
-                                />
+                                >
+                                  <option value="">La general</option>
+                                  {mgDeLaLinea.map((m) => (
+                                    <option key={`${m.anchoCm}x${m.altoCm}`} value={`${m.anchoCm}x${m.altoCm}`}>
+                                      {m.anchoCm} × {m.altoCm}
+                                    </option>
+                                  ))}
+                                </select>
                               </label>
                             ))}
                           </div>
                           <span className="ayuda">
-                            {config.anchosOrinalCm?.some((x) => x != null)
-                              ? 'Los que pediste a medida no se tocan: el claro lo cierran las pilastras'
-                              : 'En blanco toman el ancho de arriba y se ensanchan para cerrar el claro'}
+                            {config.mamparasMG?.some((x) => x != null)
+                              ? 'Cada una va con la medida que le pediste; el resto usa la general'
+                              : 'Todas van con la medida general; cambiá solo las que lleven otra'}
                           </span>
                         </div>
+                        )}
                         <div className="campo">
-                          <label>Mampara del orinal (cm)</label>
+                          <label>Mampara general (para todas)</label>
                           <select
                             value={`${config.mgAnchoCm ?? 60}x${config.mgAlturaCm}`}
                             onChange={(e) => {

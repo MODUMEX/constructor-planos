@@ -365,6 +365,35 @@ export function mgMedidas(linea: Linea): MedidaMG[] {
   return linea === 'SUPERIOR' ? MG_SUPERIOR : MG_MEDIDAS
 }
 
+/** "45x120" -> { anchoCm: 45, altoCm: 120 }; null si no se entiende */
+export function leerMedidaMG(txt: string | null | undefined): MedidaMG | null {
+  if (!txt) return null
+  const [a, b] = String(txt).split('x').map(Number)
+  return Number.isFinite(a) && Number.isFinite(b) && a > 0 && b > 0 ? { anchoCm: a, altoCm: b } : null
+}
+
+export function escribirMedidaMG(m: MedidaMG): string {
+  return `${m.anchoCm}x${m.altoCm}`
+}
+
+/**
+ * La mampara que va en la posición `i` de la tira. Es el único lugar donde se
+ * resuelve: si esa posición no tiene medida propia, manda la general del área.
+ * Todo lo que dibuja, cotiza o despieza una mampara pasa por acá, para que el
+ * plano, el PDF y el CSV no puedan discrepar.
+ */
+export function mamparaDe(
+  config: { mamparasMG?: (string | null)[]; mgAnchoCm?: number; mgAlturaCm: number },
+  i: number,
+): MedidaMG {
+  return (
+    leerMedidaMG(config.mamparasMG?.[i]) ?? {
+      anchoCm: config.mgAnchoCm && config.mgAnchoCm > 0 ? config.mgAnchoCm : 60,
+      altoCm: config.mgAlturaCm,
+    }
+  )
+}
+
 export const ANCHOS_CANALETA = [1, 2, 3, 4, 5]
 export const CANALETA_MAX_CM = 5
 

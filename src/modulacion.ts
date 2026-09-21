@@ -3,7 +3,7 @@ import {
   LARGO_SECUNDARIO_CM,
 } from './catalog'
 import type { Cabina, Config, Moneda, Pais, Tramo, TipologiaId, RenglonBOM } from './types'
-import { alturasDe, esSoloOrinales, tipologia, tierDeColor } from './catalog'
+import { alturasDe, esSoloOrinales, mamparaDe, tipologia, tierDeColor, type MedidaMG } from './catalog'
 import { ajustarPilastras, GRUESO_MG_PIEZA, modularTira } from './modulador'
 import { precioPieza, type TablaTarifas } from './tarifas'
 
@@ -469,6 +469,29 @@ export function cierraConMingitorio(tramo: Tramo): boolean {
   return ultima === undefined || ultima <= GRUESO_MG_CM + 0.01
 }
 
+/**
+ * La mampara que va a la DERECHA de la cabina `i`, o null si ahí no va ninguna.
+ *
+ * Va contando cuántas la preceden en la tira para poder pedir la medida que el
+ * vendedor eligió para esa posición. La regla de cuándo lleva mampara es la
+ * misma del despiece y de la cotización: entre dos orinales, y una más si la
+ * tira termina en orinal contra un extremo sin muro. Se resuelve en un solo
+ * lugar para que el plano, el PDF y el CSV no puedan discrepar.
+ */
+export function mamparaEn(tramo: Tramo, config: Config, i: number): MedidaMG | null {
+  let n = 0
+  for (let k = 0; k < tramo.cabinas.length; k++) {
+    if (tramo.cabinas[k].tipo !== 'orinal') continue
+    const esUltima = k === tramo.cabinas.length - 1
+    const lleva =
+      tramo.cabinas[k + 1]?.tipo === 'orinal' || (esUltima && cierraConMingitorio(tramo))
+    if (!lleva) continue
+    if (k === i) return mamparaDe(config, n)
+    n++
+  }
+  return null
+}
+
 export function pilastrasDe(tramo: Tramo): number {
   const n = tramo.cabinas.length
   if (n === 0) return 0
@@ -611,6 +634,14 @@ export function bom(
   // ancho para que la cotización cobre los m² de verdad.
   const pilastrasPorAncho = new Map<number, number>()
   let paneles = 0
+  /**
+   * Las mamparas se cuentan DESDE LA TIRA, igual que las pilastras y las
+   * puertas, y agrupadas por medida porque ya no tienen por qué ser todas
+   * iguales. Antes salían de `config.orinales - 1`, un contador que en un área
+   * de solo orinales vale 0 —los orinales son las cabinas, no un extra al
+   * costado—, así que esas áreas se cotizaban VACÍAS: cero renglones.
+   */
+  const mamparasPorMedida = new Map<string, number>()
 
   for (const tramo of tramos) {
     const n = pilastrasDe(tramo)
@@ -619,11 +650,30 @@ export function bom(
       pilastrasPorAncho.set(ancho, (pilastrasPorAncho.get(ancho) ?? 0) + 1)
     }
     paneles += panelesDe(tramo)
-    for (const cab of tramo.cabinas) {
-      if (cab.puerta.tipo === 'puerta') {
+    let nMg = 0
+    tramo.cabinas.forEach((cab, i) => {
+      if (cab.puerta.tipo === 'puerta' && cab.tipo !== 'orinal') {
         puertas.set(cab.puerta.anchoCm, (puertas.get(cab.puerta.anchoCm) ?? 0) + 1)
       }
-    }
+      if (cab.tipo !== 'orinal') return
+      // misma regla que el despiece: mampara entre dos orinales, y una más si la
+      // tira termina en orinal contra un extremo sin muro
+      const esUltima = i === tramo.cabinas.length - 1
+      const lleva =
+        tramo.cabinas[i + 1]?.tipo === 'orinal' || (esUltima && cierraConMingitorio(tramo))
+      if (!lleva) return
+      const mg = mamparaDe(config, nMg++)
+      const clave = `${mg.anchoCm}x${mg.altoCm}`
+      mamparasPorMedida.set(clave, (mamparasPorMedida.get(clave) ?? 0) + 1)
+    })
+  }
+
+  // Los orinales de los proyectos viejos no entraban en la tira: venían como un
+  // contador aparte. Ahí se siguen contando así, pero solo si la tira no trae
+  // ninguno, para no cobrarlos dos veces.
+  if (mamparasPorMedida.size === 0 && config.orinales > 1) {
+    const mg = mamparaDe(config, 0)
+    mamparasPorMedida.set(`${mg.anchoCm}x${mg.altoCm}`, config.orinales - 1)
   }
 
   const codigoLinea = config.linea === 'SUPERIOR' ? 'SUP' : config.linea === 'TOUCHLESS' ? 'TL' : 'LDR'
@@ -675,13 +725,14 @@ export function bom(
   // Si hay que cobrar herraje EXTRA, va como renglón aparte con su código real
   // (KBDL, KCL, KTL…), no automático por cabina. Las piezas que de verdad lleva
   // el pedido las calcula el CIP, ya con el plano y la cotización hechos.
-  if (config.orinales > 1) {
+  for (const [clave, cantidad] of [...mamparasPorMedida.entries()].sort()) {
+    const [ancho, alto] = clave.split('x').map(Number)
     renglones.push({
-      sku: `${codigoLinea}-MG${config.mgAnchoCm ?? 60}${config.mgAlturaCm}`,
-      descripcion: `Mingitorio ${config.mgAnchoCm ?? 60} × ${config.mgAlturaCm} cm`,
+      sku: `${codigoLinea}-MG${ancho}${alto}`,
+      descripcion: `Mingitorio ${ancho} × ${alto} cm`,
       tipo: 'Mingitorio',
-      cantidad: config.orinales - 1,
-      precioUnit: precioPieza({ familia: 'MG', anchoCm: config.mgAnchoCm ?? 60, altoCm: config.mgAlturaCm }, opciones),
+      cantidad,
+      precioUnit: precioPieza({ familia: 'MG', anchoCm: ancho, altoCm: alto }, opciones),
       tarifaReal: true,
     })
   }

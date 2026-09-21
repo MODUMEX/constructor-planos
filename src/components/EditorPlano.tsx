@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import type { Cabina, Config, Pais, Tramo } from '../types'
 import { ANCHOS_PILASTRA, puertasPosibles, tipologia } from '../catalog'
-import { anchoTotal, arrancaElCuartoPmr, minimoDe, nuevaCabina, puertaSugerida, snap, cierraConMingitorio, ladosDeCabina } from '../modulacion'
+import { anchoTotal, arrancaElCuartoPmr, minimoDe, nuevaCabina, puertaSugerida, snap, cierraConMingitorio, ladosDeCabina, mamparaEn } from '../modulacion'
 import { medidaCercana, PILASTRAS_INTERNAS, PUERTA_ACCESIBLE_MIN } from '../modulador'
 import { Grupo, Item, Menu, Raya } from './Menu'
 import {
@@ -550,7 +550,7 @@ export default function EditorPlano({
                         no tapar el hueco de la puerta del cuarto. */}
                     {i < tramo.cabinas.length - 1 && (() => {
                       // entre dos orinales el divisor es una mampara, con su propio fondo
-                      const profDiv = profundidadDeDivisor(tramo, i, prof, config.mgAnchoCm)
+                      const profDiv = profundidadDeDivisor(tramo, i, prof, mamparaEn(tramo, config, i)?.anchoCm)
                       const a = pt(m, u1 - grueso / 2, 0)
                       const b = pt(m, u1 + grueso / 2, profDiv)
                       const activo = arrastrando === `${tramo.id}:${i}`
@@ -611,7 +611,7 @@ export default function EditorPlano({
                     })()}
                     {i === tramo.cabinas.length - 1 && !tramo.muroFin && (() => {
                       // si la tira termina en orinal, la pieza de cierre es un mingitorio
-                      const profCierre = profundidadDeDivisor(tramo, i, prof, config.mgAnchoCm)
+                      const profCierre = profundidadDeDivisor(tramo, i, prof, mamparaEn(tramo, config, i)?.anchoCm)
                       const a = pt(m, largo - grueso / 2, 0)
                       const b = pt(m, largo + grueso / 2, profCierre)
                       const cierraMingitorio = cierraConMingitorio(tramo)
