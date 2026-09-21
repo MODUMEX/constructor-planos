@@ -2156,9 +2156,12 @@ export default function App() {
             <button className="btn" onClick={() => setPaso(Math.max(1, paso - 1))} disabled={paso === 1}>← Atrás</button>
             <span className="cuenta">Paso {paso} de {ultimoPaso}</span>
             <div className="sep" />
-            {paso === 6 && (
-              <button className="btn" onClick={() => { remodular(); }}>Aplicar reparto</button>
-            )}
+            {/* Acá vivía "Aplicar reparto", que llamaba a remodular() sin preguntar
+                nada y por lo tanto BORRABA los ajustes hechos a mano sobre el plano,
+                aunque no hubiera cambiado ninguna medida. No hacía falta: la vista
+                previa del reparto ya se recalcula sola con cada cambio, y "Dibujar el
+                plano" vuelve a modular solo cuando el claro o la cantidad dejaron de
+                coincidir con lo dibujado. */}
             {paso < ultimoPaso ? (
               <button
                 className="btn primario"
