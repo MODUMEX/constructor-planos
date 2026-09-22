@@ -261,7 +261,8 @@ export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Pr
                     onChange={(e) => campo('iva', e.target.value === '' ? null : Number(e.target.value))}
                   />
                   <span className="ayuda">
-                    En blanco = el de su región (Costa Rica 13, LATAM 0). Un 0 escrito a mano SÍ es 0.
+                    En blanco = el de su región (Costa Rica 13, México 16, LATAM 0). Un 0 escrito a
+                    mano SÍ es 0.
                   </span>
                 </div>
                 <div className="campo">

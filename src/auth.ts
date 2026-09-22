@@ -24,6 +24,18 @@ const LLAVE_SUPABASE = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefi
 export const hayNube = Boolean(URL_SUPABASE && LLAVE_SUPABASE)
 
 export const IVA_CR = 13
+export const IVA_MX = 16
+
+/**
+ * El IVA que le toca a una región cuando el distribuidor no escribió el suyo.
+ * Costa Rica 13, México 16 y LATAM factura sin IVA. Un 0 escrito a mano SÍ es
+ * 0 y manda sobre esto.
+ */
+export function ivaDeRegion(region: string | null | undefined): number {
+  if (region === 'LATAM') return 0
+  if (region === 'México') return IVA_MX
+  return IVA_CR
+}
 
 /**
  * Cuentas locales de respaldo, para trabajar sin red. Solo se usan cuando no
@@ -115,14 +127,10 @@ async function entrarPorSupabase(email: string, clave: string): Promise<Usuario>
         distribuidorNombre = dist[0].nombre ?? undefined
         descuento = Number(dist[0].descuento ?? 0)
         // El IVA escrito a mano manda, incluso si es 0. En blanco va el de su
-        // región: LATAM factura sin IVA y antes se le cobraba el 13 % de
-        // Costa Rica por caer en el valor por omisión.
+        // región: LATAM factura sin IVA y México con 16, no con el 13 de
+        // Costa Rica que caía por omisión.
         ivaPorcentaje =
-          dist[0].iva != null
-            ? Number(dist[0].iva)
-            : dist[0].region === 'LATAM'
-              ? 0
-              : IVA_CR
+          dist[0].iva != null ? Number(dist[0].iva) : ivaDeRegion(dist[0].region)
       }
     } catch {
       /* si la tabla no responde, se cotiza sin descuento y con el IVA de Costa Rica */
