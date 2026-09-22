@@ -113,7 +113,9 @@ export function resumenDePiezas(renglones: RenglonBOM[]): { tipo: string; cantid
  * lo que se pone en Costa Rica cuando el sistema no da el ₡.
  */
 function plata(v: number, moneda: Moneda): string {
-  const simbolo = moneda === 'CRC' ? '¢' : '$'
+  // el peso y el dólar comparten el signo: el de México se escribe MX$ para
+  // que no se confunda una cotización con la otra
+  const simbolo = moneda === 'CRC' ? '¢' : moneda === 'MXN' ? 'MX$' : '$'
   return `${simbolo}${v.toLocaleString('es-CR', {
     minimumFractionDigits: moneda === 'CRC' ? 0 : 2,
     maximumFractionDigits: moneda === 'CRC' ? 0 : 2,
@@ -400,7 +402,7 @@ export function generarCotizacionPDF(proyecto: Proyecto, d: DatosCotizacion): js
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(7.5)
   const condiciones = [
-    `Precios en ${d.moneda === 'CRC' ? 'colones costarricenses' : 'dólares estadounidenses'}, IVA incluido en el total.`,
+    `Precios en ${d.moneda === 'CRC' ? 'colones costarricenses' : d.moneda === 'MXN' ? 'pesos mexicanos' : 'dólares estadounidenses'}, IVA incluido en el total.`,
     `Esta cotización vale ${d.validezDias ?? 30} días a partir de la fecha.`,
     'Los precios incluyen el herraje y el riel de amarre de las piezas cotizadas.',
     'No incluye instalación, obra civil, fletes ni permisos, salvo que se indique aparte.',

@@ -635,7 +635,14 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
 export function bom(
   tramos: Tramo[],
   config: Config,
-  precios: { moneda: Moneda; tipoCambio: number; tarifas?: TablaTarifas; pais?: Pais } = {
+  precios: {
+    moneda: Moneda
+    tipoCambio: number
+    tarifas?: TablaTarifas
+    pais?: Pais
+    /** cabinas de TODO el proyecto; México cambia de precio a partir de 10 */
+    modulos?: number
+  } = {
     moneda: 'USD',
     tipoCambio: 1,
   },
@@ -643,11 +650,13 @@ export function bom(
   const renglones: RenglonBOM[] = []
   const opciones = {
     modeloCodigo: config.modelo,
-    // el país importa: los colores de la planta de México son de línea
-    tier: tierDeColor(config.color, precios.pais),
+    // el país importa, y la línea también: en México un mismo color puede ser
+    // Grupo 1 en Superior y Grupo 2 en LEEDER
+    tier: tierDeColor(config.color, precios.pais, config.linea),
     moneda: precios.moneda,
     tipoCambio: precios.tipoCambio,
     tarifas: precios.tarifas,
+    modulos: precios.modulos,
   }
   const puertas = new Map<number, number>()
   // Las pilastras ya no son todas del mismo ancho: la modulación elige la

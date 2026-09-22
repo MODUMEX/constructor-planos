@@ -1,5 +1,5 @@
 import type { Acabado, HerrajeAcabado, Linea, Pais, TierColor, TipologiaId, Montaje } from './types'
-import { esColorMx } from './coloresMx'
+import { esColorMx, grupoMx } from './coloresMx'
 
 /** grueso real de la pilastra en laminado compacto, en cm (12.7 mm) */
 export const GRUESO_PILASTRA = 1.27
@@ -143,6 +143,30 @@ export const ACABADOS: Record<Linea, Acabado[]> = {
   TOUCHLESS: ['Laminado Compacto'],
 }
 
+/**
+ * Los modelos que tienen precio de ARTE en la lista de México. Colgante y toda
+ * la línea Superior 2.0 no lo traen, así que ahí no se ofrece: ofrecerlo sin
+ * tarifa haría que el precio cayera en otro tier sin que se note.
+ */
+const CON_ARTE = [
+  'ESTANDAR', 'ESTANDAR170', 'REFORZADO', 'REFORZADO170',
+  'IMPERIAL', 'KIDS', 'SCUDO', 'TL_S3',
+]
+
+/**
+ * Los acabados que se pueden pedir de verdad, que dependen del país.
+ *
+ * Fórmica y Arte son de la lista de México: en Costa Rica no existen y no se
+ * ofrecen. El Arte además no lo tienen todos los modelos.
+ */
+export function acabadosPara(linea: Linea, modelo: string, pais: Pais = 'CR'): Acabado[] {
+  const base = ACABADOS[linea]
+  if (pais !== 'MX') return base
+  const extra: Acabado[] = ['Fórmica']
+  if (CON_ARTE.includes((modelo || '').toUpperCase())) extra.push('Arte')
+  return [...base, ...extra]
+}
+
 export interface Color {
   nombre: string
   /** cómo se llamaba antes; se muestra al lado para que nadie se confunda */
@@ -201,11 +225,22 @@ export function etiquetaColor(c: Color): string {
  * color. No hay lista que elegir, y el color del área es el nombre del acabado.
  */
 export function acabadoEsElColor(acabado: Acabado): boolean {
-  return acabado === 'Esmaltada Antigrafiti' || acabado === 'Acero Inoxidable'
+  return acabado === 'Esmaltada Antigrafiti'
+    || acabado === 'Acero Inoxidable'
+    || acabado === 'Fórmica'
+    || acabado === 'Arte'
 }
 
 export function etiquetaTier(tier: TierColor): string {
-  return { linea: 'Línea', especial: 'Especial', aceroInox: 'Acero Inox', antigrafiti: 'Antigrafiti' }[tier]
+  return {
+    linea: 'Línea',
+    grupo2: 'Grupo 2',
+    especial: 'Especial',
+    formica: 'Fórmica',
+    arte: 'Arte',
+    aceroInox: 'Acero Inox',
+    antigrafiti: 'Antigrafiti',
+  }[tier]
 }
 
 /**
@@ -234,11 +269,24 @@ export function buscarColor(nombre: string): Color | undefined {
   )
 }
 
-export function tierDeColor(nombre: string, pais: Pais = 'CR'): TierColor {
+export function tierDeColor(nombre: string, pais: Pais = 'CR', linea: Linea = 'LEEDER'): TierColor {
+  // en Fórmica y Arte el acabado ES el color, así que el nombre del color es el
+  // del acabado y de ahí sale el tier
+  const limpio = (nombre || '').trim().toUpperCase()
+  if (limpio === 'FÓRMICA' || limpio === 'FORMICA') return 'formica'
+  if (limpio === 'ARTE') return 'arte'
+  // México parte el laminado compacto en dos grupos de precio, y cuál le toca a
+  // cada color depende también de la línea. Se mira ANTES que el catálogo de
+  // Costa Rica porque hay nombres que están en los dos y no valen lo mismo.
+  if (pais === 'MX') {
+    const grupo = grupoMx(nombre, linea)
+    if (grupo === 1) return 'linea'
+    if (grupo === 2) return 'grupo2'
+    // Wilsonart y Lamitech, o sea todo lo que no está en los dos grupos
+    if (esColorMx(nombre)) return 'especial'
+  }
   const delCatalogo = buscarColor(nombre)
   if (delCatalogo) return delCatalogo.tier
-  // los de la lista de la planta de México son todos de línea
-  if (pais === 'MX' && esColorMx(nombre)) return 'linea'
   // un color que no está en ninguna lista se cotiza como especial, igual que hoy
   return 'especial'
 }

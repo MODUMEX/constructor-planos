@@ -1,6 +1,7 @@
 import type { Moneda, TierColor } from './types'
 import { ANCHOS_PILASTRA, ANCHOS_PUERTA, ANCHOS_PUERTA_CR, anchosPanelFabrica, mgFabrica } from './catalog'
 import { TARIFAS_BASE } from './datos/tarifas-base'
+import { TARIFAS_MXN } from './datos/tarifas-mexico'
 import { LLAVE_SUPABASE, URL_SUPABASE } from './entorno'
 
 /**
@@ -34,6 +35,23 @@ export interface ModeloTarifas {
 }
 
 export type TablaTarifas = Record<string, ModeloTarifas>
+
+/**
+ * Las tarifas de respaldo completas: las de siempre más las de México.
+ *
+ * Viven en archivos separados porque se generan distinto —`tarifas-base.ts`
+ * sale del Constructor viejo con `npm run tarifas` y las de México del Excel de
+ * la planta— y juntarlas a mano se perdería en la próxima regeneración. Acá se
+ * pegan una sola vez y todo lo demás usa esta.
+ */
+export const TARIFAS_RESPALDO: TablaTarifas = (() => {
+  const t: TablaTarifas = JSON.parse(JSON.stringify(TARIFAS_BASE))
+  for (const [modelo, juegos] of Object.entries(TARIFAS_MXN)) {
+    if (!t[modelo]) t[modelo] = {}
+    for (const [juego, set] of Object.entries(juegos)) t[modelo][juego] = { ...set }
+  }
+  return t
+})()
 
 export function familiaTarifa(familia: 'PT' | 'PN' | 'PL' | 'MG' | 'AN'): FamiliaTarifa {
   switch (familia) {
@@ -101,9 +119,25 @@ function m2Cobrados(pieza: Pieza, modeloCodigo: string): number {
   return (anchoCobrado(pieza.familia, pieza.anchoCm, modeloCodigo) * pieza.altoCm) / 1e4
 }
 
-/** el tier del color, con el nombre que usa la tabla de tarifas */
-function juegoDeTier(tier: TierColor): string {
-  return tier === 'especial' ? 'especiales' : tier
+/**
+ * Desde cuántos módulos se cobra el precio bueno. En la lista de México los
+ * Especiales y la Fórmica valen distinto según si el pedido pasa de 10, y el
+ * módulo es la cabina: se cuentan las de TODO el proyecto, no las de un área.
+ */
+export const MODULOS_CORTE = 10
+
+/**
+ * El tier del color, con el nombre que usa la tabla de tarifas.
+ *
+ * `modulos` solo se mira en México y solo para Especiales y Fórmica, que son
+ * los dos tiers que tienen precio partido. El resto no depende de la cantidad,
+ * y Costa Rica no usa el corte para nada.
+ */
+function juegoDeTier(tier: TierColor, modulos?: number): string {
+  const chico = modulos != null && modulos < MODULOS_CORTE
+  if (tier === 'especial') return chico ? 'especialesMenor' : 'especiales'
+  if (tier === 'formica') return chico ? 'formicaMenor' : 'formica'
+  return tier
 }
 
 export interface Pieza {
@@ -119,17 +153,22 @@ export interface OpcionesPrecio {
   /** tipo de cambio para los modelos que solo tienen precio en dólares */
   tipoCambio: number
   tarifas?: TablaTarifas
+  /**
+   * Cuántas cabinas lleva el proyecto entero. Solo se usa en México, donde los
+   * Especiales y la Fórmica cambian de precio a partir de 10 módulos.
+   */
+  modulos?: number
 }
 
 /** precio de una pieza, ya en la moneda pedida */
 export function precioPieza(pieza: Pieza, o: OpcionesPrecio): number {
-  const tabla = o.tarifas ?? TARIFAS_BASE
+  const tabla = o.tarifas ?? TARIFAS_RESPALDO
   const modelo = tabla[o.modeloCodigo] ?? tabla.ESTANDAR
   if (!modelo) return 0
 
   const m2 = m2Cobrados(pieza, o.modeloCodigo)
   const fam = familiaTarifa(pieza.familia)
-  const juego = juegoDeTier(o.tier)
+  const juego = juegoDeTier(o.tier, o.moneda === 'MXN' ? o.modulos : undefined)
 
   const leer = (nombre: string): number | undefined => {
     const j = modelo[nombre]
@@ -137,6 +176,18 @@ export function precioPieza(pieza: Pieza, o: OpcionesPrecio): number {
     const v = j[fam]
     // el antepecho, si no tiene tarifa propia, se cobra como puerta
     return v != null ? v : fam === 'antepecho' ? j.puerta : undefined
+  }
+
+  // México tiene su propia lista, en pesos y con sus propios tiers. Va ANTES
+  // que el camino usdOnly: Superior y Touchless también tienen precio en pesos,
+  // y convertir dólares con el tipo de cambio daría otro número.
+  if (o.moneda === 'MXN') {
+    const tarifa = leer(`${juego}MXN`)
+      ?? leer(`${juegoDeTier(o.tier)}MXN`)   // sin el corte de 10 módulos
+      ?? leer('especialesMXN')
+      ?? leer('lineaMXN')
+      ?? 0
+    return m2 * tarifa
   }
 
   if (modelo.usdOnly) {
@@ -150,6 +201,7 @@ export function precioPieza(pieza: Pieza, o: OpcionesPrecio): number {
     return m2 * usd
   }
 
+  // Costa Rica y LATAM siguen con dos tiers: los de México caen en especiales
   const claveTier = juego === 'linea' ? 'linea' : 'especiales'
   const clave = o.moneda === 'CRC' ? `${claveTier}CRC` : claveTier
   const tarifa = leer(clave) ?? leer(claveTier) ?? leer('especiales') ?? leer('linea') ?? 0
@@ -181,6 +233,20 @@ export const FAMILIAS: { key: FamiliaTarifa; label: string }[] = [
  * moneda. Es la misma separación que hace el Constructor con `usdOnly`.
  */
 export const TIERS_USD_ONLY = ['linea', 'lineaCR', 'especiales', 'aceroInox', 'antigrafiti'] as const
+
+/**
+ * Los tiers de la lista de México, en el orden de las columnas del Excel. Los
+ * dos pares mayor/menor son el corte de 10 módulos (ver MODULOS_CORTE).
+ */
+export const TIERS_MX = [
+  'linea', 'grupo2', 'especiales', 'especialesMenor',
+  'formica', 'formicaMenor', 'arte', 'aceroInox', 'antigrafiti',
+] as const
+
+/** el sufijo con el que la moneda nombra su juego de tarifas */
+export function sufijoMoneda(m: Moneda): string {
+  return m === 'CRC' ? 'CRC' : m === 'MXN' ? 'MXN' : ''
+}
 
 /** los cuatro juegos del resto de modelos: tier + moneda → nombre del juego */
 export const COMBOS_NORMALES: { tier: string; moneda: Moneda; juego: string }[] = [
@@ -241,6 +307,18 @@ export function filasParaGuardar(tabla: TablaTarifas): FilaParaGuardar[] {
       }
     }
   }
+  // México: todos los modelos y todos sus tiers, en pesos
+  for (const modelo of Object.keys(tabla)) {
+    for (const tier of TIERS_MX) {
+      const set = leer(modelo, `${tier}MXN`)
+      if (!set) continue
+      for (const f of FAMILIAS) {
+        const v = set[f.key]
+        if (v == null) continue
+        filas.push({ modelo_codigo: modelo, tier, moneda: 'MXN', familia: f.key, tarifa: Number(v) })
+      }
+    }
+  }
   return filas
 }
 
@@ -298,7 +376,7 @@ export interface ResultadoTarifas {
  * `refreshTarifas()` del Constructor: cada fila pisa un valor puntual.
  */
 export async function cargarTarifas(token: string): Promise<ResultadoTarifas> {
-  const base: TablaTarifas = JSON.parse(JSON.stringify(TARIFAS_BASE))
+  const base: TablaTarifas = JSON.parse(JSON.stringify(TARIFAS_RESPALDO))
   if (!URL_SUPABASE || !LLAVE_SUPABASE) {
     return { tabla: base, filas: 0, deLaNube: false, error: 'Sin Supabase configurado' }
   }
@@ -312,7 +390,9 @@ export async function cargarTarifas(token: string): Promise<ResultadoTarifas> {
     for (const f of filas) {
       const modelo = base[f.modelo_codigo]
       if (!modelo) continue
-      const clave = f.moneda === 'CRC' ? `${f.tier}CRC` : f.tier
+      // sin el sufijo, una fila en pesos se guardaba como si fuera el juego en
+      // dólares y le borraba el precio: MXN tiene que tener su propio juego
+      const clave = `${f.tier}${sufijoMoneda(f.moneda as Moneda)}`
       const juego = (modelo[clave] as JuegoTarifas | undefined) ?? {}
       juego[f.familia as FamiliaTarifa] = Number(f.tarifa)
       modelo[clave] = juego

@@ -15,7 +15,7 @@ import {
 import { esAdmin, IVA_CR, puedeCatalogos, puedeColoresReservados, puedeDistribuidores, puedePiezas, puedeUsuarios, type Usuario } from './auth'
 import type { Area, Cabina, Config, Moneda, Pais, Proyecto, TipoCabina, TipologiaId, Tramo } from './types'
 import {
-  ACABADOS, acabadoEsElColor, alturasDe, anchosPanel, claroAjustado, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, mgMedidas, MODELOS,
+  acabadoEsElColor, acabadosPara, alturasDe, anchosPanel, claroAjustado, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, mgMedidas, MODELOS,
   type PiezaEspecial,
   PAISES, etiquetaTier, nombreHerraje, nombreModelo, tierDeColor, TIPOLOGIAS, tipologia, tipologiaEspejo,
   ANCHOS_PILASTRA, esEspecial, esSoloOrinales,
@@ -34,7 +34,7 @@ import { anchoDeOrinal } from './geometria'
 import { cargarTarifas, type ResultadoTarifas } from './tarifas'
 import { buscarActualizacion, type FaseActualizacion } from './actualizar'
 import { versionActual, VERSION_COMPILADA } from './version'
-import { TARIFAS_BASE } from './datos/tarifas-base'
+import { TARIFAS_RESPALDO } from './tarifas'
 import EditorTarifas from './components/EditorTarifas'
 import EditorAlturas from './components/EditorAlturas'
 import EditorPiezas from './components/EditorPiezas'
@@ -135,6 +135,11 @@ function areaInicial(nombre = '', conTramos = false, tipo?: TipologiaId): Area {
   }
 }
 
+/** cómo se llama cada moneda en pantalla */
+function nombreMoneda(m: Moneda): string {
+  return m === 'CRC' ? 'Colones' : m === 'MXN' ? 'Pesos' : 'Dólares'
+}
+
 /** atajo de desarrollo: ?demo=1&paso=7&tipo=RECTA_MURO_IZQ entra sin login para revisar una pantalla */
 const params = new URLSearchParams(typeof location === 'undefined' ? '' : location.search)
 const demo = import.meta.env.DEV && params.has('demo')
@@ -182,7 +187,7 @@ export default function App() {
   const [seleccion, setSeleccion] = useState<string | null>(null)
   /** qué área está a un clic de borrarse; se pregunta antes de sacarla */
   const [borrarArea, setBorrarArea] = useState<number | null>(null)
-  const [moneda, setMoneda] = useState<'USD' | 'CRC'>('CRC')
+  const [moneda, setMoneda] = useState<Moneda>('CRC')
 
   const [guardado, setGuardado] = useState<string | null>(null)
   const [tarifas, setTarifas] = useState<ResultadoTarifas | null>(null)
@@ -317,7 +322,7 @@ export default function App() {
 
   function recargarTarifas() {
     if (!usuario?.token) {
-      setTarifas({ tabla: TARIFAS_BASE, filas: 0, deLaNube: false })
+      setTarifas({ tabla: TARIFAS_RESPALDO, filas: 0, deLaNube: false })
       return
     }
     cargarTarifas(usuario.token).then(setTarifas)
@@ -341,8 +346,11 @@ export default function App() {
    * el resto de LATAM en dólares. Sin distribuidor elegido todavía no hay
    * región, así que ahí se deja como estaba.
    */
-  const monedaFija: 'CRC' | 'USD' | null =
-    regionDistribuidor === 'Costa Rica' ? 'CRC' : regionDistribuidor === 'LATAM' ? 'USD' : null
+  const monedaFija: Moneda | null =
+    regionDistribuidor === 'Costa Rica' ? 'CRC'
+      : regionDistribuidor === 'LATAM' ? 'USD'
+        : regionDistribuidor === 'México' ? 'MXN'
+          : null
 
   /**
    * Se cotiza si se fabrica en Costa Rica Y el distribuidor no es de México,
@@ -611,8 +619,8 @@ export default function App() {
   }
 
   function cambiarLinea(linea: Config['linea']) {
-    const acabado = ACABADOS[linea][0]
     const modelo = MODELOS[linea][0].codigo
+    const acabado = acabadosPara(linea, modelo, proyecto.paisFabricacion)[0]
     const paneles = anchosPanel(modelo)
     const mg = mgMedidas(linea, modelo)
     const mgSigue = mg.some((m) => m.anchoCm === (config.mgAnchoCm ?? 60) && m.altoCm === config.mgAlturaCm)
@@ -1023,15 +1031,26 @@ export default function App() {
   // columnas en dólares y en colones, y los modelos usdOnly convierten con el TC
   // se arma POR ÁREA y después se aplana: la cotización muestra qué le toca a
   // cada baño, y el total es el mismo porque son los mismos renglones
+  /**
+   * Los módulos del pedido: las cabinas de TODAS las áreas. En México los
+   * Especiales y la Fórmica cambian de precio a partir de 10, y el corte se
+   * mira sobre el proyecto entero, no área por área.
+   */
+  const modulosDelProyecto = useMemo(
+    () => proyecto.areas.reduce((n, a) => n + a.tramos.reduce((m, t) => m + t.cabinas.length, 0), 0),
+    [proyecto.areas],
+  )
+
   const renglonesPorArea = useMemo(
     () =>
       proyecto.areas.map((a) => ({
         nombre: a.nombre,
         renglones: bom(a.tramos, a.config, {
           moneda, tipoCambio: TC, tarifas: tarifas?.tabla, pais: proyecto.paisFabricacion,
+          modulos: modulosDelProyecto,
         }),
       })),
-    [proyecto.areas, proyecto.paisFabricacion, moneda, tarifas],
+    [proyecto.areas, proyecto.paisFabricacion, moneda, tarifas, modulosDelProyecto],
   )
   const renglones = useMemo(() => renglonesPorArea.flatMap((a) => a.renglones), [renglonesPorArea])
 
@@ -1082,7 +1101,9 @@ export default function App() {
     const propios = (proyecto.descuentos ?? []).filter((_, k) => k !== i)
     setProyecto({ ...proyecto, descuentos: propios })
   }
-  const simbolo = moneda === 'CRC' ? '₡' : '$'
+  // el peso mexicano y el dólar comparten el signo, así que el de México se
+  // escribe MX$ para que nadie confunda una cotización con la otra
+  const simbolo = moneda === 'CRC' ? '₡' : moneda === 'MXN' ? 'MX$' : '$'
 
   const money = (v: number) =>
     `${simbolo}${v.toLocaleString('es-CR', { maximumFractionDigits: moneda === 'CRC' ? 0 : 2 })}`
@@ -1149,7 +1170,7 @@ export default function App() {
       ivaPct: usuario?.ivaPorcentaje ?? IVA_CR,
       pais: suyo.paisFabricacion,
       modelo: config?.modelo ?? '',
-      tier: tierDeColor(config?.color ?? '', suyo.paisFabricacion),
+      tier: tierDeColor(config?.color ?? '', suyo.paisFabricacion, config?.linea),
     }, lineas)
     if (!guardada.ok || !guardada.dato) return { ok: false, mensaje: guardada.mensaje }
 
@@ -1417,7 +1438,7 @@ export default function App() {
       {verTarifas && puedeCatalogos(usuario) && (
         <EditorTarifas
           usuario={usuario}
-          tabla={tarifas?.tabla ?? TARIFAS_BASE}
+          tabla={tarifas?.tabla ?? TARIFAS_RESPALDO}
           onCambio={(t) =>
             setTarifas({ tabla: t, filas: tarifas?.filas ?? 0, deLaNube: tarifas?.deLaNube ?? false })
           }
@@ -1754,7 +1775,7 @@ export default function App() {
                       : 'Los colores son los del catálogo de Costa Rica. Si el cliente pide uno que no está en la lista, se escribe abajo y la cotización lo toma como especial.'}
                   </p>
                   <div className="grid-cards">
-                    {ACABADOS[config.linea].map((a) => (
+                    {acabadosPara(config.linea, config.modelo, proyecto.paisFabricacion).map((a) => (
                       <button key={a} className={`card ${config.acabado === a ? 'sel' : ''}`} onClick={() => cambiarAcabado(a)} type="button">
                         <b>{a}</b>
                         <small>
@@ -1790,7 +1811,7 @@ export default function App() {
                   ) : (
                     <>
                       <h4 style={{ margin: '28px 0 10px', color: 'var(--text-2)' }}>
-                        Color · {etiquetaTier(tierDeColor(config.color, proyecto.paisFabricacion))}
+                        Color · {etiquetaTier(tierDeColor(config.color, proyecto.paisFabricacion, config.linea))}
                       </h4>
                       <div className="pildoras">
                         {coloresPara(config.linea, config.acabado).map((c) => (
@@ -1822,7 +1843,7 @@ export default function App() {
                     <div className="campo">
                       <label>Color especial</label>
                       <input
-                        value={tierDeColor(config.color, proyecto.paisFabricacion) === 'especial' ? config.color : ''}
+                        value={tierDeColor(config.color, proyecto.paisFabricacion, config.linea) === 'especial' ? config.color : ''}
                         placeholder="Escribí el color que pidió el cliente"
                         onChange={(e) => setConfig({ color: e.target.value })}
                       />
@@ -2234,7 +2255,7 @@ export default function App() {
                     </b>
                     <span>
                       {tarifas?.deLaNube
-                        ? `Precio por m² de ${nombreModelo(config.linea, config.modelo)} (${config.modelo}), color de tier ${etiquetaTier(tierDeColor(config.color, proyecto.paisFabricacion))}, en ${moneda === 'CRC' ? 'colones' : 'dólares'}.`
+                        ? `Precio por m² de ${nombreModelo(config.linea, config.modelo)} (${config.modelo}), color de tier ${etiquetaTier(tierDeColor(config.color, proyecto.paisFabricacion, config.linea))}, en ${nombreMoneda(moneda).toLowerCase()}${moneda === 'MXN' ? ` · ${modulosDelProyecto} módulo(s) en el proyecto` : ''}.`
                         : `Todavía no llegaron las tarifas de Supabase${tarifas?.error ? `: ${tarifas.error}` : ''}. Se están usando las de la lista que trae el Constructor.`}
                     </span>
                   </div>
@@ -2372,7 +2393,7 @@ export default function App() {
                     </div>
                     {monedaFija ? (
                       <div>
-                        <span className="chip on">{monedaFija === 'CRC' ? 'Colones' : 'Dólares'}</span>
+                        <span className="chip on">{nombreMoneda(monedaFija)}</span>
                         <div className="ayuda" style={{ marginTop: 6 }}>
                           La moneda la manda la región del distribuidor:{' '}
                           {regionDistribuidor === 'Costa Rica'

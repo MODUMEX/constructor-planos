@@ -3,7 +3,8 @@ import type { Moneda } from '../types'
 import { MODELOS } from '../catalog'
 import {
   COMBOS_NORMALES, FAMILIAS, filasParaGuardar, guardarTarifas, modelosNormales, modelosUsdOnly,
-  TIERS_USD_ONLY, type FamiliaTarifa, type JuegoTarifas, type ResultadoGuardado, type TablaTarifas,
+  TIERS_MX, TIERS_USD_ONLY, type FamiliaTarifa, type JuegoTarifas, type ResultadoGuardado,
+  type TablaTarifas,
 } from '../tarifas'
 import type { Usuario } from '../auth'
 
@@ -19,6 +20,13 @@ const NOMBRE_TIER: Record<string, string> = {
   especiales: 'Especiales',
   aceroInox: 'Acero inoxidable',
   antigrafiti: 'Antigrafiti',
+  // los de la lista de México: ahí "Línea" es el Grupo 1, y los Especiales y la
+  // Fórmica tienen dos precios según si el pedido pasa de 10 módulos
+  grupo2: 'Grupo 2',
+  especialesMenor: 'Especiales · menos de 10',
+  formica: 'Fórmica · 10 o más',
+  formicaMenor: 'Fórmica · menos de 10',
+  arte: 'Arte',
 }
 
 /** el nombre del modelo, buscándolo en las tres líneas */
@@ -42,6 +50,7 @@ export default function EditorTarifas({ usuario, tabla, onCambio, onCerrar, onRe
   const [tier, setTier] = useState('linea')
   const [moneda, setMoneda] = useState<Moneda>('USD')
   const [tierSup, setTierSup] = useState<string>('linea')
+  const [tierMx, setTierMx] = useState<string>('linea')
   const [guardando, setGuardando] = useState(false)
   const [resultado, setResultado] = useState<ResultadoGuardado | null>(null)
   const [confirmar, setConfirmar] = useState(false)
@@ -157,6 +166,20 @@ export default function EditorTarifas({ usuario, tabla, onCambio, onCerrar, onRe
             ))}
           </div>
           {tabla_(usdOnly, tierSup, '$')}
+
+          <h4 style={{ marginTop: 26 }}>México · en pesos, con sus propios grupos de color</h4>
+          <p className="sub" style={{ marginTop: 0 }}>
+            Acá "Línea" es el Grupo 1 de la lista de México. Los Especiales y la Fórmica tienen dos
+            precios: el corte son 10 módulos, contando las cabinas de todo el proyecto.
+          </p>
+          <div className="pildoras" style={{ marginBottom: 12 }}>
+            {TIERS_MX.map((t) => (
+              <button key={t} className={`pildora ${tierMx === t ? 'on' : ''}`} onClick={() => setTierMx(t)} type="button">
+                {NOMBRE_TIER[t] ?? t}
+              </button>
+            ))}
+          </div>
+          {tabla_([...normales, ...usdOnly].sort(), `${tierMx}MXN`, 'MX$')}
         </div>
 
         <footer className="modal-pie">
