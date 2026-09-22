@@ -214,8 +214,25 @@ export interface Area {
   tramos: Tramo[]
 }
 
+/**
+ * Un descuento de la cotización. Se aplican EN CASCADA y en orden: cada uno
+ * muerde lo que dejó el anterior, nunca el precio de lista. Dos del 5 % seguidos
+ * no son un 10 %.
+ *
+ * El del distribuidor sale de su ficha y es el único que NO va en el PDF del
+ * cliente: es lo que el distribuidor compra, no lo que vende.
+ */
+export interface Descuento {
+  /** 'distribuidor' es el de la ficha; 'manual' los que se agregan a mano */
+  origen: 'distribuidor' | 'manual'
+  etiqueta: string
+  pct: number
+}
+
 export interface Proyecto {
   numero: string
+  /** los descuentos que se le agregaron a mano, en el orden en que se aplican */
+  descuentos?: Descuento[]
   /** dónde se fabrica; define qué lista de colores se ofrece */
   paisFabricacion: Pais
   obra: string

@@ -82,14 +82,30 @@ writeFileSync(rutaPdf, Buffer.from(pdf.output('arraybuffer')))
 const rutaCsv = `${salida}/${nombreArchivoCSV(proyecto)}`
 writeFileSync(rutaCsv, '﻿' + generarCSV(proyecto), 'utf8')
 
-// la cotización, con las mismas tarifas de respaldo que usa la app sin nube
-const renglones = proyecto.areas.flatMap((a) =>
-  bom(a.tramos, a.config, { moneda: 'CRC', tipoCambio: 510, pais: proyecto.paisFabricacion }))
-const cot = generarCotizacionPDF(proyecto, {
-  renglones, moneda: 'CRC', descuentoPct: 12, ivaPct: 13, vendedor: 'Dayanna Lizano', numero: 'COT-1042',
-})
-const rutaCot = `${salida}/${nombreArchivoCotizacion(proyecto, 'COT-1042')}`
-writeFileSync(rutaCot, Buffer.from(cot.output('arraybuffer')))
+// la cotización, con las mismas tarifas de respaldo que usa la app sin nube.
+// Salen las DOS hojas: la del distribuidor lleva su descuento de ficha y la del
+// cliente no, que es la única diferencia entre las dos.
+const porArea = proyecto.areas.map((a) => ({
+  nombre: a.nombre,
+  renglones: bom(a.tramos, a.config, { moneda: 'CRC' as const, tipoCambio: 510, pais: proyecto.paisFabricacion }),
+}))
+const renglones = porArea.flatMap((a) => a.renglones)
+const descuentos = [
+  { origen: 'distribuidor' as const, etiqueta: 'Descuento distribuidor', pct: 12 },
+  { origen: 'manual' as const, etiqueta: 'Descuento por volumen', pct: 5 },
+  { origen: 'manual' as const, etiqueta: 'Descuento de cierre', pct: 5 },
+]
+const rutasCot: string[] = []
+for (const para of ['distribuidor', 'cliente'] as const) {
+  const cot = generarCotizacionPDF(proyecto, {
+    renglones, porArea, moneda: 'CRC', descuentos, para,
+    ivaPct: 13, vendedor: 'Dayanna Lizano', numero: 'COT-1042',
+  })
+  const ruta = `${salida}/${nombreArchivoCotizacion(proyecto, 'COT-1042', para)}`
+  writeFileSync(ruta, Buffer.from(cot.output('arraybuffer')))
+  rutasCot.push(ruta)
+}
+const rutaCot = rutasCot.join('\n      ')
 
 console.log('PDF :', rutaPdf)
 console.log('COT :', rutaCot)

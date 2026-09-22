@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import Login from './components/Login'
 import PreviewTipologia from './components/PreviewTipologia'
 import EditorPlano, { formatear } from './components/EditorPlano'
 import { generarCSV, nombreArchivoCSV } from './exportar/csv'
 import { generarPDF, nombreArchivoPDF } from './exportar/pdf'
-import { generarCotizacionPDF, nombreArchivoCotizacion } from './exportar/cotizacion'
+import {
+  generarCotizacionPDF, nombreArchivoCotizacion, resumenDePiezas, totalesDe,
+} from './exportar/cotizacion'
 import { csvABytes, FILTRO_CSV, FILTRO_PDF, guardarArchivo } from './exportar/guardar'
 import { abrirProyecto } from './proyectos'
 import {
@@ -27,7 +29,7 @@ import Solicitudes from './components/Solicitudes'
 import { contarSolicitudes } from './solicitudes'
 import { coloresMxPara, slugRenderMx } from './coloresMx'
 import { fotoDe, fotosHerraje, faltanFotosHerraje, terminacionesDe } from './renders'
-import { anchoAccesibleDe, anchoTotal, bom, claroDeOrinales, crearTramos, modularConCatalogo, nuevoId, reajustarConPuertas, totalBOM } from './modulacion'
+import { anchoAccesibleDe, anchoTotal, bom, claroDeOrinales, crearTramos, modularConCatalogo, nuevoId, reajustarConPuertas } from './modulacion'
 import { anchoDeOrinal } from './geometria'
 import { cargarTarifas, type ResultadoTarifas } from './tarifas'
 import { buscarActualizacion, type FaseActualizacion } from './actualizar'
@@ -42,6 +44,7 @@ import { listarDistribuidores, type Distribuidor } from './distribuidores'
 import { alturasDeFabrica, cargarAlturas, usarAlturas, type TablaAlturas } from './alturas'
 import { cargarPiezas, usarPiezas } from './piezas'
 import Proyectos from './components/Proyectos'
+import type { Descuento } from './types'
 import {
   codigoDe, guardarProyecto, huellaDe, listarProyectos, revisionAGuardar, type Revision,
 } from './proyectos'
@@ -1018,20 +1021,67 @@ export default function App() {
   // ---------- cotización ----------
   // los precios salen ya en la moneda elegida: la tabla de tarifas tiene
   // columnas en dólares y en colones, y los modelos usdOnly convierten con el TC
-  const renglones = useMemo(
+  // se arma POR ÁREA y después se aplana: la cotización muestra qué le toca a
+  // cada baño, y el total es el mismo porque son los mismos renglones
+  const renglonesPorArea = useMemo(
     () =>
-      proyecto.areas.flatMap((a) =>
-        bom(a.tramos, a.config, { moneda, tipoCambio: TC, tarifas: tarifas?.tabla, pais: proyecto.paisFabricacion }),
-      ),
+      proyecto.areas.map((a) => ({
+        nombre: a.nombre,
+        renglones: bom(a.tramos, a.config, {
+          moneda, tipoCambio: TC, tarifas: tarifas?.tabla, pais: proyecto.paisFabricacion,
+        }),
+      })),
     [proyecto.areas, proyecto.paisFabricacion, moneda, tarifas],
   )
-  const neto = totalBOM(renglones)
-  const descuento = neto * ((usuario?.descuento ?? 0) / 100)
-  const gravable = neto - descuento
+  const renglones = useMemo(() => renglonesPorArea.flatMap((a) => a.renglones), [renglonesPorArea])
+
   // el IVA lo trae el distribuidor; si no, el 13 % de Costa Rica
   const ivaPorcentaje = usuario?.ivaPorcentaje ?? IVA_CR
-  const iva = gravable * (ivaPorcentaje / 100)
-  const total = gravable + iva
+
+  /**
+   * Los descuentos en cascada. El primero es el de la ficha del distribuidor
+   * —no se edita acá, sale de su cuenta— y detrás van los que se agreguen a
+   * mano, en orden. Ver `totalesDe`.
+   */
+  const descuentos = useMemo<Descuento[]>(() => {
+    const dist = usuario?.descuento ?? 0
+    const propios = proyecto.descuentos ?? []
+    return dist > 0
+      ? [{ origen: 'distribuidor' as const, etiqueta: 'Descuento distribuidor', pct: dist }, ...propios]
+      : propios
+  }, [usuario?.descuento, proyecto.descuentos])
+
+  const totales = useMemo(
+    () => totalesDe(renglones, descuentos, ivaPorcentaje),
+    [renglones, descuentos, ivaPorcentaje],
+  )
+  const neto = totales.neto
+  const descuento = totales.descuento
+  const gravable = totales.gravable
+  void gravable
+  const iva = totales.iva
+  const total = totales.total
+  const piezasDelPedido = useMemo(() => resumenDePiezas(renglones), [renglones])
+
+  function agregarDescuento() {
+    const propios = proyecto.descuentos ?? []
+    setProyecto({
+      ...proyecto,
+      descuentos: [...propios, { origen: 'manual', etiqueta: `Descuento ${propios.length + 1}`, pct: 5 }],
+    })
+  }
+
+  function cambiarDescuento(i: number, cambio: Partial<Descuento>) {
+    const propios = [...(proyecto.descuentos ?? [])]
+    if (!propios[i]) return
+    propios[i] = { ...propios[i], ...cambio }
+    setProyecto({ ...proyecto, descuentos: propios })
+  }
+
+  function quitarDescuento(i: number) {
+    const propios = (proyecto.descuentos ?? []).filter((_, k) => k !== i)
+    setProyecto({ ...proyecto, descuentos: propios })
+  }
   const simbolo = moneda === 'CRC' ? '₡' : '$'
 
   const money = (v: number) =>
@@ -1118,22 +1168,31 @@ export default function App() {
     setGuardado(ruta ? `Orden de compra guardada en ${ruta}` : null)
   }
 
-  /** La cotización en PDF, la que el distribuidor le lleva al cliente. */
-  async function bajarCotizacion() {
+  /**
+   * La cotización en PDF. Son dos hojas distintas:
+   *
+   *   · distribuidor → con TODOS los descuentos, incluido el de su ficha. Es lo
+   *     que él paga.
+   *   · cliente      → sin el de la ficha. Es lo que él vende, y el descuento
+   *     con el que compra no tiene por qué verlo su cliente.
+   */
+  async function bajarCotizacion(para: 'distribuidor' | 'cliente') {
     try {
       const doc = generarCotizacionPDF(proyectoConAutor, {
         renglones,
+        porArea: renglonesPorArea,
         moneda,
-        descuentoPct: usuario?.descuento ?? 0,
+        descuentos,
+        para,
         ivaPct: ivaPorcentaje,
         vendedor: usuario?.nombre ?? '',
       })
       const bytes = new Uint8Array(doc.output('arraybuffer'))
       if (bytes.length < 1000) throw new Error(`el PDF salió vacío (${bytes.length} bytes)`)
       const ruta = await guardarArchivo(
-        nombreArchivoCotizacion(proyecto), bytes, 'application/pdf', FILTRO_PDF,
+        nombreArchivoCotizacion(proyecto, undefined, para), bytes, 'application/pdf', FILTRO_PDF,
       )
-      setGuardado(ruta ? `Cotización guardada en ${ruta}` : null)
+      setGuardado(ruta ? `Cotización del ${para} guardada en ${ruta}` : null)
     } catch (e) {
       setGuardado(null)
       setBloqueo(`No se pudo guardar la cotización: ${e instanceof Error ? e.message : String(e)}`)
@@ -2191,34 +2250,118 @@ export default function App() {
                         </tr>
                       </thead>
                       <tbody>
-                        {renglones.map((r, i) => (
-                          <tr key={`${r.sku}-${i}`}>
-                            <td className="num">{r.sku}</td>
-                            <td>
-                              {r.descripcion}
-                              {!r.tarifaReal && (
-                                <span className="estimado" title="Los kits no están en tarifa_m2: este precio es estimado">
-                                  estimado
-                                </span>
-                              )}
-                            </td>
-                            <td>{r.tipo}</td>
-                            <td className="der">{r.cantidad}</td>
-                            <td className="der">{money(r.precioUnit)}</td>
-                            <td className="der">{money(r.cantidad * r.precioUnit)}</td>
-                          </tr>
+                        {renglonesPorArea.map((a, ia) => (
+                          <Fragment key={`area-${ia}`}>
+                            {/* con una sola área el rótulo no aporta nada */}
+                            {renglonesPorArea.length > 1 && a.renglones.length > 0 && (
+                              <tr>
+                                <td colSpan={5} style={{ fontWeight: 700, paddingTop: 14 }}>{a.nombre}</td>
+                                <td className="der" style={{ fontWeight: 700, paddingTop: 14 }}>
+                                  {money(a.renglones.reduce((t, r) => t + r.cantidad * r.precioUnit, 0))}
+                                </td>
+                              </tr>
+                            )}
+                            {a.renglones.map((r, i) => (
+                              <tr key={`${r.sku}-${i}`}>
+                                <td className="num">{r.sku}</td>
+                                <td>
+                                  {r.descripcion}
+                                  {!r.tarifaReal && (
+                                    <span className="estimado" title="Los kits no están en tarifa_m2: este precio es estimado">
+                                      estimado
+                                    </span>
+                                  )}
+                                </td>
+                                <td>{r.tipo}</td>
+                                <td className="der">{r.cantidad}</td>
+                                <td className="der">{money(r.precioUnit)}</td>
+                                <td className="der">{money(r.cantidad * r.precioUnit)}</td>
+                              </tr>
+                            ))}
+                          </Fragment>
                         ))}
                       </tbody>
                       <tfoot>
                         <tr><td colSpan={5}>Neto</td><td className="der">{money(neto)}</td></tr>
-                        {usuario.descuento > 0 && (
-                          <tr><td colSpan={5}>Descuento {usuario.descuento}%</td><td className="der">−{money(descuento)}</td></tr>
-                        )}
+                        {/* la cascada: cada descuento muerde lo que dejó el anterior */}
+                        {totales.pasos.map((p, i) => (
+                          <Fragment key={`paso-${i}`}>
+                            <tr><td colSpan={5}>{p.etiqueta} {p.pct}%</td><td className="der">−{money(p.monta)}</td></tr>
+                            <tr><td colSpan={5} style={{ color: 'var(--text-2)' }}>Subtotal</td><td className="der">{money(p.subtotal)}</td></tr>
+                          </Fragment>
+                        ))}
                         <tr><td colSpan={5}>IVA {ivaPorcentaje}%</td><td className="der">{money(iva)}</td></tr>
                         <tr><td colSpan={5}>Total</td><td className="der">{money(total)}</td></tr>
                       </tfoot>
                     </table>
                   </div>
+
+                  {/* ---------- descuentos en cascada ---------- */}
+                  <div style={{ margin: '22px 0 0', maxWidth: 720 }}>
+                    <h4 style={{ margin: '0 0 4px' }}>
+                      Descuentos <span className="num">· se aplican en cascada, uno sobre lo que dejó el anterior</span>
+                    </h4>
+                    {(usuario.descuento ?? 0) > 0 && (
+                      <p className="sub" style={{ margin: '0 0 8px' }}>
+                        El de tu ficha de distribuidor ({usuario.descuento}%) va siempre primero y no se edita acá.
+                        Es el único que NO sale en la cotización del cliente.
+                      </p>
+                    )}
+                    {(proyecto.descuentos ?? []).map((d, i) => (
+                      <div key={`desc-${i}`} className="campos" style={{ alignItems: 'flex-end', marginBottom: 6 }}>
+                        <label className="campo" style={{ flex: '1 1 240px' }}>
+                          <span>Concepto</span>
+                          <input
+                            value={d.etiqueta}
+                            onChange={(e) => cambiarDescuento(i, { etiqueta: e.target.value })}
+                          />
+                        </label>
+                        <label className="campo" style={{ width: 110 }}>
+                          <span>%</span>
+                          <input
+                            className="celda-precio num" type="number" min={0} max={100} step="0.5"
+                            value={d.pct}
+                            onChange={(e) => cambiarDescuento(i, { pct: Number(e.target.value) || 0 })}
+                          />
+                        </label>
+                        <button className="btn" style={{ flex: "0 0 auto" }} onClick={() => quitarDescuento(i)}>Quitar</button>
+                      </div>
+                    ))}
+                    <button className="btn plano chico" onClick={agregarDescuento}>+ Agregar descuento</button>
+                    {descuentos.length > 0 && (
+                      <p className="sub" style={{ marginTop: 8 }}>
+                        En total se descuenta {money(descuento)} sobre {money(neto)}
+                        {totales.pasos.length > 1 && ' — en cascada, no es la suma de los porcentajes'}.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* ---------- cuántas piezas lleva el pedido ---------- */}
+                  {piezasDelPedido.length > 0 && (
+                    <div className="tabla-wrap" style={{ marginTop: 18, maxWidth: 360 }}>
+                      <table>
+                        <thead>
+                          <tr><th>Piezas del pedido</th><th className="der">Cant.</th></tr>
+                        </thead>
+                        <tbody>
+                          {piezasDelPedido.map((p) => (
+                            <tr key={p.tipo}>
+                              <td>{p.tipo}</td>
+                              <td className="der num">{p.cantidad}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr>
+                            <td style={{ fontWeight: 700 }}>Total de piezas</td>
+                            <td className="der num" style={{ fontWeight: 700 }}>
+                              {piezasDelPedido.reduce((t, p) => t + p.cantidad, 0)}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )}
 
                   <div style={{ display: 'flex', gap: 22, alignItems: 'flex-end', margin: '24px 0 20px', flexWrap: 'wrap' }}>
                     <div className="total-grande">
@@ -2253,7 +2396,12 @@ export default function App() {
                     <button className="btn primario" onClick={() => void guardarAhora()} disabled={guardandoProyecto}>
                       {guardandoProyecto ? 'Guardando…' : 'Guardar proyecto'}
                     </button>
-                    <button className="btn" onClick={bajarCotizacion}>Cotización en PDF</button>
+                    <button className="btn" onClick={() => void bajarCotizacion('distribuidor')}>
+                      Cotización distribuidor
+                    </button>
+                    <button className="btn" onClick={() => void bajarCotizacion('cliente')}>
+                      Cotización cliente
+                    </button>
                     <button className="btn" onClick={bajarPDF}>Plano en PDF</button>
                     <button className="btn" onClick={bajarCSV}>CSV para el CIP</button>
                   </div>

@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf'
-import type { Moneda, Proyecto, RenglonBOM } from '../types'
+import type { Descuento, Moneda, Proyecto, RenglonBOM } from '../types'
 import { nombreModelo } from '../catalog'
 import { marcaDeAgua, ponerLogo } from './portada'
 import { nombreLinea } from './piezas'
@@ -21,9 +21,13 @@ const AMARILLO: [number, number, number] = [247, 200, 70]
 
 export interface DatosCotizacion {
   renglones: RenglonBOM[]
+  /** los renglones separados por área, para que se vea qué va a cada una */
+  porArea?: { nombre: string; renglones: RenglonBOM[] }[]
   moneda: Moneda
-  /** % de descuento del distribuidor; 0 si no tiene */
-  descuentoPct: number
+  /** los descuentos en cascada, en orden */
+  descuentos: Descuento[]
+  /** para quién es la hoja; la del cliente no lleva el descuento del distribuidor */
+  para?: 'distribuidor' | 'cliente'
   ivaPct: number
   /** quién la emite, para el pie */
   vendedor: string
@@ -35,21 +39,70 @@ export interface DatosCotizacion {
   estado?: string
 }
 
+export interface PasoDescuento {
+  etiqueta: string
+  pct: number
+  /** lo que se lleva ESTE descuento, ya sobre lo que dejó el anterior */
+  monta: number
+  /** con lo que queda el subtotal después de aplicarlo */
+  subtotal: number
+}
+
 export interface Totales {
   neto: number
+  /** cada descuento, en cascada, con lo que se llevó y lo que dejó */
+  pasos: PasoDescuento[]
+  /** la suma de todos los descuentos */
   descuento: number
   gravable: number
   iva: number
   total: number
 }
 
-/** Los mismos números que muestra la pantalla, en un solo lugar. */
-export function totalesDe(renglones: RenglonBOM[], descuentoPct: number, ivaPct: number): Totales {
+/**
+ * Los mismos números que muestra la pantalla, en un solo lugar.
+ *
+ * Los descuentos van EN CASCADA: cada uno se calcula sobre lo que dejó el
+ * anterior, no sobre el neto. Un 5 % y otro 5 % sobre 100 dan 90,25, no 90.
+ */
+export function totalesDe(renglones: RenglonBOM[], descuentos: Descuento[], ivaPct: number): Totales {
   const neto = renglones.reduce((s, r) => s + r.cantidad * r.precioUnit, 0)
-  const descuento = neto * (descuentoPct / 100)
-  const gravable = neto - descuento
+  const pasos: PasoDescuento[] = []
+  let corriendo = neto
+  for (const d of descuentos) {
+    const pct = Number(d.pct) || 0
+    if (pct <= 0) continue
+    const monta = corriendo * (pct / 100)
+    corriendo -= monta
+    pasos.push({ etiqueta: d.etiqueta, pct, monta, subtotal: corriendo })
+  }
+  const gravable = corriendo
   const iva = gravable * (ivaPct / 100)
-  return { neto, descuento, gravable, iva, total: gravable + iva }
+  return { neto, pasos, descuento: neto - gravable, gravable, iva, total: gravable + iva }
+}
+
+/** los descuentos que SÍ van en la hoja del cliente: todos menos el del distribuidor */
+export function descuentosDelCliente(descuentos: Descuento[]): Descuento[] {
+  return descuentos.filter((d) => d.origen !== 'distribuidor')
+}
+
+/** Las familias del cuadro resumen, en el orden en que se leen. */
+const ORDEN_PIEZAS = ['Puerta', 'Panel', 'Pilastra', 'Mingitorio', 'Antepecho']
+
+/**
+ * Cuántas piezas lleva el pedido, por familia. Es la cuenta que se hace a mano
+ * al final de cada cotización para saber qué se va a fabricar.
+ */
+export function resumenDePiezas(renglones: RenglonBOM[]): { tipo: string; cantidad: number }[] {
+  const por = new Map<string, number>()
+  for (const r of renglones) por.set(r.tipo, (por.get(r.tipo) ?? 0) + r.cantidad)
+  const orden = (t: string) => {
+    const i = ORDEN_PIEZAS.indexOf(t)
+    return i < 0 ? ORDEN_PIEZAS.length : i
+  }
+  return [...por.entries()]
+    .map(([tipo, cantidad]) => ({ tipo, cantidad }))
+    .sort((a, b) => orden(a.tipo) - orden(b.tipo) || a.tipo.localeCompare(b.tipo))
 }
 
 /**
@@ -92,7 +145,7 @@ function encabezado(doc: jsPDF, proyecto: Proyecto, d: DatosCotizacion, hojaN: n
   doc.setTextColor(...MARCA)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(17)
-  doc.text('COTIZACIÓN', HOJA.w - M, M + 8, { align: 'right' })
+  doc.text(d.para === 'distribuidor' ? 'COTIZACIÓN · DISTRIBUIDOR' : 'COTIZACIÓN', HOJA.w - M, M + 8, { align: 'right' })
 
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
@@ -171,7 +224,10 @@ function tituloTabla(doc: jsPDF, y: number, cols: number[]): number {
 
 export function generarCotizacionPDF(proyecto: Proyecto, d: DatosCotizacion): jsPDF {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' })
-  const t = totalesDe(d.renglones, d.descuentoPct, d.ivaPct)
+  // la hoja del cliente no lleva el descuento del distribuidor: eso es lo que
+  // el distribuidor COMPRA, no lo que le vende a su cliente
+  const descuentos = d.para === 'cliente' ? descuentosDelCliente(d.descuentos) : d.descuentos
+  const t = totalesDe(d.renglones, descuentos, d.ivaPct)
 
   // x de cada columna: las tres de plata van alineadas a la derecha
   const cols = [M + 2, M + 30, HOJA.w - M - 78, HOJA.w - M - 40, HOJA.w - M - 2]
@@ -185,14 +241,34 @@ export function generarCotizacionPDF(proyecto: Proyecto, d: DatosCotizacion): js
   const tope = HOJA.h - M - 62
 
   doc.setFont('helvetica', 'normal')
-  for (const [i, r] of d.renglones.entries()) {
-    if (y + 6 > tope) {
-      doc.addPage()
-      hojaN += 1
-      y = encabezado(doc, proyecto, d, hojaN)
-      y = tituloTabla(doc, y, cols)
-      doc.setFont('helvetica', 'normal')
-    }
+
+  const sitio = (alto: number) => {
+    if (y + alto <= tope) return
+    doc.addPage()
+    hojaN += 1
+    y = encabezado(doc, proyecto, d, hojaN)
+    y = tituloTabla(doc, y, cols)
+    doc.setFont('helvetica', 'normal')
+  }
+
+  /** una banda gris con el nombre del área, antes de sus renglones */
+  const tituloArea = (nombre: string, renglones: RenglonBOM[]) => {
+    // el título solo sirve si abajo entra al menos un renglón
+    sitio(6 + 6)
+    doc.setFillColor(236, 239, 244)
+    doc.rect(M, y, HOJA.w - M * 2, 6, 'F')
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(8)
+    doc.setTextColor(...MARCA)
+    doc.text(nombre.toUpperCase(), cols[0], y + 4.2)
+    const suma = renglones.reduce((a, r) => a + r.cantidad * r.precioUnit, 0)
+    doc.text(plata(suma, d.moneda), cols[4], y + 4.2, { align: 'right' })
+    y += 6
+    doc.setFont('helvetica', 'normal')
+  }
+
+  const fila = (r: RenglonBOM, i: number) => {
+    sitio(6)
     if (i % 2 === 1) {
       doc.setFillColor(246, 247, 250)
       doc.rect(M, y, HOJA.w - M * 2, 6, 'F')
@@ -207,6 +283,18 @@ export function generarCotizacionPDF(proyecto: Proyecto, d: DatosCotizacion): js
     doc.text(plata(r.precioUnit, d.moneda), cols[3], y + 4.2, { align: 'right' })
     doc.text(plata(r.cantidad * r.precioUnit, d.moneda), cols[4], y + 4.2, { align: 'right' })
     y += 6
+  }
+
+  // Con más de un área se separa por área, con su subtotal: es lo que se mira
+  // para saber qué le toca a cada baño. Con una sola no hace falta el rótulo.
+  const areas = (d.porArea ?? []).filter((a) => a.renglones.length > 0)
+  if (areas.length > 1) {
+    for (const a of areas) {
+      tituloArea(a.nombre || 'Área', a.renglones)
+      a.renglones.forEach(fila)
+    }
+  } else {
+    d.renglones.forEach(fila)
   }
 
   doc.setDrawColor(210)
@@ -226,11 +314,12 @@ export function generarCotizacionPDF(proyecto: Proyecto, d: DatosCotizacion): js
   }
 
   renglonPlata('Subtotal', plata(t.neto, d.moneda))
-  // el descuento solo aparece si de verdad lo hay: un "0 %" confunde al cliente
-  if (d.descuentoPct > 0) {
+  // cada descuento con lo que se lleva y con lo que deja: en cascada, el
+  // segundo muerde lo que dejó el primero, así que el desglose importa
+  for (const p of t.pasos) {
     // guion normal, no el signo menos largo: ese tampoco está en WinAnsi
-    renglonPlata(`Descuento ${d.descuentoPct}%`, `-${plata(t.descuento, d.moneda)}`)
-    renglonPlata('Subtotal con descuento', plata(t.gravable, d.moneda))
+    renglonPlata(`${p.etiqueta} ${p.pct}%`, `-${plata(p.monta, d.moneda)}`)
+    renglonPlata('Subtotal', plata(p.subtotal, d.moneda))
   }
   renglonPlata(`IVA ${d.ivaPct}%`, plata(t.iva, d.moneda))
 
@@ -243,6 +332,42 @@ export function generarCotizacionPDF(proyecto: Proyecto, d: DatosCotizacion): js
   doc.text('TOTAL', xEtiqueta, y + 1.8)
   doc.text(plata(t.total, d.moneda), HOJA.w - M - 2, y + 1.8, { align: 'right' })
   y += 14
+
+  // ---------- cuántas piezas lleva el pedido ----------
+  const piezas = resumenDePiezas(d.renglones)
+  if (piezas.length > 0) {
+    const altoCuadro = 7 + piezas.length * 5 + 3
+    if (y + altoCuadro > HOJA.h - M - 34) {
+      doc.addPage()
+      hojaN += 1
+      y = encabezado(doc, proyecto, d, hojaN)
+    }
+    const ancho = 74
+    doc.setFillColor(...MARCA)
+    doc.rect(M, y - 4, ancho, 7, 'F')
+    doc.setTextColor(255)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(7.5)
+    doc.text('PIEZAS DEL PEDIDO', M + 2, y + 0.8)
+    let yp = y + 7
+    for (const p of piezas) {
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(8.5)
+      doc.setTextColor(TINTA)
+      doc.text(p.tipo, M + 2, yp)
+      doc.setFont('helvetica', 'bold')
+      doc.text(String(p.cantidad), M + ancho - 2, yp, { align: 'right' })
+      yp += 5
+    }
+    doc.setDrawColor(210)
+    doc.line(M, yp - 3.4, M + ancho, yp - 3.4)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(8.5)
+    doc.setTextColor(...MARCA)
+    doc.text('Total de piezas', M + 2, yp)
+    doc.text(String(piezas.reduce((a, p) => a + p.cantidad, 0)), M + ancho - 2, yp, { align: 'right' })
+    y = yp + 9
+  }
 
   // ---------- condiciones ----------
   doc.setTextColor(GRIS)
@@ -280,10 +405,18 @@ export function generarCotizacionPDF(proyecto: Proyecto, d: DatosCotizacion): js
   return doc
 }
 
-export function nombreArchivoCotizacion(proyecto: Proyecto, numero?: string): string {
+export function nombreArchivoCotizacion(
+  proyecto: Proyecto,
+  numero?: string,
+  para?: 'distribuidor' | 'cliente',
+): string {
   const limpio = (s: string) => s.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-')
-  const partes = ['Cotizacion', limpio(numero || proyecto.numero || ''), limpio(proyecto.obra || '')]
-    .filter(Boolean)
+  const partes = [
+    'Cotizacion',
+    para === 'distribuidor' ? 'Distribuidor' : para === 'cliente' ? 'Cliente' : '',
+    limpio(numero || proyecto.numero || ''),
+    limpio(proyecto.obra || ''),
+  ].filter(Boolean)
   if (partes.length === 1) partes.push('proyecto')
   return partes.join('-') + '.pdf'
 }
