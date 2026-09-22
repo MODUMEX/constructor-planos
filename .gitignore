@@ -15,3 +15,5 @@ tsconfig.tsbuildinfo
 .mamp.mjs
 .odoo.mjs
 .bom.mjs
+.claude
+.especiales.ts

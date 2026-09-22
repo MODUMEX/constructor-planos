@@ -1,4 +1,5 @@
 import type { Moneda, TierColor } from './types'
+import { ANCHOS_PILASTRA, ANCHOS_PUERTA, ANCHOS_PUERTA_CR, anchosPanelFabrica, mgFabrica } from './catalog'
 import { TARIFAS_BASE } from './datos/tarifas-base'
 import { LLAVE_SUPABASE, URL_SUPABASE } from './entorno'
 
@@ -54,6 +55,52 @@ export function anchoCobradoPuerta(anchoCm: number): number {
   return ({ 62: 70, 64: 70, 92: 100, 94: 100 } as Record<number, number>)[anchoCm] ?? anchoCm
 }
 
+/** la menor de la lista que llegue a `valor`; si ninguna llega, el valor mismo */
+function subirA(valor: number, opciones: number[]): number {
+  const arriba = opciones.filter((o) => o >= valor).sort((a, b) => a - b)
+  return arriba.length ? arriba[0] : valor
+}
+
+/**
+ * El ancho con el que se COBRA una pieza, que no siempre es el que mide.
+ *
+ * Una pieza especial —una medida que no está en las fichas— se cobra como la
+ * de catálogo inmediatamente superior, porque en planta sale de esa: un panel
+ * de 155 se corta de uno de 165 y se paga el de 165. Si la medida se pasa de
+ * la más grande que existe no hay de dónde subirla, así que se cobran sus
+ * propios m².
+ *
+ * Las medidas de catálogo no se tocan: `subirA` las devuelve iguales.
+ */
+export function anchoCobrado(familia: Pieza['familia'], anchoCm: number, modeloCodigo: string): number {
+  switch (familia) {
+    case 'PT':
+      return anchoCobradoPuerta(subirA(anchoCm, [...ANCHOS_PUERTA, ...ANCHOS_PUERTA_CR]))
+    case 'PN':
+      return subirA(anchoCm, anchosPanelFabrica(modeloCodigo))
+    case 'PL':
+      return subirA(anchoCm, ANCHOS_PILASTRA)
+    default:
+      return anchoCm
+  }
+}
+
+/**
+ * Los m² con los que se cobra la pieza. La mampara de mingitorio se sube por
+ * las dos medidas a la vez —se elige la de ficha más chica que la contenga—
+ * porque ancho y alto salen de la misma hoja.
+ */
+function m2Cobrados(pieza: Pieza, modeloCodigo: string): number {
+  if (pieza.familia === 'MG') {
+    const contiene = mgFabrica(modeloCodigo)
+      .filter((m) => m.anchoCm >= pieza.anchoCm && m.altoCm >= pieza.altoCm)
+      .sort((a, b) => a.anchoCm * a.altoCm - b.anchoCm * b.altoCm)[0]
+    const m = contiene ?? { anchoCm: pieza.anchoCm, altoCm: pieza.altoCm }
+    return (m.anchoCm * m.altoCm) / 1e4
+  }
+  return (anchoCobrado(pieza.familia, pieza.anchoCm, modeloCodigo) * pieza.altoCm) / 1e4
+}
+
 /** el tier del color, con el nombre que usa la tabla de tarifas */
 function juegoDeTier(tier: TierColor): string {
   return tier === 'especial' ? 'especiales' : tier
@@ -80,7 +127,7 @@ export function precioPieza(pieza: Pieza, o: OpcionesPrecio): number {
   const modelo = tabla[o.modeloCodigo] ?? tabla.ESTANDAR
   if (!modelo) return 0
 
-  const m2 = ((pieza.familia === 'PT' ? anchoCobradoPuerta(pieza.anchoCm) : pieza.anchoCm) * pieza.altoCm) / 1e4
+  const m2 = m2Cobrados(pieza, o.modeloCodigo)
   const fam = familiaTarifa(pieza.familia)
   const juego = juegoDeTier(o.tier)
 

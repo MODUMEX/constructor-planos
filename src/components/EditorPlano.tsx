@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import type { Cabina, Config, Pais, Tramo } from '../types'
-import { ANCHOS_PILASTRA, puertasPosibles, tipologia } from '../catalog'
+import { anchosPilastra, esEspecial, puertasPosibles, tipologia } from '../catalog'
 import { anchoTotal, arrancaElCuartoPmr, minimoDe, nuevaCabina, puertaSugerida, snap, cierraConMingitorio, ladosDeCabina, mamparaEn } from '../modulacion'
 import { medidaCercana, PILASTRAS_INTERNAS, PUERTA_ACCESIBLE_MIN } from '../modulador'
 import { Grupo, Item, Menu, Raya } from './Menu'
@@ -194,7 +194,11 @@ export default function EditorPlano({
       // El buscador automático sigue prefiriendo las delgadas —que es lo normal
       // contra un muro—, pero hay planos que cierran con una ancha de relleno,
       // como los 55 del extremo derecho de algunos baños ya fabricados.
-      const opciones = p.extremo ? ANCHOS_PILASTRA : PILASTRAS_INTERNAS
+      // las especiales del modelo se pueden poner en cualquier posición: se
+      // dieron de alta a mano justo para casos que el catálogo no resuelve
+      const opciones = anchosPilastra(config.modelo).filter(
+        (a) => p.extremo || PILASTRAS_INTERNAS.includes(a) || esEspecial('PL', a, config.modelo),
+      )
       onPilastra(p.tramoId, p.indice, medidaCercana(opciones, deseado))
       return
     }
@@ -945,7 +949,7 @@ export default function EditorPlano({
           >
             <Grupo>Ancho de puerta</Grupo>
             <div className="anchos">
-              {puertasPosibles(cab.anchoCm, pais)
+              {puertasPosibles(cab.anchoCm, pais, config.modelo)
                 .filter(({ ancho }) => (cab.tipo === 'accesible' ? ancho >= PUERTA_ACCESIBLE_MIN : true))
                 .map(({ ancho, cabe }) => (
                 <button

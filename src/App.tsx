@@ -10,12 +10,13 @@ import { abrirProyecto } from './proyectos'
 import {
   autorizar as autorizarEnOdoo, cuadran, guardarCotizacion, lineasParaOdoo, rechazar as rechazarCotizacion,
 } from './odoo/enviar'
-import { esAdmin, IVA_CR, puedeCatalogos, puedeColoresReservados, puedeDistribuidores, puedeUsuarios, type Usuario } from './auth'
+import { esAdmin, IVA_CR, puedeCatalogos, puedeColoresReservados, puedeDistribuidores, puedePiezas, puedeUsuarios, type Usuario } from './auth'
 import type { Area, Cabina, Config, Moneda, Pais, Proyecto, TipoCabina, TipologiaId, Tramo } from './types'
 import {
   ACABADOS, acabadoEsElColor, alturasDe, anchosPanel, claroAjustado, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, mgMedidas, MODELOS,
+  type PiezaEspecial,
   PAISES, etiquetaTier, nombreHerraje, nombreModelo, tierDeColor, TIPOLOGIAS, tipologia, tipologiaEspejo,
-  ANCHOS_PILASTRA, esSoloOrinales,
+  ANCHOS_PILASTRA, esEspecial, esSoloOrinales,
 } from './catalog'
 import { medidaCercana } from './modulador'
 import VistaRender from './components/VistaRender'
@@ -34,10 +35,12 @@ import { versionActual, VERSION_COMPILADA } from './version'
 import { TARIFAS_BASE } from './datos/tarifas-base'
 import EditorTarifas from './components/EditorTarifas'
 import EditorAlturas from './components/EditorAlturas'
+import EditorPiezas from './components/EditorPiezas'
 import Distribuidores from './components/Distribuidores'
 import DuplicarArea from './components/DuplicarArea'
 import { listarDistribuidores, type Distribuidor } from './distribuidores'
 import { alturasDeFabrica, cargarAlturas, usarAlturas, type TablaAlturas } from './alturas'
+import { cargarPiezas, usarPiezas } from './piezas'
 import Proyectos from './components/Proyectos'
 
 const TC = 512
@@ -181,6 +184,9 @@ export default function App() {
   const [alturasTabla, setAlturasTabla] = useState<TablaAlturas>(alturasDeFabrica)
   const [alturasNube, setAlturasNube] = useState(false)
   const [verAlturas, setVerAlturas] = useState(false)
+  const [piezasLista, setPiezasLista] = useState<PiezaEspecial[]>([])
+  const [piezasNube, setPiezasNube] = useState(false)
+  const [verPiezas, setVerPiezas] = useState(false)
   const [distribuidores, setDistribuidores] = useState<Distribuidor[]>([])
   const [verDistribuidores, setVerDistribuidores] = useState(false)
   const [verUsuarios, setVerUsuarios] = useState(false)
@@ -250,6 +256,11 @@ export default function App() {
       setAlturasTabla(r.tabla)
       setAlturasNube(r.deLaNube)
     })
+    cargarPiezas(usuario.token).then((r) => {
+      if (!vigente) return
+      setPiezasLista(r.lista)
+      setPiezasNube(r.deLaNube)
+    })
     return () => {
       vigente = false
     }
@@ -282,6 +293,12 @@ export default function App() {
   useEffect(() => {
     usarAlturas(alturasTabla)
   }, [alturasTabla])
+
+  // las especiales viajan por el mismo camino que las alturas: se dejan puestas
+  // en el catálogo para que los selectores, el plano y la cotización las vean
+  useEffect(() => {
+    usarPiezas(piezasLista)
+  }, [piezasLista])
 
   function recargarTarifas() {
     if (!usuario?.token) {
@@ -423,7 +440,7 @@ export default function App() {
   // los paneles grandes no existen en todos los modelos
   const panelesDelModelo = anchosPanel(config.modelo)
   // las mamparas de orinal también cambian por línea
-  const mgDeLaLinea = mgMedidas(config.linea)
+  const mgDeLaLinea = mgMedidas(config.linea, config.modelo)
 
   /**
    * Tramos que no cerraron contra su claro. El buscador siempre devuelve la
@@ -505,7 +522,7 @@ export default function App() {
     const acabado = ACABADOS[linea][0]
     const modelo = MODELOS[linea][0].codigo
     const paneles = anchosPanel(modelo)
-    const mg = mgMedidas(linea)
+    const mg = mgMedidas(linea, modelo)
     const mgSigue = mg.some((m) => m.anchoCm === (config.mgAnchoCm ?? 60) && m.altoCm === config.mgAlturaCm)
     setConfig({
       linea,
@@ -1123,6 +1140,9 @@ export default function App() {
             <button className="btn plano chico" onClick={() => setVerTarifas(true)}>Precios</button>
           </>
         )}
+        {puedePiezas(usuario) && (
+          <button className="btn plano chico" onClick={() => setVerPiezas(true)}>Piezas</button>
+        )}
         {puedeUsuarios(usuario) && (
           <button className="btn plano chico" onClick={() => setVerUsuarios(true)}>Usuarios</button>
         )}
@@ -1211,6 +1231,16 @@ export default function App() {
           deLaNube={alturasNube}
           onCambio={setAlturasTabla}
           onCerrar={() => setVerAlturas(false)}
+        />
+      )}
+
+      {verPiezas && puedePiezas(usuario) && (
+        <EditorPiezas
+          usuario={usuario}
+          lista={piezasLista}
+          deLaNube={piezasNube}
+          onCambio={setPiezasLista}
+          onCerrar={() => setVerPiezas(false)}
         />
       )}
 
@@ -1805,10 +1835,10 @@ export default function App() {
                       <label>Profundidad de cabina (cm)</label>
                       <select value={config.profundidadCm} onChange={(e) => setConfig({ profundidadCm: Number(e.target.value) })}>
                         {panelesDelModelo.map((a) => (
-                          <option key={a} value={a}>{a}</option>
+                          <option key={a} value={a}>{a}{esEspecial('PN', a, config.modelo) ? ' · especial' : ''}</option>
                         ))}
                       </select>
-                      <span className="ayuda">Es el ancho del panel divisor: solo las medidas que se fabrican</span>
+                      <span className="ayuda">Es el ancho del panel divisor. Las marcadas como especiales no son de ficha: se cobran como la medida de arriba</span>
                     </div>
                     )}
                     {/*

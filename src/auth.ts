@@ -251,3 +251,15 @@ export function puedeDistribuidores(u: Usuario | null): boolean {
 export function puedeAutorizar(u: Usuario | null): boolean {
   return esAdmin(u) || u?.rol === 'Vendedor'
 }
+
+/**
+ * Dar de alta medidas que no están en las fichas. Lo puede hacer el Vendedor,
+ * además del administrador: es el que está cotizando cuando aparece la medida
+ * rara. El distribuidor no, porque una medida especial cambia el precio.
+ *
+ * Esto es solo la pantalla; la regla de verdad está en la política de
+ * `app_config` del SQL 25.
+ */
+export function puedePiezas(u: Usuario | null): boolean {
+  return esAdmin(u) || u?.rol === 'Vendedor'
+}

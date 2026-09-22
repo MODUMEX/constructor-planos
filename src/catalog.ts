@@ -285,9 +285,9 @@ export const ANCHOS_PUERTA = [55, 60, 70, 75, 85, 90, 100]
 export const ANCHOS_PUERTA_CR = [62, 64, 92, 94]
 
 /** las puertas que se pueden pedir según dónde se fabrica */
-export function anchosPuerta(pais: Pais = 'CR'): number[] {
+export function anchosPuerta(pais: Pais = 'CR', modelo?: string): number[] {
   const todas = pais === 'CR' ? [...ANCHOS_PUERTA, ...ANCHOS_PUERTA_CR] : ANCHOS_PUERTA
-  return [...todas].sort((a, b) => a - b)
+  return unirAnchos(todas, especialesDe('PT', modelo))
 }
 
 /** anchos de pilastra (familia PI) */
@@ -325,10 +325,19 @@ const PANELES_GRANDES: Record<string, number[]> = {
 /** todos los anchos de panel que existen, sin importar el modelo */
 export const ANCHOS_PANEL = [...PANELES_HASTA_140, 150, 165, 180]
 
+/**
+ * Los anchos de panel de FICHA del modelo, sin las especiales. Es lo que se
+ * usa para cobrar: una especial se cobra como la de catálogo de arriba.
+ */
+export function anchosPanelFabrica(modelo: string): number[] {
+  const grandes = PANELES_GRANDES[(modelo || '').toUpperCase()] ?? [150]
+  return [...PANELES_HASTA_140, ...grandes].sort((a, b) => a - b)
+}
+
 /** los anchos de panel que se pueden pedir en ese modelo */
 export function anchosPanel(modelo: string): number[] {
   const grandes = PANELES_GRANDES[(modelo || '').toUpperCase()] ?? [150]
-  return [...PANELES_HASTA_140, ...grandes]
+  return unirAnchos([...PANELES_HASTA_140, ...grandes], especialesDe('PN', modelo))
 }
 
 /**
@@ -361,8 +370,12 @@ const MG_SUPERIOR: MedidaMG[] = [
 ]
 
 /** las mamparas de mingitorio que existen en esa línea */
-export function mgMedidas(linea: Linea): MedidaMG[] {
-  return linea === 'SUPERIOR' ? MG_SUPERIOR : MG_MEDIDAS
+export function mgMedidas(linea: Linea, modelo?: string): MedidaMG[] {
+  const base = linea === 'SUPERIOR' ? MG_SUPERIOR : MG_MEDIDAS
+  const extra = especialesDe('MG', modelo).map((p) => ({ anchoCm: p.anchoCm, altoCm: p.altoCm ?? 0 }))
+  const vistas = new Set(base.map(escribirMedidaMG))
+  const nuevas = extra.filter((m) => m.altoCm > 0 && !vistas.has(escribirMedidaMG(m)))
+  return [...base, ...nuevas].sort((a, b) => a.anchoCm - b.anchoCm || a.altoCm - b.altoCm)
 }
 
 /** "45x120" -> { anchoCm: 45, altoCm: 120 }; null si no se entiende */
@@ -415,9 +428,13 @@ export function medidaQueCabe(opciones: number[], max: number): number | null {
 /** una puerta necesita este margen contra el ancho de la cabina */
 export const MARGEN_PUERTA_CM = 8
 
-export function puertasPosibles(anchoCabinaCm: number, pais: Pais = 'CR'): { ancho: number; cabe: boolean }[] {
+export function puertasPosibles(
+  anchoCabinaCm: number,
+  pais: Pais = 'CR',
+  modelo?: string,
+): { ancho: number; cabe: boolean }[] {
   const max = anchoCabinaCm - MARGEN_PUERTA_CM
-  return anchosPuerta(pais).map((ancho) => ({ ancho, cabe: ancho <= max }))
+  return anchosPuerta(pais, modelo).map((ancho) => ({ ancho, cabe: ancho <= max }))
 }
 
 export interface Tipologia {
@@ -538,4 +555,72 @@ export function tarifaM2(_acabado: Acabado, color: string): number {
     default:
       return 158
   }
+}
+
+/* ─────────────────────── piezas especiales ───────────────────────
+ *
+ * Medidas que NO están en las fichas y que un vendedor o un administrador da
+ * de alta desde la pantalla Piezas. Una vez creadas aparecen en los selectores
+ * del modelo al que se les creó, al lado de las de catálogo.
+ *
+ * Se guardan en `app_config` (clave `piezas_especiales`), así que son iguales
+ * para todo el mundo. Nunca se mezclan con las tablas de fábrica: son una capa
+ * aparte, y eso importa porque el PRECIO de una especial sale de la medida de
+ * catálogo de arriba, no de la especial misma (ver `anchoCobrado` en
+ * tarifas.ts). Si se mezclaran, una especial se cobraría a sí misma.
+ */
+
+export type FamiliaPieza = 'PT' | 'PN' | 'PL' | 'MG'
+
+export interface PiezaEspecial {
+  familia: FamiliaPieza
+  /** código del modelo al que se le dio de alta */
+  modelo: string
+  anchoCm: number
+  /** solo las mamparas de mingitorio llevan alto propio */
+  altoCm?: number
+}
+
+let especiales: PiezaEspecial[] = []
+
+/** deja la lista activa para los selectores, el plano y la cotización */
+export function aplicarPiezasEspeciales(lista: PiezaEspecial[] | null) {
+  especiales = Array.isArray(lista) ? lista : []
+}
+
+export function piezasEspeciales(): PiezaEspecial[] {
+  return especiales
+}
+
+/** las especiales de esa familia y ese modelo */
+export function especialesDe(familia: FamiliaPieza, modelo?: string): PiezaEspecial[] {
+  if (!modelo) return []
+  const cod = modelo.toUpperCase()
+  return especiales.filter((p) => p.familia === familia && p.modelo.toUpperCase() === cod)
+}
+
+/** true si esa medida no existe en las fichas: se dio de alta a mano */
+export function esEspecial(familia: FamiliaPieza, anchoCm: number, modelo?: string, altoCm?: number): boolean {
+  return especialesDe(familia, modelo).some(
+    (p) => p.anchoCm === anchoCm && (familia !== 'MG' || p.altoCm === altoCm),
+  )
+}
+
+function unirAnchos(base: number[], extra: PiezaEspecial[]): number[] {
+  const todos = new Set([...base, ...extra.map((p) => p.anchoCm)])
+  return [...todos].sort((a, b) => a - b)
+}
+
+/** los anchos de pilastra que se pueden pedir, con las especiales del modelo */
+export function anchosPilastra(modelo?: string): number[] {
+  return unirAnchos(ANCHOS_PILASTRA, especialesDe('PL', modelo))
+}
+
+/**
+ * Las mamparas de mingitorio de FICHA que le tocan a un modelo, sin las
+ * especiales. Se deduce la línea del código: los de Superior empiezan con SUP_.
+ * Es lo que se usa para cobrar.
+ */
+export function mgFabrica(modelo: string): MedidaMG[] {
+  return (modelo || '').toUpperCase().startsWith('SUP_') ? MG_SUPERIOR : MG_MEDIDAS
 }

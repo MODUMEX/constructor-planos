@@ -98,6 +98,8 @@ export function modularConCatalogo(
     /** la tira arranca en orinal sin muro de ese lado: también cierra con mingitorio */
     cierreMingitorioInicio?: boolean
     pais?: Pais
+    /** el modelo, para que las piezas especiales que tenga entren en la tira */
+    modelo?: string
   },
 ): { cabinas: Cabina[]; pilastras: number[]; canaletaCm: number; ajuste: Tramo['ajuste']; mensaje: string; avisoAccesible?: string } | null {
   // ------------------------------------------------------------------
@@ -175,7 +177,7 @@ export function modularConCatalogo(
     cierreMingitorio: extra?.cierreMingitorio,
     cierreMingitorioInicio: extra?.cierreMingitorioInicio,
     sinPilastraInicio: extra?.sinPilastraInicio,
-    catalogoPuertas: anchosPuerta(extra?.pais ?? 'CR'),
+    catalogoPuertas: anchosPuerta(extra?.pais ?? 'CR', extra?.modelo),
     anchoAccesibleCm: extra?.anchoAccesibleMinCm,
     murosPilastra,
     extremoAbierto,
@@ -596,6 +598,7 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
     // Si el cliente pidió una medida de puerta, esa manda: el buscador solo
     // puede mover las pilastras. Es la regla del negocio, no una preferencia.
     const conCatalogo = modularConCatalogo(claroTramo, soloOrinales ? cant : total, murosConPilastra, muros < 2, { puerta: config.puertaCm, puertaAccesible: config.puertaAccesibleCm }, {
+      modelo: config.modelo,
       accesible: conAccesible && esPrincipal,
       sinPilastraInicio,
       anchoAccesibleMinCm: anchoAccesibleDe(config),
