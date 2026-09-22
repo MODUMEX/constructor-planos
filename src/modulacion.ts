@@ -706,6 +706,15 @@ export function bom(
     mamparasPorMedida.set(`${mg.anchoCm}x${mg.altoCm}`, config.orinales - 1)
   }
 
+  /**
+   * Un proyecto de la planta de MEXICO vendido en otra moneda no tiene tarifa
+   * exacta: sus colores salen del catalogo mexicano, con Grupo 1, Grupo 2,
+   * Formica y Arte, y la lista en dolares o colones solo tiene linea y
+   * especiales. El precio sale igual —los cuatro caen en especiales— pero se
+   * marca como estimado para que se vea en la cotizacion en vez de pasar
+   * callado.
+   */
+  const tarifaExacta = !(precios.pais === 'MX' && precios.moneda !== 'MXN')
   const codigoLinea = config.linea === 'SUPERIOR' ? 'SUP' : config.linea === 'TOUCHLESS' ? 'TL' : 'LDR'
 
   // las alturas las manda el modelo, no el vendedor
@@ -719,7 +728,7 @@ export function bom(
       tipo: 'Puerta',
       cantidad,
       precioUnit: precioPieza({ familia: 'PT', anchoCm: ancho, altoCm: alturas.puerta }, opciones),
-      tarifaReal: true,
+      tarifaReal: tarifaExacta,
     })
   }
   if (paneles > 0) {
@@ -732,7 +741,7 @@ export function bom(
         { familia: 'PN', anchoCm: config.profundidadCm, altoCm: alturas.panel },
         opciones,
       ),
-      tarifaReal: true,
+      tarifaReal: tarifaExacta,
     })
   }
   const sufijoPil = config.montaje === 'PISO_TECHO' ? 'PT' : 'STD'
@@ -743,7 +752,7 @@ export function bom(
       tipo: 'Pilastra',
       cantidad,
       precioUnit: precioPieza({ familia: 'PL', anchoCm: ancho, altoCm: altoPil }, opciones),
-      tarifaReal: true,
+      tarifaReal: tarifaExacta,
     })
   }
   // El riel de amarre tampoco se cotiza aparte: va dentro de la tarifa por m²,
@@ -763,7 +772,7 @@ export function bom(
       tipo: 'Mingitorio',
       cantidad,
       precioUnit: precioPieza({ familia: 'MG', anchoCm: ancho, altoCm: alto }, opciones),
-      tarifaReal: true,
+      tarifaReal: tarifaExacta,
     })
   }
   return renglones

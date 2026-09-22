@@ -2293,7 +2293,16 @@ export default function App() {
                                 <td>
                                   {r.descripcion}
                                   {!r.tarifaReal && (
-                                    <span className="estimado" title="Los kits no están en tarifa_m2: este precio es estimado">
+                                    <span
+                                      className="estimado"
+                                      title={
+                                        proyecto.paisFabricacion === 'MX' && moneda !== 'MXN'
+                                          ? 'Se fabrica en México pero se cotiza en otra moneda: los grupos de color de México solo tienen tarifa en pesos, así que este precio sale de la lista en ' +
+                                            (moneda === 'CRC' ? 'colones' : 'dólares') +
+                                            ', donde Grupo 2, Especiales, Fórmica y Arte cuestan lo mismo.'
+                                          : 'Este precio no sale de tarifa_m2: es estimado'
+                                      }
+                                    >
                                       estimado
                                     </span>
                                   )}
