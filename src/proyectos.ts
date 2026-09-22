@@ -295,3 +295,45 @@ export async function borrarProyecto(usuario: Usuario | null, proyectoId: number
     return { ok: false, mensaje: e instanceof Error ? e.message : 'No se pudo borrar.' }
   }
 }
+
+/**
+ * Huella del contenido, para saber si cambió algo desde el último guardado.
+ * El orden de las claves lo pone el propio objeto, que siempre se arma igual,
+ * así que dos proyectos idénticos dan la misma cadena.
+ */
+export function huellaDe(proyecto: Proyecto): string {
+  return JSON.stringify(proyecto)
+}
+
+export interface RevisionElegida {
+  revision: Revision
+  /** true si nace una revisión nueva; false si se reemplaza la de siempre */
+  nueva: boolean
+  /** ya no quedan letras libres: se reemplaza en vez de subir */
+  sinLetras: boolean
+}
+
+/**
+ * Con qué letra toca guardar. NO se elige: sale de lo que ya hay.
+ *
+ *   - Nunca guardado          → la primera libre del plano (la A si el número
+ *                               es nuevo).
+ *   - Guardado y sin tocar    → la misma. Volver a guardar no inventa copias.
+ *   - Guardado y con cambios  → la siguiente libre. Una revisión marca un
+ *                               cambio, así que es editar lo que la hace nacer.
+ *
+ * Con las cinco letras ocupadas no hay a dónde subir: se reemplaza la que se
+ * está editando y `sinLetras` avisa, en vez de pisar la de otro.
+ */
+export function revisionAGuardar(
+  actual: Revision | null,
+  ocupadas: Iterable<string>,
+  hayCambios: boolean,
+): RevisionElegida {
+  if (actual && !hayCambios) return { revision: actual, nueva: false, sinLetras: false }
+  const usadas = new Set(ocupadas)
+  const desde = actual ? REVISIONES.indexOf(actual) + 1 : 0
+  const libre = REVISIONES.slice(desde).find((r) => !usadas.has(r))
+  if (libre) return { revision: libre, nueva: true, sinLetras: false }
+  return { revision: actual ?? REVISIONES[REVISIONES.length - 1], nueva: false, sinLetras: true }
+}

@@ -562,6 +562,20 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
             texto(doc, String(profDiv), nx, ny, { size: 5.5, align: 'center', angle: rot + 90, color: COTA })
           }
         }
+
+        // Los paneles que CIERRAN la tira donde no hay muro. Salían mudos: la
+        // cota de fondo la tenían solo los divisores internos, y el de cierre
+        // puede medir distinto. El de la punta se acota acá solo cuando es un
+        // panel; si es mampara de mingitorio la pone el bloque de más abajo.
+        if (i === 0 && !tramo.muroInicio) {
+          const [nx, ny] = aHoja(e, pt(m, -7, prof / 2))
+          texto(doc, String(prof), nx, ny, { size: 5.5, align: 'center', angle: rot + 90, color: COTA })
+        }
+        if (i === nCab - 1 && !tramo.muroFin && !esMingitorio(tramo, nCab)) {
+          const profCierre = profundidadDeDivisor(tramo, i, prof, mamparaEn(tramo, area.config, i)?.anchoCm)
+          const [nx, ny] = aHoja(e, pt(m, largo + 7, profCierre / 2))
+          texto(doc, String(profCierre), nx, ny, { size: 5.5, align: 'center', angle: rot + 90, color: COTA })
+        }
       })
 
       // El mingitorio de cierre queda fuera del recorrido de cabinas, porque su

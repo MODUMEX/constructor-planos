@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { puedeAutorizar, type Usuario } from '../auth'
 import type { Proyecto } from '../types'
 import {
-  abrirProyecto, borrarProyecto, codigoDe, guardarProyecto, listarProyectos, REVISIONES,
+  abrirProyecto, borrarProyecto, codigoDe, listarProyectos, revisionAGuardar,
   siguienteNumero, type ProyectoEnLista, type Revision,
 } from '../proyectos'
 import { estadosDeCotizacion, type EstadoCotizacion } from '../odoo/enviar'
@@ -18,9 +18,15 @@ import { estadosDeCotizacion, type EstadoCotizacion } from '../odoo/enviar'
 interface Props {
   usuario: Usuario
   proyecto: Proyecto
-  onAbrir: (p: Proyecto) => void
+  onAbrir: (p: Proyecto, revision: Revision) => void
   onCambiarNumero: (numero: string) => void
   onCerrar: () => void
+  /** la revisión con la que está guardado lo de pantalla, o null si nunca se guardó */
+  revisionActual: Revision | null
+  /** si cambió algo desde ese guardado; es lo que hace nacer la letra siguiente */
+  hayCambios: boolean
+  /** guarda el proyecto de pantalla; la letra la elige App, no esta pantalla */
+  onGuardar: () => Promise<Aviso>
   /** autoriza la cotización del proyecto y la manda a Odoo; lo arma App */
   onAutorizar: (p: ProyectoEnLista) => Promise<Aviso>
   onRechazar: (cotizacionId: number, motivo: string) => Promise<Aviso>
@@ -39,13 +45,13 @@ function fecha(iso: string): string {
 
 export default function Proyectos({
   usuario, proyecto, onAbrir, onCambiarNumero, onCerrar, onAutorizar, onRechazar,
+  revisionActual, hayCambios, onGuardar,
 }: Props) {
   const [pestana, setPestana] = useState<'abrir' | 'guardar'>('abrir')
   const [lista, setLista] = useState<ProyectoEnLista[]>([])
   const [cargando, setCargando] = useState(true)
   const [trabajando, setTrabajando] = useState(false)
   const [aviso, setAviso] = useState<Aviso | null>(null)
-  const [revision, setRevision] = useState<Revision>('A')
   const [confirmarBorrado, setConfirmarBorrado] = useState<number | null>(null)
   const [busqueda, setBusqueda] = useState('')
   const [cotizaciones, setCotizaciones] = useState<Map<number, EstadoCotizacion>>(new Map())
@@ -79,13 +85,6 @@ export default function Proyectos({
     return new Set(lista.filter((p) => p.numeroPlano === n).map((p) => p.revision))
   }, [lista, proyecto.numero])
 
-  // al abrir la pestaña de guardar, se propone la primera revisión libre
-  useEffect(() => {
-    if (pestana !== 'guardar' || cargando) return
-    const libre = REVISIONES.find((r) => !revisionesDelPlano.has(r))
-    setRevision(libre ?? 'A')
-  }, [pestana, cargando, revisionesDelPlano])
-
   const filtrada = useMemo(() => {
     const q = busqueda.trim().toLowerCase()
     if (!q) return lista
@@ -97,9 +96,9 @@ export default function Proyectos({
   async function guardar() {
     setTrabajando(true)
     setAviso(null)
-    const r = await guardarProyecto(usuario, proyecto, revision)
+    const r = await onGuardar()
     setTrabajando(false)
-    setAviso({ ok: r.ok, mensaje: r.mensaje })
+    setAviso(r)
     if (r.ok) await recargar()
   }
 
@@ -112,7 +111,7 @@ export default function Proyectos({
       setAviso({ ok: false, mensaje: r.mensaje })
       return
     }
-    onAbrir(r.dato)
+    onAbrir(r.dato, (p.revision as Revision) || 'A')
     onCerrar()
   }
 
@@ -159,8 +158,11 @@ export default function Proyectos({
     setAviso({ ok: true, mensaje: `Número de plano ${r.dato}. ${r.mensaje}` })
   }
 
+  // la letra no se elige: sale de lo que hay guardado y de si se tocó algo
+  const elegida = revisionAGuardar(revisionActual, revisionesDelPlano, hayCambios)
+  const revision = elegida.revision
   const codigo = codigoDe(proyecto.numero || '—', revision)
-  const pisa = revisionesDelPlano.has(revision)
+  const pisa = !elegida.nueva
 
   return (
     <div className="modal-fondo" onClick={onCerrar}>
@@ -356,21 +358,11 @@ export default function Proyectos({
 
               <h4 style={{ margin: '22px 0 8px', color: 'var(--text-2)' }}>Revisión</h4>
               <p className="sub" style={{ marginTop: 0 }}>
-                Las que ya existen salen marcadas. Guardar sobre una que existe la reemplaza.
+                La letra no se elige, sale sola: la primera vez toma la libre, y de ahí en adelante
+                sube solo si se editó algo. Guardar dos veces sin tocar nada no crea una copia.
+                {revisionesDelPlano.size > 0 &&
+                  ` Este plano ya tiene la ${[...revisionesDelPlano].sort().join(', la ')}.`}
               </p>
-              <div className="pildoras">
-                {REVISIONES.map((r) => (
-                  <button
-                    key={r}
-                    className={`pildora ${revision === r ? 'on' : ''}`}
-                    onClick={() => setRevision(r)}
-                    type="button"
-                  >
-                    {r}
-                    {revisionesDelPlano.has(r) && <span className="viejo">ya existe</span>}
-                  </button>
-                ))}
-              </div>
 
               <div className="aviso-caja" style={{ marginTop: 18, maxWidth: 720 }}>
                 <b>Se va a guardar como {codigo}</b>
@@ -379,9 +371,11 @@ export default function Proyectos({
                     ? 'Una área'
                     : `${proyecto.areas.length} áreas`}
                   {' · '}
-                  {pisa
-                    ? 'Esa revisión ya existe: se reemplaza lo que tenga guardado.'
-                    : 'Revisión nueva: no toca las anteriores.'}
+                  {elegida.sinLetras
+                    ? `Ya se usaron las cinco letras: se reemplaza la ${revision}.`
+                    : elegida.nueva
+                      ? 'Revisión nueva: no toca las anteriores.'
+                      : 'No cambió nada desde el último guardado: se reemplaza la misma.'}
                 </span>
               </div>
             </>

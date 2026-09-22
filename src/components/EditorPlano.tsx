@@ -605,12 +605,26 @@ export default function EditorPlano({
                     {i === 0 && !tramo.muroInicio && (() => {
                       const a = pt(m, -grueso / 2, 0)
                       const b = pt(m, grueso / 2, profIni)
+                      const c = pt(m, 0, profIni * 0.5)
                       return (
-                        <rect
-                          x={Math.min(a.x, b.x)} y={Math.min(a.y, b.y)}
-                          width={Math.max(Math.abs(b.x - a.x), MIN_PIEZA_PX)} height={Math.max(Math.abs(b.y - a.y), MIN_PIEZA_PX)}
-                          fill="#22303f" pointerEvents="none"
-                        />
+                        <g pointerEvents="none">
+                          <rect
+                            x={Math.min(a.x, b.x)} y={Math.min(a.y, b.y)}
+                            width={Math.max(Math.abs(b.x - a.x), MIN_PIEZA_PX)} height={Math.max(Math.abs(b.y - a.y), MIN_PIEZA_PX)}
+                            fill="#22303f"
+                          />
+                          {/* El panel que cierra el arranque también lleva su fondo.
+                              Se dibujaba mudo: la cota la tenían solo los divisores
+                              internos, y este puede medir distinto que ellos. */}
+                          {verCotas && (
+                            <text
+                              x={c.x} y={c.y} textAnchor="middle" fontSize={14} fill="#7f8fa3"
+                              transform={`rotate(${horizontal ? -90 : 0} ${c.x} ${c.y})`}
+                            >
+                              {formatear(profIni, unidad)}
+                            </text>
+                          )}
+                        </g>
                       )
                     })()}
                     {i === tramo.cabinas.length - 1 && !tramo.muroFin && (() => {
@@ -639,11 +653,11 @@ export default function EditorPlano({
                               <title>Mingitorio de cierre — arrastra para cambiar el ancho del orinal</title>
                             </rect>
                           )}
-                          {/* La mampara de cierre también lleva su fondo. Era la única
-                              que se quedaba sin cota: las internas la tienen desde
-                              siempre y esta se dibujaba muda, aunque puede medir
-                              distinto que las demás. */}
-                          {verCotas && cierraMingitorio && (() => {
+                          {/* La pieza de cierre también lleva su fondo, sea mampara de
+                              mingitorio o panel. Se dibujaba muda: la cota la tenían
+                              solo los divisores internos, y esta puede medir distinto
+                              que ellos. */}
+                          {verCotas && (() => {
                             const c = pt(m, largo, profCierre * 0.5)
                             return (
                               <text

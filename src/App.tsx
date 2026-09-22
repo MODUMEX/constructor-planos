@@ -42,6 +42,9 @@ import { listarDistribuidores, type Distribuidor } from './distribuidores'
 import { alturasDeFabrica, cargarAlturas, usarAlturas, type TablaAlturas } from './alturas'
 import { cargarPiezas, usarPiezas } from './piezas'
 import Proyectos from './components/Proyectos'
+import {
+  codigoDe, guardarProyecto, huellaDe, listarProyectos, revisionAGuardar, type Revision,
+} from './proyectos'
 
 const TC = 512
 
@@ -210,6 +213,15 @@ export default function App() {
   /** si ya se le avisó que faltan datos del proyecto; se enciende al querer avanzar */
   const [avisoDatos, setAvisoDatos] = useState(false)
   const [verProyectos, setVerProyectos] = useState(false)
+  /**
+   * La revisión con la que está guardado lo que hay en pantalla, y la huella
+   * del contenido en ese momento. Con las dos cosas se sabe si el proyecto
+   * cambió desde el último guardado, que es lo que hace nacer la letra
+   * siguiente. En null mientras el proyecto no se haya guardado nunca.
+   */
+  const [revisionGuardada, setRevisionGuardada] = useState<{ revision: Revision; huella: string } | null>(null)
+  const [guardandoProyecto, setGuardandoProyecto] = useState(false)
+  const [avisoProyecto, setAvisoProyecto] = useState<{ ok: boolean; mensaje: string } | null>(null)
   const [version, setVersion] = useState(VERSION_COMPILADA)
   const [actualizando, setActualizando] = useState<FaseActualizacion | null>(null)
   const [buscandoActualizacion, setBuscandoActualizacion] = useState(false)
@@ -463,6 +475,83 @@ export default function App() {
     return claroAjustado(t.claroCm, muros, conPuerta) - cuerpos
   }
   const avisosAccesible = area.tramos.filter((t) => t.avisoAccesible)
+
+  /**
+   * ¿Cambió algo desde el último guardado? Un proyecto que nunca se guardó
+   * cuenta como cambiado, para que la primera vez tome una letra.
+   */
+  const hayCambiosSinGuardar = revisionGuardada ? huellaDe(proyecto) !== revisionGuardada.huella : true
+
+  /**
+   * Guarda el proyecto en la nube. La letra NO se elige: la calcula
+   * `revisionAGuardar` con lo que ya hay en la nube y con si se tocó algo.
+   * Guardar dos veces seguidas sin editar no inventa una revisión nueva.
+   */
+  async function guardarAhora(): Promise<{ ok: boolean; mensaje: string }> {
+    if (!usuario) return { ok: false, mensaje: 'Hay que entrar con la cuenta para guardar.' }
+    const numero = proyecto.numero.trim()
+    if (!numero) return { ok: false, mensaje: 'Falta el número de plano.' }
+    setGuardandoProyecto(true)
+    setAvisoProyecto(null)
+    const fallar = (mensaje: string) => {
+      setGuardandoProyecto(false)
+      const r = { ok: false, mensaje }
+      setAvisoProyecto(r)
+      return r
+    }
+    // hay que mirar qué revisiones existen ya: la letra sale de ahí
+    const lista = await listarProyectos(usuario)
+    if (!lista.ok) return fallar(lista.mensaje)
+    const ocupadas = (lista.dato ?? []).filter((p) => p.numeroPlano === numero).map((p) => p.revision)
+    const huella = huellaDe(proyecto)
+    const elegida = revisionAGuardar(revisionGuardada?.revision ?? null, ocupadas, hayCambiosSinGuardar)
+    const g = await guardarProyecto(usuario, proyecto, elegida.revision)
+    if (!g.ok) return fallar(g.mensaje)
+    setGuardandoProyecto(false)
+    setRevisionGuardada({ revision: elegida.revision, huella })
+    const codigo = codigoDe(numero, elegida.revision)
+    const r = {
+      ok: true,
+      mensaje: elegida.sinLetras
+        ? `Guardado como ${codigo}. Este plano ya usó las cinco letras, así que se reemplazó la ${elegida.revision} en vez de subir.`
+        : elegida.nueva
+          ? `Guardado como ${codigo}.`
+          : `Guardado como ${codigo}. No había nada nuevo, así que no nació otra revisión.`,
+    }
+    setAvisoProyecto(r)
+    return r
+  }
+
+  /**
+   * Cerrar este proyecto y arrancar otro en blanco, desde el paso 1.
+   *
+   * Si quedó algo sin guardar se guarda primero, y si ese guardado falla NO se
+   * limpia nada: perder el trabajo por un error de red sería lo peor que puede
+   * hacer este botón.
+   */
+  async function empezarProyectoNuevo() {
+    if (hayCambiosSinGuardar && proyecto.numero.trim()) {
+      const r = await guardarAhora()
+      if (!r.ok) return
+    }
+    setProyecto({
+      numero: '',
+      paisFabricacion: proyecto.paisFabricacion,
+      obra: '',
+      cliente: '',
+      ubicacion: '',
+      // el distribuidor se mantiene: es el mismo quien sigue cotizando
+      distribuidor: proyecto.distribuidor,
+      creadoPor: proyecto.creadoPor,
+      areas: [areaInicial('Área 1', false)],
+    })
+    setActiva(0)
+    setSeleccion(null)
+    setRevisionGuardada(null)
+    setAvisoProyecto(null)
+    setGuardado(null)
+    setPaso(1)
+  }
 
   /** los colores de México no están en el catálogo, así que el render se busca por nombre */
   function conFoto(cfg: Config, cabina?: TipoCabina) {
@@ -1196,8 +1285,15 @@ export default function App() {
         <Proyectos
           usuario={usuario}
           proyecto={proyecto}
-          onAbrir={(p) => {
+          revisionActual={revisionGuardada?.revision ?? null}
+          hayCambios={hayCambiosSinGuardar}
+          onGuardar={guardarAhora}
+          onAbrir={(p, revision) => {
             setProyecto(p)
+            // lo que se abre YA está guardado con esa letra: desde acá, la
+            // siguiente nace solo si se edita algo
+            setRevisionGuardada({ revision, huella: huellaDe(p) })
+            setAvisoProyecto(null)
             // el proyecto que llega trae sus propias áreas y su plano ya armado:
             // se vuelve al área uno y al paso del plano, no al principio
             setActiva(0)
@@ -2154,10 +2250,29 @@ export default function App() {
 
 
                   <div style={{ display: 'flex', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
-                    <button className="btn primario" onClick={bajarCotizacion}>Cotización en PDF</button>
+                    <button className="btn primario" onClick={() => void guardarAhora()} disabled={guardandoProyecto}>
+                      {guardandoProyecto ? 'Guardando…' : 'Guardar proyecto'}
+                    </button>
+                    <button className="btn" onClick={bajarCotizacion}>Cotización en PDF</button>
                     <button className="btn" onClick={bajarPDF}>Plano en PDF</button>
                     <button className="btn" onClick={bajarCSV}>CSV para el CIP</button>
+                    <div className="sep" style={{ flex: 1 }} />
+                    <button
+                      className="btn plano"
+                      onClick={() => void empezarProyectoNuevo()}
+                      disabled={guardandoProyecto}
+                      title="Guarda lo que falte y arranca un proyecto en blanco"
+                    >
+                      + Proyecto nuevo
+                    </button>
                   </div>
+
+                  {avisoProyecto && (
+                    <div className={`aviso-caja ${avisoProyecto.ok ? 'ok' : ''}`} style={{ marginTop: 16, maxWidth: 720 }}>
+                      <b>{avisoProyecto.ok ? 'Proyecto guardado' : 'No se guardó'}</b>
+                      <span>{avisoProyecto.mensaje}</span>
+                    </div>
+                  )}
 
                   <div className="aviso-caja" style={{ marginTop: 16, maxWidth: 720 }}>
                     <b>Qué lleva cada archivo</b>
