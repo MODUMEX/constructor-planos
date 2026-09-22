@@ -2256,15 +2256,6 @@ export default function App() {
                     <button className="btn" onClick={bajarCotizacion}>Cotización en PDF</button>
                     <button className="btn" onClick={bajarPDF}>Plano en PDF</button>
                     <button className="btn" onClick={bajarCSV}>CSV para el CIP</button>
-                    <div className="sep" style={{ flex: 1 }} />
-                    <button
-                      className="btn plano"
-                      onClick={() => void empezarProyectoNuevo()}
-                      disabled={guardandoProyecto}
-                      title="Guarda lo que falte y arranca un proyecto en blanco"
-                    >
-                      + Proyecto nuevo
-                    </button>
                   </div>
 
                   {avisoProyecto && (
@@ -2323,7 +2314,19 @@ export default function App() {
                 {paso === 6 ? 'Dibujar el plano →' : 'Siguiente →'}
               </button>
             ) : paso === 8 ? (
-              <button className="btn primario" onClick={() => setPaso(7)}>Volver al plano</button>
+              <>
+                {/* Empezar otro proyecto es lo último que se hace en la pantalla,
+                    así que vive acá abajo y no arriba entre los de exportar. */}
+                <button
+                  className="btn"
+                  onClick={() => void empezarProyectoNuevo()}
+                  disabled={guardandoProyecto}
+                  title="Guarda lo que falte y arranca un proyecto en blanco"
+                >
+                  {guardandoProyecto ? 'Guardando…' : '+ Proyecto nuevo'}
+                </button>
+                <button className="btn primario" onClick={() => setPaso(7)}>Volver al plano</button>
+              </>
             ) : null}
           </div>
         </div>
