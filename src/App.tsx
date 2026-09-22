@@ -342,34 +342,34 @@ export default function App() {
     distribuidores.find((d) => d.nombre === proyecto.distribuidor)?.region ?? null
 
   /**
-   * La moneda NO se elige: la manda la región. Costa Rica factura en colones y
-   * el resto de LATAM en dólares. Sin distribuidor elegido todavía no hay
-   * región, así que ahí se deja como estaba.
+   * La moneda NO se elige.
+   *
+   * Lo primero que manda es DÓNDE SE FABRICA: un proyecto de la planta de
+   * México sale de la lista de precios de México, que está en pesos y con sus
+   * propios grupos de color, así que cotizarlo en otra moneda mezclaría los
+   * tiers de una lista con las tarifas de la otra.
+   *
+   * La manda la REGIÓN DEL DISTRIBUIDOR, que es quien factura: Costa Rica en
+   * colones, México en pesos y el resto de LATAM en dólares.
+   *
+   * Mientras no haya distribuidor elegido todavía no hay región, y ahí decide
+   * dónde se fabrica: la planta de México cotiza de su lista, que está en
+   * pesos. Con Costa Rica se deja elegir, como siempre.
    */
   const monedaFija: Moneda | null =
     regionDistribuidor === 'Costa Rica' ? 'CRC'
-      : regionDistribuidor === 'LATAM' ? 'USD'
-        : regionDistribuidor === 'México' ? 'MXN'
-          : null
+      : regionDistribuidor === 'México' ? 'MXN'
+        : regionDistribuidor === 'LATAM' ? 'USD'
+          : proyecto.paisFabricacion === 'MX' ? 'MXN'
+            : null
 
-  /**
-   * Se cotiza si se fabrica en Costa Rica Y el distribuidor no es de México,
-   * que no cotiza desde la app: se lleva plano y orden de compra, sin precio.
-   */
-  const cotiza = proyecto.paisFabricacion === 'CR' && regionDistribuidor !== 'México'
-
-  // OJO: estos dos efectos van ACÁ y no más abajo. Abajo hay un return temprano
+  // OJO: este efecto va ACÁ y no más abajo. Abajo hay un return temprano
   // para la pantalla de entrada, y un hook después de un return cambia la
   // cantidad de hooks entre "sin sesión" y "con sesión": React aborta el
   // dibujo y la ventana queda en negro al iniciar sesión.
   useEffect(() => {
     if (monedaFija && moneda !== monedaFija) setMoneda(monedaFija)
   }, [monedaFija, moneda])
-
-  // si el distribuidor elegido no cotiza, no dejarla parada en ese paso
-  useEffect(() => {
-    if (!cotiza && paso === 8) setPaso(7)
-  }, [cotiza, paso])
 
   /**
    * Los datos del proyecto que NO pueden faltar: sin ellos el plano sale con el
@@ -591,8 +591,6 @@ export default function App() {
    * dejarle un color que exista en la lista nueva.
    */
   function cambiarPais(paisFabricacion: Pais) {
-    // México no cotiza: si estaba parada en Cotización, se regresa al plano.
-    if (paisFabricacion === 'MX') setPaso((n) => (n === 8 ? 7 : n))
     setProyecto((p) => ({
       ...p,
       paisFabricacion,
@@ -1264,9 +1262,14 @@ export default function App() {
   const cabinasTotal = area.tramos.reduce((s, t) => s + t.cabinas.length, 0)
 
 
-  const pasosVisibles = cotiza ? PASOS : PASOS.filter((p) => p.n !== 8)
-  const ultimoPaso = cotiza ? 8 : 7
-  const puedePasar = (n: number) => (n <= 6 || area.tramos.length > 0) && (n !== 8 || cotiza)
+  const pasosVisibles = PASOS
+  /**
+   * La cotización es el último paso SIEMPRE. Antes México se quedaba en el 7:
+   * no tenía lista de precios y se llevaba plano y orden de compra sin precio.
+   * Desde que llegó la lista de la planta de México las dos plantas cotizan.
+   */
+  const ultimoPaso = 8
+  const puedePasar = (n: number) => n <= 6 || area.tramos.length > 0
 
   return (
     <div className="app" data-tema={tema === 'claro' ? 'claro' : undefined}>
@@ -1708,7 +1711,7 @@ export default function App() {
                       {regionDistribuidor && (
                         <span className="ayuda">
                           {regionDistribuidor === 'México'
-                            ? 'México no cotiza desde la app: este proyecto lleva plano y orden de compra, sin el paso de Cotización.'
+                            ? 'Cotiza en pesos mexicanos.'
                             : regionDistribuidor === 'Costa Rica'
                               ? 'Cotiza en colones.'
                               : 'Cotiza en dólares.'}
