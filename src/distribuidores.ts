@@ -180,8 +180,16 @@ async function llamarGestion(usuario: Usuario | null, cuerpo: Record<string, unk
  */
 export async function crearDistribuidor(usuario: Usuario | null, d: DatosDistribuidor): Promise<Resultado<Distribuidor>> {
   if (!(d.nombre ?? '').trim()) return { ok: false, mensaje: 'El nombre no puede ir en blanco.' }
-  if (!(d.email ?? '').trim()) return { ok: false, mensaje: 'El correo es el usuario con el que entra: no puede ir en blanco.' }
-  if ((d.password ?? '').length < 6) return { ok: false, mensaje: 'La contraseña tiene que tener al menos 6 caracteres.' }
+  // El correo y la contraseña son OPCIONALES: solo hacen falta si además de la
+  // ficha se le quiere dar a la empresa una cuenta propia. Lo normal es dar de
+  // alta la ficha sola y ligarle los contactos después, desde Solicitudes.
+  const conAcceso = Boolean((d.email ?? '').trim()) || Boolean(d.password)
+  if (conAcceso && !(d.email ?? '').trim()) {
+    return { ok: false, mensaje: 'Pusiste contraseña pero no correo: los dos son el acceso, van juntos.' }
+  }
+  if (conAcceso && (!d.password || d.password.length < 6)) {
+    return { ok: false, mensaje: 'Para darle cuenta propia, la contraseña tiene que tener al menos 6 caracteres.' }
+  }
 
   const r = await llamarGestion(usuario, {
     accion: 'crear_distribuidor',

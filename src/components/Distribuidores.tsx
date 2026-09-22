@@ -12,10 +12,14 @@ import CampoNumero from './CampoNumero'
  * pantalla de administración: el vendedor no escribe el nombre en el cajetín,
  * lo elige de acá.
  *
- * Dar de alta crea DOS cosas: la ficha de la empresa y la cuenta con la que el
- * distribuidor entra a la app, con rol restringido. Por eso el correo y la
- * contraseña son obligatorios al crearlo; al editar, la contraseña solo se toca
- * si se escribe una nueva.
+ * Dar de alta crea la FICHA de la empresa. El correo y la contraseña son
+ * opcionales: si se ponen, además se le crea a la empresa una cuenta propia con
+ * rol restringido; si no, la ficha queda sola y los contactos se le ligan
+ * después, al aprobar sus solicitudes. Ese es el camino normal, y es lo que
+ * permite dar de alta al distribuidor antes de que exista ningún contacto.
+ *
+ * Los dos van juntos o no va ninguno: son el usuario y su clave. Al editar, la
+ * contraseña solo se toca si se escribe una nueva.
  *
  * Un distribuidor no se borra, se desactiva: los planos viejos siguen llevando
  * su nombre y perderlo dejaría cajetines huérfanos. Los desactivados no salen
@@ -151,7 +155,10 @@ export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Pr
                 <div className="campo">
                   <label>Correo</label>
                   <input value={edita.email ?? ''} onChange={(e) => campo('email', e.target.value)} placeholder="distribuidor@empresa.com" />
-                  <span className="ayuda">Con este correo entra a la app</span>
+                  <span className="ayuda">
+                    Opcional. Solo si la empresa va a tener cuenta propia; los contactos se ligan
+                    después desde Solicitudes
+                  </span>
                 </div>
                 <div className="campo">
                   <label>Contraseña</label>
@@ -175,7 +182,7 @@ export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Pr
                   </div>
                   <span className="ayuda">
                     {esNuevo
-                      ? 'Se le crea la cuenta con esta clave'
+                      ? 'Opcional. Va junto con el correo: los dos son el acceso'
                       : 'La que ya tiene no se puede ver: Supabase la guarda cifrada. Si no la sabés, escribile una nueva y entregásela.'}
                   </span>
                 </div>
