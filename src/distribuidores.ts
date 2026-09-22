@@ -51,6 +51,12 @@ export interface Distribuidor {
   descuento: number
   /** IVA en %; null = el automático de la región (Costa Rica 13, LATAM 0) */
   iva: number | null
+  /**
+   * El logo de la empresa como data URI (data:image/png;base64,…). Sale en el
+   * PDF de la cotización, al lado del de Modumex. Va en una columna de texto y
+   * no en un bucket: así no hay URL pública que se caiga ni CSP que lo bloquee.
+   */
+  logo: string | null
   activo: boolean
 }
 
@@ -71,10 +77,11 @@ interface Fila {
   pais: string | null
   descuento: number | null
   iva: number | null
+  logo: string | null
   activo: boolean | null
 }
 
-const COLUMNAS = 'distribuidor_id,nombre,contacto,email,telefono,ubicacion,region,pais,descuento,iva,activo'
+const COLUMNAS = 'distribuidor_id,nombre,contacto,email,telefono,ubicacion,region,pais,descuento,iva,logo,activo'
 
 function deFila(f: Fila): Distribuidor {
   return {
@@ -89,6 +96,7 @@ function deFila(f: Fila): Distribuidor {
     descuento: Number(f.descuento ?? 0),
     // ojo: 0 es un IVA válido (LATAM), así que solo null es "automático"
     iva: f.iva === null || f.iva === undefined ? null : Number(f.iva),
+    logo: f.logo ?? null,
     activo: f.activo !== false,
   }
 }
@@ -186,6 +194,7 @@ export async function crearDistribuidor(usuario: Usuario | null, d: DatosDistrib
     pais: d.pais ?? null,
     descuento: d.descuento ?? 0,
     iva: d.iva ?? null,
+    logo: d.logo ?? null,
     activo: d.activo !== false,
     password: d.password,
   })
@@ -203,6 +212,7 @@ export async function crearDistribuidor(usuario: Usuario | null, d: DatosDistrib
       pais: d.pais ?? null,
       descuento: d.descuento ?? 0,
       iva: d.iva ?? null,
+      logo: d.logo ?? null,
       activo: d.activo !== false,
     },
     mensaje: 'Distribuidor dado de alta con su cuenta de acceso.',
@@ -229,6 +239,8 @@ export async function guardarDistribuidor(usuario: Usuario | null, d: DatosDistr
     pais: d.pais ?? null,
     descuento: d.descuento ?? 0,
     iva: d.iva ?? null,
+    // null borra el logo a propósito; undefined lo deja como estaba
+    logo: d.logo === undefined ? undefined : (d.logo || null),
     activo: d.activo !== false,
     ...(d.password ? { password: d.password } : {}),
   })
@@ -246,6 +258,7 @@ export async function guardarDistribuidor(usuario: Usuario | null, d: DatosDistr
       pais: d.pais ?? null,
       descuento: d.descuento ?? 0,
       iva: d.iva ?? null,
+      logo: d.logo ?? null,
       activo: d.activo !== false,
     },
     mensaje: d.password ? 'Cambios guardados, incluida la contraseña.' : 'Cambios guardados.',

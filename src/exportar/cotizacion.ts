@@ -31,6 +31,8 @@ export interface DatosCotizacion {
   ivaPct: number
   /** quién la emite, para el pie */
   vendedor: string
+  /** el logo del distribuidor como data URI; va al lado del de Modumex */
+  logoDistribuidor?: string | null
   /** validez en días; la cotización dice hasta cuándo vale */
   validezDias?: number
   /** número de la cotización si ya está guardada */
@@ -140,6 +142,27 @@ function encabezado(doc: jsPDF, proyecto: Proyecto, d: DatosCotizacion, hojaN: n
   marcaDeAgua(doc, HOJA)
 
   const altoLogo = ponerLogo(doc, M, M, 46)
+
+  // El logo del distribuidor va a la derecha del de Modumex, separado por una
+  // rayita. Si la imagen viniera rota se sigue sin él: una cotización sin logo
+  // se entiende, una que no se genera no.
+  if (d.logoDistribuidor) {
+    try {
+      const prop = doc.getImageProperties(d.logoDistribuidor)
+      const maxAlto = Math.max(altoLogo, 12)
+      const maxAncho = 40
+      const escala = Math.min(maxAncho / prop.width, maxAlto / prop.height)
+      const w = prop.width * escala
+      const h = prop.height * escala
+      const x = M + 46 + 8
+      doc.setDrawColor(210)
+      doc.line(M + 46 + 4, M, M + 46 + 4, M + maxAlto)
+      doc.addImage(d.logoDistribuidor, x, M + (maxAlto - h) / 2, w, h, undefined, 'FAST')
+    } catch {
+      // logo ilegible: se omite y la cotización sale igual
+    }
+  }
+
   let y = M + Math.max(altoLogo, 16) + 8
 
   doc.setTextColor(...MARCA)

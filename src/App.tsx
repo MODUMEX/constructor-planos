@@ -1186,6 +1186,8 @@ export default function App() {
         para,
         ivaPct: ivaPorcentaje,
         vendedor: usuario?.nombre ?? '',
+        // el logo sale de la ficha del distribuidor del proyecto
+        logoDistribuidor: distribuidores.find((x) => x.nombre === proyectoConAutor.distribuidor)?.logo ?? null,
       })
       const bytes = new Uint8Array(doc.output('arraybuffer'))
       if (bytes.length < 1000) throw new Error(`el PDF salió vacío (${bytes.length} bytes)`)

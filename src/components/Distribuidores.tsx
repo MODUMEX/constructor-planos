@@ -24,8 +24,11 @@ import CampoNumero from './CampoNumero'
 
 const VACIO: DatosDistribuidor = {
   nombre: '', contacto: '', email: '', telefono: '', ubicacion: '', region: 'Costa Rica',
-  pais: 'Costa Rica', descuento: 0, iva: null, activo: true, password: '',
+  pais: 'Costa Rica', descuento: 0, iva: null, logo: null, activo: true, password: '',
 }
+
+/** hasta acá pesa un logo; de sobra para un PNG o un JPG de empresa */
+const LOGO_MAX_BYTES = 800_000
 
 interface Props {
   usuario: Usuario
@@ -40,6 +43,32 @@ export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Pr
   const [verClave, setVerClave] = useState(false)
   const [refrescando, setRefrescando] = useState(false)
   const [cambiando, setCambiando] = useState<number | null>(null)
+  const [avisoLogo, setAvisoLogo] = useState('')
+
+  /**
+   * Lee el archivo y lo deja como data URI en la ficha. No se sube a ningún
+   * lado: viaja con la ficha y se guarda en su columna, así el PDF lo dibuja
+   * sin depender de una URL.
+   */
+  function subirLogo(archivo: File | undefined) {
+    setAvisoLogo('')
+    if (!archivo) return
+    if (!['image/png', 'image/jpeg'].includes(archivo.type)) {
+      setAvisoLogo('El logo tiene que ser PNG o JPG.')
+      return
+    }
+    if (archivo.size > LOGO_MAX_BYTES) {
+      setAvisoLogo(`El logo pesa ${Math.round(archivo.size / 1024)} KB y el tope son 800 KB. Achicá la imagen.`)
+      return
+    }
+    const lector = new FileReader()
+    lector.onerror = () => setAvisoLogo('No se pudo leer la imagen.')
+    lector.onload = () => {
+      campo('logo', String(lector.result))
+      setAvisoLogo(`Cargado: ${archivo.name}. Falta apretar Guardar.`)
+    }
+    lector.readAsDataURL(archivo)
+  }
 
   /**
    * Activa o desactiva sin abrir la ficha. Un distribuidor NO se borra: los
@@ -189,6 +218,32 @@ export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Pr
                     min={0} max={100} step={0.01}
                   />
                   <span className="ayuda">Cae automático en su cotización</span>
+                </div>
+                <div className="campo" style={{ flex: '1 1 100%' }}>
+                  <label>Logo de la empresa</label>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                    {edita.logo && (
+                      <img
+                        src={edita.logo} alt="logo"
+                        style={{
+                          height: 38, maxWidth: 150, objectFit: 'contain',
+                          background: '#fff', borderRadius: 4, padding: 2,
+                        }}
+                      />
+                    )}
+                    <input
+                      type="file" accept="image/png,image/jpeg"
+                      onChange={(e) => subirLogo(e.target.files?.[0])}
+                    />
+                    {edita.logo && (
+                      <button className="btn" style={{ flex: '0 0 auto' }} onClick={() => { campo('logo', null); setAvisoLogo('') }}>
+                        Quitar logo
+                      </button>
+                    )}
+                  </div>
+                  <span className="ayuda">
+                    {avisoLogo || 'PNG o JPG, hasta 800 KB. Sale en el PDF de la cotización, al lado del de Modumex.'}
+                  </span>
                 </div>
                 <div className="campo">
                   <label>IVA (%)</label>
