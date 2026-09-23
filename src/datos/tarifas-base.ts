@@ -66,52 +66,52 @@ export const TARIFAS_BASE: TablaTarifas = {
   "REFORZADO": {
     "linea": {
       "puerta": 232.29,
-      "panel": 304.93,
-      "pilastra": 268.34,
+      "panel": 195.8,
+      "pilastra": 304.93,
       "mingitorio": 228.66
     },
     "especiales": {
       "puerta": 277.47,
-      "panel": 364.21,
-      "pilastra": 320.52,
+      "panel": 233.88,
+      "pilastra": 364.21,
       "mingitorio": 273.13
     },
     "lineaCRC": {
       "puerta": 133914.42,
-      "panel": 175781.05,
-      "pilastra": 157403.47,
+      "panel": 112870.21,
+      "pilastra": 175781.05,
       "mingitorio": 131820.32
     },
     "especialesCRC": {
       "puerta": 159956.63,
-      "panel": 209957.26,
-      "pilastra": 184766.11,
+      "panel": 134827.37,
+      "pilastra": 209957.26,
       "mingitorio": 157449.89
     }
   },
   "REFORZADO170": {
     "linea": {
       "puerta": 232.29,
-      "panel": 304.93,
-      "pilastra": 268.34,
+      "panel": 195.8,
+      "pilastra": 304.93,
       "mingitorio": 228.66
     },
     "especiales": {
       "puerta": 277.47,
-      "panel": 364.21,
-      "pilastra": 320.52,
+      "panel": 233.88,
+      "pilastra": 364.21,
       "mingitorio": 273.13
     },
     "lineaCRC": {
       "puerta": 133914.42,
-      "panel": 175781.05,
-      "pilastra": 157403.47,
+      "panel": 112870.21,
+      "pilastra": 175781.05,
       "mingitorio": 131820.32
     },
     "especialesCRC": {
       "puerta": 159956.63,
-      "panel": 209957.26,
-      "pilastra": 184766.11,
+      "panel": 134827.37,
+      "pilastra": 209957.26,
       "mingitorio": 157449.89
     }
   },
@@ -253,25 +253,25 @@ export const TARIFAS_BASE: TablaTarifas = {
     "linea": {
       "puerta": 369.26,
       "panel": 313.14,
-      "pilastra": 268.34,
+      "pilastra": 480.93,
       "mingitorio": 363.66
     },
     "especiales": {
       "puerta": 438.73,
       "panel": 371.69,
-      "pilastra": 320.52,
+      "pilastra": 572.11,
       "mingitorio": 432.04
     },
     "lineaCRC": {
       "puerta": 196159.89,
       "panel": 166269.89,
-      "pilastra": 157403.47,
+      "pilastra": 255630.42,
       "mingitorio": 193173.47
     },
     "especialesCRC": {
       "puerta": 262748.32,
       "panel": 214269.26,
-      "pilastra": 184766.11,
+      "pilastra": 343041.26,
       "mingitorio": 249059.26
     }
   },
@@ -345,32 +345,32 @@ export const TARIFAS_BASE: TablaTarifas = {
     "usdOnly": true,
     "linea": {
       "puerta": 335.34,
-      "panel": 440.17,
-      "pilastra": 387.35,
+      "panel": 282.66,
+      "pilastra": 440.17,
       "mingitorio": 330.09
     },
     "lineaCR": {
       "puerta": 368.51,
-      "panel": 483.7,
-      "pilastra": 425.66,
+      "panel": 310.62,
+      "pilastra": 483.7,
       "mingitorio": 362.73
     },
     "especiales": {
       "puerta": 388.29,
-      "panel": 509.69,
-      "pilastra": 448.51,
+      "panel": 327.29,
+      "pilastra": 509.69,
       "mingitorio": 382.44
     },
     "aceroInox": {
       "puerta": 436.98,
-      "panel": 537.41,
-      "pilastra": 524.12,
+      "panel": 382.47,
+      "pilastra": 537.41,
       "mingitorio": 424.96
     },
     "antigrafiti": {
       "puerta": 316.63,
-      "panel": 366.23,
-      "pilastra": 351.81,
+      "panel": 263.86,
+      "pilastra": 366.23,
       "mingitorio": 293.18
     }
   },
@@ -378,32 +378,32 @@ export const TARIFAS_BASE: TablaTarifas = {
     "usdOnly": true,
     "linea": {
       "puerta": 335.34,
-      "panel": 440.17,
-      "pilastra": 387.35,
+      "panel": 282.66,
+      "pilastra": 440.17,
       "mingitorio": 330.09
     },
     "lineaCR": {
       "puerta": 368.51,
-      "panel": 483.7,
-      "pilastra": 425.66,
+      "panel": 310.62,
+      "pilastra": 483.7,
       "mingitorio": 362.73
     },
     "especiales": {
       "puerta": 388.29,
-      "panel": 509.69,
-      "pilastra": 448.51,
+      "panel": 327.29,
+      "pilastra": 509.69,
       "mingitorio": 382.44
     },
     "aceroInox": {
       "puerta": 436.98,
-      "panel": 537.41,
-      "pilastra": 524.12,
+      "panel": 382.47,
+      "pilastra": 537.41,
       "mingitorio": 424.96
     },
     "antigrafiti": {
       "puerta": 316.63,
-      "panel": 366.23,
-      "pilastra": 351.81,
+      "panel": 263.86,
+      "pilastra": 366.23,
       "mingitorio": 293.18
     }
   },

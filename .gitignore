@@ -18,3 +18,4 @@ tsconfig.tsbuildinfo
 .claude
 .especiales.ts
 .libre.mjs
+.extras.mjs

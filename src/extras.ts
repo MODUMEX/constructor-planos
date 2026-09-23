@@ -12,10 +12,12 @@ import type { Extra, RenglonBOM } from './types'
  *   · puerta, panel, pilastra y mingitorio se cobran POR M², con la misma
  *     tarifa, tier y moneda que el resto del proyecto. Se piden las medidas
  *     porque el precio depende del área de la pieza.
- *   · herraje y grabado se cobran POR UNIDAD y están en las dos listas: la de
- *     LATAM en dólares y la de México en pesos. Para Costa Rica se toma el de
- *     dólares y se pasa a colones con el tipo de cambio, que es la misma regla
- *     que ya usan los modelos `usdOnly`.
+ *   · herraje y grabado se cobran POR UNIDAD y salen de las listas de precios:
+ *     LATAM en dólares, Costa Rica en colones y México en pesos. Para los
+ *     herrajes, Costa Rica tiene lista PROPIA en colones, así que esa manda.
+ *     Solo lo que no está en esa lista —los grabados láser, que no tienen hoja
+ *     de CR— se convierte desde el dólar con el tipo de cambio, como en los
+ *     modelos `usdOnly`.
  *
  * Un precio escrito a mano SIEMPRE manda sobre el del catálogo: es la salida
  * para un artículo que no está en la lista o para un precio negociado.
@@ -74,9 +76,12 @@ export function precioDeExtra(extra: Extra, o: OpcionesPrecio): { precio: number
   if (o.moneda === 'MXN') {
     return art.mxn != null ? { precio: art.mxn, deLista: true } : { precio: 0, deLista: false }
   }
+  // Costa Rica tiene su propia lista en colones: si el artículo está ahí, ese
+  // es el precio bueno y no hay nada que convertir
+  if (o.moneda === 'CRC' && art.crc != null) return { precio: art.crc, deLista: true }
   if (art.usd == null) return { precio: 0, deLista: false }
-  // Costa Rica factura en colones pero la lista está en dólares: se convierte
-  // con el tipo de cambio, igual que las tarifas de los modelos usdOnly
+  // lo que no está en la lista de CR se pasa desde el dólar con el tipo de
+  // cambio, igual que las tarifas de los modelos usdOnly
   if (o.moneda === 'CRC') return { precio: art.usd * (o.tipoCambio || 0), deLista: (o.tipoCambio || 0) > 0 }
   return { precio: art.usd, deLista: true }
 }
