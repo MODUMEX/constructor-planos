@@ -19,3 +19,4 @@ tsconfig.tsbuildinfo
 .especiales.ts
 .libre.mjs
 .extras.mjs
+.verext.mjs
