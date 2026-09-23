@@ -173,6 +173,16 @@ export interface Config {
    */
   puertaAccesibleCm?: number
   anchoPilastraCm: number
+  /**
+   * La pilastra con la que el divisor del CUARTO PMR cierra contra el muro del
+   * fondo, en cm.
+   *
+   * Se elige igual que las de la tira —arrastrándola en el plano— y es la que
+   * manda: lo que queda del fondo se lo lleva el PANEL del divisor, que por eso
+   * es más largo que los de las demás cabinas. Si no viene, se usa la medida
+   * que salía antes, para que un plano ya guardado se siga viendo igual.
+   */
+  pilastraPmrCm?: number
   /** espesor del material de PT, PN y PL, en mm: 3 en Superior, 12 en compacto */
   espesorMm: number
   terminacion: Terminacion

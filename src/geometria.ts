@@ -1,7 +1,9 @@
 import type { Cabina, Config, Tramo } from './types'
-import { ANCHOS_PILASTRA, GRUESO_PILASTRA } from './catalog'
-import { anchoTotal, ladoDePilastra, ladosDeCabina, lugaresDe } from './modulacion'
-import { medidaCercana } from './modulador'
+import { anchosPanelFabrica, GRUESO_PILASTRA } from './catalog'
+import { anchoTotal, divisorDelCuarto, ladoDePilastra, ladosDeCabina, lugaresDe, profundidadDelLugar } from './modulacion'
+// se mudó a modulación —que es de quien depende este archivo— pero se sigue
+// pudiendo importar desde acá, que es donde la busca el resto de la app
+export { profundidadDelLugar }
 
 /** espesor con el que se dibuja la pared, en cm */
 export const ESPESOR_MURO = 12
@@ -194,6 +196,14 @@ export interface CuartoPmr {
   divisor: PiezaDivisorPmr[]
   /** la pilastra con la que el divisor cierra contra el muro del fondo */
   pilastraCm: number
+  /**
+   * El panel del divisor, que NO es el de las demás cabinas.
+   *
+   * El cuarto es más hondo que un baño normal, así que su panel es más largo:
+   * mide lo que queda del fondo después de la puerta y de la pilastra. Es la
+   * pieza que se estira cuando se cambia cualquiera de las otras dos.
+   */
+  panelCm: number
   /** qué avisar cuando el divisor no cierra justo contra el fondo */
   aviso: string | null
 }
@@ -225,10 +235,7 @@ export function centroPilastra(
   return u
 }
 
-/** la profundidad del lugar, que nunca puede ser menor que la de la cabina */
-export function profundidadDelLugar(config: Config): number {
-  return Math.max(config.profundidadLugarCm ?? config.profundidadCm, config.profundidadCm)
-}
+
 
 /**
  * El cuarto PMR de este tramo, o null si el área no lo lleva.
@@ -246,20 +253,11 @@ export function cuartoPmr(tramo: Tramo, config: Config): CuartoPmr | null {
   const desde = acumulado(tramo.cabinas)[i]
   const prof = profundidadDelLugar(config)
 
-  // El panel del divisor NO se pide aparte: es el mismo panel que llevan las
-  // demás cabinas. Lo que sobra del fondo lo cubren la puerta y una pilastra
-  // contra el muro.
-  const panel = config.profundidadCm
-  // La puerta la manda la CABINA, no la configuración: así el menú del plano
-  // sirve de verdad. Antes ganaba config.puertaAccesibleCm, que siempre tiene
-  // valor, y cambiar la puerta sobre el dibujo no movía nada.
-  const puerta = Math.max(0, cab.puerta.anchoCm || config.puertaAccesibleCm || 90)
-  const sobra = Math.round((prof - panel - puerta) * 10) / 10
-  // la pilastra sale de una medida de catálogo, no de lo que sobre pelado
-  const pilastra = sobra > 0 ? medidaCercana(ANCHOS_PILASTRA, sobra) : 0
-  // si la pieza de catálogo no da justo, se dice: es un dato de fabricación,
-  // no un redondeo que se pueda tapar
-  const falta = Math.round((sobra - pilastra) * 10) / 10
+  // Cómo se reparte el fondo entre las tres piezas lo decide modulación, que
+  // es de donde salen también el despiece y la cotización: la PILASTRA se
+  // elige y el PANEL se estira con lo que quede. La puerta la manda la CABINA,
+  // no la configuración, así el menú del plano sirve de verdad.
+  const { puerta, pilastra, panel } = divisorDelCuarto(cab, config, prof)
 
   const divisor: PiezaDivisorPmr[] = []
   let v = 0
@@ -279,29 +277,36 @@ export function cuartoPmr(tramo: Tramo, config: Config): CuartoPmr | null {
     cierre: config.cierrePmr ?? 'muros',
     divisor,
     pilastraCm: pilastra,
-    aviso: avisoDelDivisor(prof, panel, puerta, pilastra, sobra, falta),
+    panelCm: panel,
+    aviso: avisoDelDivisor(prof, panel, puerta, pilastra, config.modelo),
   }
 }
 
 /** Qué decirle al vendedor cuando el divisor no cierra contra el fondo. */
+/**
+ * Qué avisar del divisor del cuarto.
+ *
+ * Ya no hay que avisar que "no cierra": el panel se estira hasta cerrar. Lo
+ * que sí hay que decir es cuándo ese panel no se puede fabricar —porque se
+ * pasa de la hoja más grande del modelo— o cuándo no es una medida de ficha y
+ * entonces se corta de la de arriba.
+ */
 function avisoDelDivisor(
-  prof: number, panel: number, puerta: number, pilastra: number, sobra: number, falta: number,
+  prof: number, panel: number, puerta: number, pilastra: number, modelo?: string,
 ): string | null {
-  if (sobra < 0) {
-    return `El divisor se pasa ${(-sobra).toFixed(1)} cm del fondo: el panel de ${panel} y la puerta de ${puerta}`
-      + ` suman más que los ${prof} cm del lugar. Achicá la puerta o agrandá el fondo.`
+  if (panel <= 0) {
+    return `La puerta de ${puerta} y la pilastra de ${pilastra} ya suman los ${prof} cm del fondo:`
+      + ` no queda panel. Achicá la puerta o la pilastra.`
   }
-  if (sobra === 0) {
-    return `El divisor cierra justo con el panel y la puerta, sin pilastra contra el muro.`
-      + ` Si la lleva, achicá la puerta.`
+  const deFicha = anchosPanelFabrica(modelo ?? '')
+  const mayor = Math.max(...deFicha)
+  if (panel > mayor) {
+    return `El panel del divisor tendría que medir ${panel} cm y el más grande de este modelo es de`
+      + ` ${mayor}. Agrandá la pilastra contra el muro o achicá el fondo del cuarto.`
   }
-  if (pilastra === 0) {
-    return `Sobran ${sobra.toFixed(1)} cm para la pilastra del divisor y la más chica del catálogo`
-      + ` es de ${ANCHOS_PILASTRA[0]} cm.`
-  }
-  if (falta !== 0) {
-    return `La pilastra del divisor quedó de ${pilastra} cm y el hueco es de ${sobra.toFixed(1)}:`
-      + ` ${falta > 0 ? `faltan ${falta.toFixed(1)} cm` : `sobran ${(-falta).toFixed(1)} cm`}.`
+  if (!deFicha.includes(panel)) {
+    const arriba = deFicha.filter((a) => a > panel).sort((a, b) => a - b)[0]
+    return `El panel del divisor mide ${panel} cm, que no es medida de ficha: se corta de uno de ${arriba}.`
   }
   return null
 }

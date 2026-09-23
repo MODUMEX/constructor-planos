@@ -64,6 +64,12 @@ interface Props {
   onTipoPuerta: (tramoId: string, indice: number, tipo: 'puerta' | 'ninguna') => void
   /** se le escribió la medida a un ESPACIO LIBRE: queda clavada y modulan las pilastras */
   onAnchoLibre: (tramoId: string, indice: number, anchoCm: number) => void
+  /**
+   * al arrastrar la pilastra del divisor del CUARTO PMR, la que cierra contra
+   * el muro del fondo: se elige su medida y el PANEL del divisor se estira con
+   * lo que quede
+   */
+  onPilastraPmr: (anchoCm: number) => void
 
 }
 
@@ -86,6 +92,7 @@ export default function EditorPlano({
   onPuerta,
   onTipoPuerta,
   onAnchoLibre,
+  onPilastraPmr,
   onOrinal,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
@@ -160,6 +167,39 @@ export default function EditorPlano({
     }
   }
 
+  /**
+   * Arrastre de la pilastra del divisor del cuarto PMR.
+   *
+   * Va a lo HONDO, no a lo largo de la tira, así que el desplazamiento se mide
+   * contra el eje de profundidad del marco. Tirando hacia el frente se agranda;
+   * lo que cambie se lo lleva el panel del divisor, que es la pieza que se
+   * estira.
+   */
+  const arrastrePmr = useRef<{
+    x0: number
+    y0: number
+    px: number
+    py: number
+    escala: number
+    ancho0: number
+  } | null>(null)
+
+  function empezarArrastrePmr(e: React.PointerEvent, m: Marco, ancho0: number) {
+    e.stopPropagation()
+    const svg = svgRef.current
+    if (!svg) return
+    const r = svg.getBoundingClientRect()
+    arrastrePmr.current = {
+      x0: e.clientX, y0: e.clientY, px: m.px, py: m.py, escala: r.width / caja.w, ancho0,
+    }
+    setArrastrando('pmr')
+    try {
+      (e.target as Element).setPointerCapture(e.pointerId)
+    } catch {
+      /* sin captura el arrastre sigue mientras el puntero esté sobre el plano */
+    }
+  }
+
   /** arrastre de una pilastra: cambia SU medida y el resto se reacomoda solo */
   function empezarArrastrePilastra(
     e: React.PointerEvent,
@@ -193,6 +233,17 @@ export default function EditorPlano({
   }
 
   function moviendo(e: React.PointerEvent) {
+    const q = arrastrePmr.current
+    if (q) {
+      if (!Number.isFinite(q.escala) || q.escala <= 0) return
+      const dx = (e.clientX - q.x0) / q.escala
+      const dy = (e.clientY - q.y0) / q.escala
+      // la pilastra está contra el muro del fondo: tirando hacia el frente crece
+      const deseado = q.ancho0 - (dx * q.px + dy * q.py)
+      const elegida = medidaCercana(anchosPilastra(config.modelo), Math.max(0, deseado))
+      if (elegida !== (config.pilastraPmrCm ?? q.ancho0)) onPilastraPmr(elegida)
+      return
+    }
     const p = arrastrePil.current
     if (p) {
       if (!Number.isFinite(p.escala) || p.escala <= 0) return
@@ -260,6 +311,7 @@ export default function EditorPlano({
     }
     arrastre.current = null
     arrastrePil.current = null
+    arrastrePmr.current = null
     setArrastrando(null)
   }
 
@@ -842,8 +894,9 @@ export default function EditorPlano({
                 const c0 = pt(m, cuarto.desdeCm - ESPESOR_MURO - 24, 0)
                 const c1 = pt(m, cuarto.desdeCm - ESPESOR_MURO - 24, profC)
                 return (
-                  <g pointerEvents="none">
+                  <g>
                     <rect
+                      pointerEvents="none"
                       x={Math.min(pa.x, pb.x)} y={Math.min(pa.y, pb.y)}
                       width={horizontal ? Math.abs(pb.x - pa.x) : ESPESOR_MURO}
                       height={horizontal ? ESPESOR_MURO : Math.abs(pb.y - pa.y)}
@@ -887,14 +940,22 @@ export default function EditorPlano({
                         )
                       }
 
+                      // La PILASTRA del divisor se agarra y se arrastra, igual
+                      // que las de la tira: es la que se elige, y el panel de al
+                      // lado se estira con lo que quede.
+                      const seArrastra = pieza.tipo === 'pilastra'
                       return (
-                        <g key={pieza.tipo}>
+                        <g key={pieza.tipo} pointerEvents={seArrastra ? 'auto' : 'none'}>
                           <rect
                             x={Math.min(a.x, b.x)} y={Math.min(a.y, b.y)}
                             width={Math.max(Math.abs(b.x - a.x), MIN_PIEZA_PX)}
                             height={Math.max(Math.abs(b.y - a.y), MIN_PIEZA_PX)}
                             fill="#22303f"
-                          />
+                            style={seArrastra ? { cursor: horizontal ? 'ns-resize' : 'ew-resize' } : undefined}
+                            onPointerDown={seArrastra ? (ev) => empezarArrastrePmr(ev, m, largoPieza) : undefined}
+                          >
+                            {seArrastra && <title>Pilastra contra el muro: arrastrala para cambiarla. El panel del divisor se estira solo.</title>}
+                          </rect>
                           {verCotas && (
                             <text
                               x={medio.x} y={medio.y} textAnchor="middle" fontSize={14} fill="#7f8fa3"

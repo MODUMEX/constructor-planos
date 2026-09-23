@@ -1816,6 +1816,7 @@ export default function App() {
                     onPuerta={onPuerta}
                     onTipoPuerta={onTipoPuerta}
                     onAnchoLibre={onAnchoLibre}
+                    onPilastraPmr={(anchoCm) => setConfig({ pilastraPmrCm: anchoCm })}
                   />
                 </div>
 

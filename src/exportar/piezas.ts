@@ -143,9 +143,12 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
         // pared del cuarto, así que va LATERAL, igual que la pilastra que lo
         // acompaña.
         const esDelCuarto = config.tipologia === 'PMR' && cab.tipo === 'accesible'
+        // El del cuarto es más largo que los demás: el cuarto es más hondo y su
+        // panel se estira hasta cerrar el divisor.
+        const delCuarto = esDelCuarto ? cuartoPmr(tramo, config) : null
         piezas.push({
           familia: 'PN',
-          anchoCm: config.profundidadCm,
+          anchoCm: delCuarto && delCuarto.panelCm > 0 ? delCuarto.panelCm : config.profundidadCm,
           altoCm: altoPanel,
           subTipo: esUltima || esDelCuarto ? 'PNLAT' : 'PNCEN',
           area,

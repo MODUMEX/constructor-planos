@@ -3,8 +3,8 @@ import {
   LARGO_SECUNDARIO_CM,
 } from './catalog'
 import type { Cabina, Config, Moneda, Pais, Tramo, TipologiaId, RenglonBOM } from './types'
-import { alturasDe, esSoloOrinales, familiaDelFrente, mamparaDe, tipologia, tierDeColor, type MedidaMG } from './catalog'
-import { ajustarPilastras, GRUESO_MG_PIEZA, modularTira } from './modulador'
+import { alturasDe, ANCHOS_PILASTRA, esSoloOrinales, familiaDelFrente, mamparaDe, tipologia, tierDeColor, type MedidaMG } from './catalog'
+import { ajustarPilastras, GRUESO_MG_PIEZA, medidaCercana, modularTira } from './modulador'
 import { precioPieza, type TablaTarifas } from './tarifas'
 
 let seq = 0
@@ -434,6 +434,39 @@ export function reajustarConPuertas(
   }
 }
 
+/**
+ * Cómo se reparte el FONDO en el divisor del cuarto accesible: panel, puerta y
+ * la pilastra que cierra contra el muro.
+ *
+ * Quién se estira: la PILASTRA se elige —se arrastra igual que las de la tira—
+ * y el PANEL se lleva lo que quede. Antes era al revés, con el panel clavado al
+ * fondo de las demás cabinas y la pilastra redondeada a una medida de catálogo:
+ * cuando no daba justo, el divisor no cerraba y solo quedaba un aviso. Así
+ * cierra siempre, y el panel del cuarto queda más largo que los de los baños
+ * normales, que es como se fabrica.
+ *
+ * Vive acá y no en el dibujo porque lo necesitan el plano, el despiece y la
+ * cotización, y tienen que dar los tres el mismo número.
+ */
+export function divisorDelCuarto(
+  cabina: Cabina,
+  config: Config,
+  profundidadLugarCm: number,
+): { puerta: number; pilastra: number; panel: number } {
+  const puerta = Math.max(0, cabina.puerta.anchoCm || config.puertaAccesibleCm || 90)
+  const sobra = Math.round((profundidadLugarCm - config.profundidadCm - puerta) * 10) / 10
+  /** la que salía antes: es el punto de partida de los planos ya guardados */
+  const deAntes = sobra > 0 ? medidaCercana(ANCHOS_PILASTRA, sobra) : 0
+  const pedida = config.pilastraPmrCm
+  const pilastra = pedida != null && pedida > 0 ? pedida : deAntes
+  return { puerta, pilastra, panel: Math.round((profundidadLugarCm - puerta - pilastra) * 10) / 10 }
+}
+
+/** la profundidad del lugar, que nunca puede ser menor que la de la cabina */
+export function profundidadDelLugar(config: Config): number {
+  return Math.max(config.profundidadLugarCm ?? config.profundidadCm, config.profundidadCm)
+}
+
 /** cuántas pilastras lleva un tramo: una por divisor interno y una en cada extremo */
 /**
  * Un lugar de la tira, visto desde las piezas que lo rodean.
@@ -765,6 +798,8 @@ export function bom(
    */
   const panelesDeFrentePorAncho = new Map<number, number>()
   let paneles = 0
+  /** los paneles de cuarto PMR, que miden distinto que los de las cabinas normales */
+  const panelesDelCuarto = new Map<number, number>()
   /**
    * Las mamparas se cuentan DESDE LA TIRA, igual que las pilastras y las
    * puertas, y agrupadas por medida porque ya no tienen por qué ser todas
@@ -781,7 +816,16 @@ export function bom(
       const donde = familiaDelFrente(ancho, config.modelo) === 'PN' ? panelesDeFrentePorAncho : pilastrasPorAncho
       donde.set(ancho, (donde.get(ancho) ?? 0) + 1)
     }
-    paneles += panelesDe(tramo)
+    // El panel del cuarto PMR es más largo que los otros, así que se cuenta
+    // aparte: cobrarlo con el fondo de las demás cabinas sería cobrar de menos.
+    const acc = config.tipologia === 'PMR' ? tramo.cabinas.find((c) => c.tipo === 'accesible') : undefined
+    const delCuarto = acc ? divisorDelCuarto(acc, config, profundidadDelLugar(config)) : null
+    if (delCuarto && delCuarto.panel > 0 && delCuarto.panel !== config.profundidadCm) {
+      panelesDelCuarto.set(delCuarto.panel, (panelesDelCuarto.get(delCuarto.panel) ?? 0) + 1)
+      paneles += panelesDe(tramo) - 1
+    } else {
+      paneles += panelesDe(tramo)
+    }
     let nMg = 0
     tramo.cabinas.forEach((cab, i) => {
       if (cab.puerta.tipo === 'puerta' && cab.tipo !== 'orinal') {
@@ -855,6 +899,16 @@ export function bom(
       tipo: 'Panel',
       cantidad,
       precioUnit: precioPieza({ familia: 'PN', anchoCm: ancho, altoCm: altoPil }, opciones),
+      tarifaReal: tarifaExacta,
+    })
+  }
+  for (const [ancho, cantidad] of [...panelesDelCuarto.entries()].sort((a, b) => a[0] - b[0])) {
+    renglones.push({
+      sku: `${codigoLinea}-PN${ancho}`,
+      descripcion: `Panel del cuarto accesible ${ancho} × ${alturas.panel} cm`,
+      tipo: 'Panel',
+      cantidad,
+      precioUnit: precioPieza({ familia: 'PN', anchoCm: ancho, altoCm: alturas.panel }, opciones),
       tarifaReal: tarifaExacta,
     })
   }
