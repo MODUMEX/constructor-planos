@@ -10,6 +10,7 @@ import {
 } from '../geometria'
 import { alturasDe, mamparaDe, nombreHerraje, tipologia } from '../catalog'
 import { anchoTotal, arrancaElCuartoPmr, ladosDeCabina, mamparaEn } from '../modulacion'
+import type { CuartoPmr } from '../geometria'
 import { agrupar, modeloParaCsv, nombreLinea, nombreSistema, piezasDeArea } from './piezas'
 import { ALTO_ORINAL_CM, ALTO_REGADERA_CM, ALTO_WC_CM, ORINAL, REGADERA, WC } from '../assets/sanitarios'
 import { marcaDeAgua, ponerLogo, portada } from './portada'
@@ -32,6 +33,8 @@ const PANEL_W = 74 // cuadro de piezas a la derecha
  * escala, y el rótulo terminaba encima del cajetín.
  */
 const SEPARA_VISTAS_MM = 17
+/** aire entre el alzado de la tira y el del cuarto accesible, en cm de dibujo */
+const SEPARA_ALZADOS_CM = 70
 const ROTULO_MM = 12
 /**
  * Alto del zoclo o de la pata al pie de la pilastra, en cm. Sale de la ficha
@@ -62,6 +65,19 @@ interface Escala {
 
 function aHoja(e: Escala, p: { x: number; y: number }): [number, number] {
   return [e.ox + p.x * e.k, e.oy + p.y * e.k]
+}
+
+/**
+ * Cuántos centímetros de DIBUJO hacen falta para separar `n` milímetros en la
+ * HOJA.
+ *
+ * Las separaciones de las cotas tienen que medirse en la hoja, no en el dibujo:
+ * a 1:39 diez centímetros son dos milímetros y medio, y un número de 5,5 pt
+ * mide casi dos. Poner "11 cm" de aire dejaba el texto pegado a la línea en un
+ * plano y suelto en otro, según la escala que le tocara a cada área.
+ */
+function aire(e: Escala, n: number): number {
+  return n / e.k
 }
 
 function texto(doc: jsPDF, s: string, x: number, y: number, opts: { size?: number; bold?: boolean; align?: 'left' | 'center' | 'right'; angle?: number; color?: number | [number, number, number] } = {}) {
@@ -136,6 +152,37 @@ function muro(doc: jsPDF, x: number, y: number, w: number, h: number) {
   doc.setDrawColor(70)
   doc.setLineWidth(0.4)
   doc.rect(x, y, w, h)
+}
+
+/**
+ * Dónde queda el CENTRO de la pilastra del corte `k`.
+ *
+ * Casi todas van a caballo del corte, media pilastra en cada cabina: son
+ * CENTRALES. Entran enteras para adentro las dos de punta, la que cierra
+ * contra un mingitorio y la que sigue al CUARTO ACCESIBLE.
+ *
+ * Esa última es LATERAL: a su izquierda no hay cabina sino el cuarto, que
+ * cierra con su propio divisor corriendo a lo hondo. Dibujada centrada se
+ * corría media pilastra sobre el cuarto y dejaba de coincidir con su cota y
+ * con el arranque de la puerta de al lado.
+ *
+ * Está en un solo lugar a propósito: la planta y el alzado tienen que poner
+ * cada pieza en el mismo sitio, y antes la cuenta estaba copiada cuatro veces.
+ */
+function centroPilastra(
+  tramo: Tramo,
+  cortes: number[],
+  k: number,
+  ancho: number,
+  cuarto: CuartoPmr | null,
+): number {
+  const u = cortes[k]
+  if (k === 0) return u + ancho / 2
+  if (k === cortes.length - 1) return u - ancho / 2
+  // la lateral que cierra la tira de baños contra los orinales
+  if (esMingitorio(tramo, k + 1) && !esMingitorio(tramo, k)) return u - ancho / 2
+  if (cuarto && k === cuarto.indice + 1) return u + ancho / 2
+  return u
 }
 
 /**
@@ -299,17 +346,12 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
       doc.setFillColor(120, 120, 120)
       doc.setDrawColor(70)
       doc.setLineWidth(0.25)
-      cortes.forEach((u, k) => {
+      cortes.forEach((_u, k) => {
         // en las fronteras de mingitorio no hay pilastra que dibujar
         if (esMingitorio(tramo, k)) return
         // cada pilastra con SU ancho de catálogo, el que eligió la modulación
         const anchoPil = Math.max(tramo.pilastras?.[k] ?? area.config.anchoPilastraCm, grueso)
-        // en los extremos se corre hacia adentro para no invadir el muro
-        // la lateral que cierra la tira de baños va entera adentro de la tira,
-        // como las de punta: centrada se leería como una pilastra central
-        const cierraLaTira = esMingitorio(tramo, k + 1) && !esMingitorio(tramo, k)
-        const centro =
-          k === 0 ? u + anchoPil / 2 : k === cortes.length - 1 || cierraLaTira ? u - anchoPil / 2 : u
+        const centro = centroPilastra(tramo, cortes, k, anchoPil, cuarto)
         const [ax, ay] = aHoja(e, pt(m, centro - anchoPil / 2, prof - grueso))
         const [bx, by] = aHoja(e, pt(m, centro + anchoPil / 2, prof))
         doc.rect(Math.min(ax, bx), Math.min(ay, by), Math.abs(bx - ax), Math.abs(by - ay), 'FD')
@@ -500,19 +542,19 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
       const cortes = [0, ...acum.slice(1), largo]
 
       // cada pilastra, acotada por su ancho real de pieza
-      cortes.forEach((u, k) => {
+      cortes.forEach((_u, k) => {
         if (esMingitorio(tramo, k)) return
         const ancho = anchoPilDe(k)
-        // la lateral que cierra la tira de baños va entera adentro de la tira,
-        // como las de punta: centrada se leería como una pilastra central
-        const cierraLaTira = esMingitorio(tramo, k + 1) && !esMingitorio(tramo, k)
-        const centro =
-          k === 0 ? u + ancho / 2 : k === cortes.length - 1 || cierraLaTira ? u - ancho / 2 : u
-        cotaEntre(doc, e, m, centro - ancho / 2, centro + ancho / 2, prof - 9, prof - 1, String(ancho), {
-          size: 5.5,
-          rot,
-          vTexto: prof - 11,
-        })
+        const centro = centroPilastra(tramo, cortes, k, ancho, cuarto)
+        // AFUERA de la planta, por debajo del frente. Adentro caía justo donde
+        // los paneles llegan a la línea de frente, y cada panel partía el número
+        // y las flechas en dos. Los paneles corren de la pared al frente, así
+        // que el único lugar limpio para esta cadena es afuera.
+        cotaEntre(
+          doc, e, m, centro - ancho / 2, centro + ancho / 2,
+          prof + aire(e, 4), prof + aire(e, 0.5), String(ancho),
+          { size: 5.5, rot, vTexto: prof + aire(e, 7) },
+        )
       })
 
       // la profundidad, al costado, como el "TO FACE" de los planos de taller
@@ -558,7 +600,9 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
               uTexto: u1 + 12,
             })
           } else {
-            const [nx, ny] = aHoja(e, pt(m, u1 + 7, profDiv / 2))
+            // al LADO de la pieza y hacia la pared, no encima: escrita sobre la
+            // línea del panel el número quedaba tachado por ella
+            const [nx, ny] = aHoja(e, pt(m, u1 + aire(e, 3.5), profDiv * 0.34))
             texto(doc, String(profDiv), nx, ny, { size: 5.5, align: 'center', angle: rot + 90, color: COTA })
           }
         }
@@ -568,12 +612,12 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
         // puede medir distinto. El de la punta se acota acá solo cuando es un
         // panel; si es mampara de mingitorio la pone el bloque de más abajo.
         if (i === 0 && !tramo.muroInicio) {
-          const [nx, ny] = aHoja(e, pt(m, -7, prof / 2))
+          const [nx, ny] = aHoja(e, pt(m, -aire(e, 3.5), prof * 0.34))
           texto(doc, String(prof), nx, ny, { size: 5.5, align: 'center', angle: rot + 90, color: COTA })
         }
         if (i === nCab - 1 && !tramo.muroFin && !esMingitorio(tramo, nCab)) {
           const profCierre = profundidadDeDivisor(tramo, i, prof, mamparaEn(tramo, area.config, i)?.anchoCm)
-          const [nx, ny] = aHoja(e, pt(m, largo + 7, profCierre / 2))
+          const [nx, ny] = aHoja(e, pt(m, largo + aire(e, 3.5), profCierre * 0.34))
           texto(doc, String(profCierre), nx, ny, { size: 5.5, align: 'center', angle: rot + 90, color: COTA })
         }
       })
@@ -591,6 +635,86 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
         })
       }
     }
+  })
+}
+
+/**
+ * ALZADO DEL CUARTO ACCESIBLE, visto DE LADO.
+ *
+ * El cuarto PMR no mira al mismo lado que las cabinas: toma todo el fondo del
+ * lugar y su divisor —el que lleva la puerta— corre a lo hondo, perpendicular
+ * a la tira. En el alzado de frente esa pieza se vería de canto, o sea no se
+ * vería, así que un plano de PMR necesita DOS alzados y este es el segundo.
+ *
+ * Se dibuja sobre la misma línea de piso y a la misma escala que el otro, a su
+ * derecha, para que se lean juntos. Su ancho es la PROFUNDIDAD del cuarto.
+ */
+function alzadoPmr(
+  doc: jsPDF,
+  area: Area,
+  e: Escala,
+  cuarto: CuartoPmr,
+  desdeCm: number,
+  pisoY: number,
+) {
+  const alturas = alturasDe(area.config.modelo)
+  const hPilastra = alturas.pilastra
+  const hPuerta = alturas.puerta
+  const hPanel = alturas.panel
+  const hueco = Math.max(0, hPilastra - hPuerta)
+  const largo = cuarto.profCm
+
+  const aY = (h: number) => pisoY - h * e.k
+  const aX = (u: number) => e.ox + (desdeCm + u) * e.k
+
+  // línea de piso, la misma altura que la del otro alzado
+  doc.setDrawColor(TINTA)
+  doc.setLineWidth(0.5)
+  doc.line(aX(-SOBRA_MURO_CM), pisoY, aX(largo + SOBRA_MURO_CM), pisoY)
+
+  for (const pieza of cuarto.divisor) {
+    const ancho = pieza.hastaCm - pieza.desdeCm
+    if (ancho <= 0) continue
+    const x = aX(pieza.desdeCm)
+    const w = ancho * e.k
+    if (pieza.tipo === 'pilastra') {
+      // la pilastra es la única que baja al piso
+      doc.setFillColor(120, 120, 120)
+      doc.setDrawColor(70)
+      doc.setLineWidth(0.25)
+      doc.rect(x, aY(hPilastra), w, hPilastra * e.k, 'FD')
+      const conZoclo = area.config.terminacion === 'ZOCLO'
+      const anchoBase = conZoclo ? ancho : Math.min(ancho, 6)
+      doc.setFillColor(200, 203, 208)
+      doc.rect(aX(pieza.desdeCm + (ancho - anchoBase) / 2), aY(ALTO_BASE_CM), anchoBase * e.k, ALTO_BASE_CM * e.k, 'FD')
+      continue
+    }
+    // panel y puerta cuelgan: arrancan arriba y dejan el hueco de abajo
+    const alto = pieza.tipo === 'puerta' ? hPuerta : hPanel
+    doc.setFillColor(248, 249, 251)
+    doc.setDrawColor(MARCA[0], MARCA[1], MARCA[2])
+    doc.setLineWidth(0.35)
+    doc.rect(x, aY(hueco + alto), w, alto * e.k, 'FD')
+    if (pieza.tipo === 'puerta') {
+      // la manija, para que se lea cuál de las dos hojas es la puerta
+      doc.setFillColor(MARCA[0], MARCA[1], MARCA[2])
+      doc.circle(x + w - 3, aY(hueco + alto / 2), 0.7, 'F')
+    }
+  }
+
+  // cotas de ancho, arriba: cada pieza del divisor y el total
+  const yPiezas = aY(hPilastra) - 5
+  for (const pieza of cuarto.divisor) {
+    const ancho = pieza.hastaCm - pieza.desdeCm
+    if (ancho <= 0) continue
+    cotaAncho(doc, aX(pieza.desdeCm), aX(pieza.hastaCm), yPiezas, `${ancho}`)
+  }
+  cotaAncho(doc, aX(0), aX(largo), yPiezas - 7, `${largo} cm`, true)
+
+  texto(doc, 'ALZADO DEL CUARTO ACCESIBLE  ·  visto de lado', aX(largo / 2), pisoY + 8, {
+    size: 6,
+    color: GRIS,
+    align: 'center',
   })
 }
 
@@ -615,6 +739,13 @@ function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) 
   const largo = anchoTotal(tramo.cabinas)
   const acum = acumulado(tramo.cabinas)
   const anchoPil = (j: number) => tramo.pilastras?.[j] ?? area.config.anchoPilastraCm
+  /**
+   * El cuarto accesible NO se dibuja acá. Su divisor —con la puerta— corre a lo
+   * hondo, perpendicular a la tira, así que de frente se vería de canto. Va en
+   * `alzadoPmr`, la vista de lado. Sin esto la puerta del cuarto salía DOS
+   * veces: una de frente, donde no está, y otra de lado, donde sí.
+   */
+  const cuarto = cuartoPmr(tramo, area.config)
 
   /** del alto en cm a la hoja: el piso es la base y se sube desde ahí */
   const aY = (h: number) => pisoY - h * e.k
@@ -630,12 +761,10 @@ function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) 
   doc.setFillColor(120, 120, 120)
   doc.setDrawColor(70)
   doc.setLineWidth(0.25)
-  cortes.forEach((u: number, k: number) => {
+  cortes.forEach((_u: number, k: number) => {
     if (esMingitorio(tramo, k)) return
     const ancho = anchoPil(k)
-    const cierraLaTira = esMingitorio(tramo, k + 1) && !esMingitorio(tramo, k)
-    const centro =
-      k === 0 ? u + ancho / 2 : k === cortes.length - 1 || cierraLaTira ? u - ancho / 2 : u
+    const centro = centroPilastra(tramo, cortes, k, ancho, cuarto)
     doc.rect(aX(centro - ancho / 2), aY(hPilastra), ancho * e.k, hPilastra * e.k, 'FD')
     // el zoclo o la pata al pie, los 10 cm que acota la ficha
     const conZoclo = area.config.terminacion === 'ZOCLO'
@@ -653,6 +782,7 @@ function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) 
 
   // puertas y mingitorios, colgados a la altura que les toca
   tramo.cabinas.forEach((cab: Cabina, i: number) => {
+    if (cuarto?.indice === i) return
     const u0 = acum[i]
     const u1 = u0 + cab.anchoCm
     const { izq, der } = ladosDeCabina(tramo.cabinas.map((x: Cabina) => x.tipo === 'orinal'), anchoPil, i, arrancaElCuartoPmr(tramo, area.config))
@@ -696,15 +826,14 @@ function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) 
   // alzado se lee solo, como en los planos de obra.
   const yPiezas = aY(hPilastra) - 5
   const yTotal = yPiezas - 7
-  cortes.forEach((u: number, k: number) => {
+  cortes.forEach((_u: number, k: number) => {
     if (esMingitorio(tramo, k)) return
     const ancho = anchoPil(k)
-    const cierraLaTira = esMingitorio(tramo, k + 1) && !esMingitorio(tramo, k)
-    const centro =
-      k === 0 ? u + ancho / 2 : k === cortes.length - 1 || cierraLaTira ? u - ancho / 2 : u
+    const centro = centroPilastra(tramo, cortes, k, ancho, cuarto)
     cotaAncho(doc, aX(centro - ancho / 2), aX(centro + ancho / 2), yPiezas, `${ancho}`)
   })
   tramo.cabinas.forEach((cab: Cabina, i: number) => {
+    if (cuarto?.indice === i) return
     const u0 = acum[i]
     const u1 = u0 + cab.anchoCm
     const { izq, der } = ladosDeCabina(tramo.cabinas.map((x: Cabina) => x.tipo === 'orinal'), anchoPil, i, arrancaElCuartoPmr(tramo, area.config))
@@ -727,8 +856,13 @@ function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) 
   cotaAlto(doc, e, xCota, pisoY, hPuerta + hueco, hueco, `${hPuerta}`)
   if (hueco > 0) cotaAlto(doc, e, xCota, pisoY, hueco, 0, `${hueco}`)
   cotaAlto(doc, e, aX(largo + SOBRA_MURO_CM) + 8, pisoY, hPilastra, 0, `${hPilastra}`)
-  // los 10 cm del zoclo o de la pata, del otro lado para no encimarse
-  cotaAlto(doc, e, aX(-SOBRA_MURO_CM) - 7, pisoY, ALTO_BASE_CM, 0, `${ALTO_BASE_CM}`)
+  // Los 10 cm del zoclo o de la pata, del otro lado para no encimarse. Va
+  // ROTULADO: un "10" suelto en la esquina se lee como una pieza que falta
+  // dibujar, y de hecho ya pasó.
+  cotaAlto(
+    doc, e, aX(-SOBRA_MURO_CM) - 7, pisoY, ALTO_BASE_CM, 0,
+    `${ALTO_BASE_CM} ${area.config.terminacion === 'ZOCLO' ? 'zoclo' : 'pata'}`,
+  )
   // Cada mingitorio con SUS dos medidas: el alto de la pieza y los 30 cm que
   // quedan del piso a su borde de abajo. Van una arriba de la otra en la misma
   // línea, así que se leen juntas.
@@ -943,16 +1077,26 @@ export function generarPDF(proyecto: Proyecto, fecha = new Date().toLocaleDateSt
     // la hoja, así que la escala sale del alto de las dos juntas.
     const tramoPrincipal = area.tramos[tipologia(area.config.tipologia).principal]
     const conAlzado = !!tramoPrincipal && tramoPrincipal.cabinas.length > 0
+    // El cuarto accesible lleva SU PROPIO alzado, a la derecha del otro: su
+    // divisor corre a lo hondo y de frente se vería de canto. Eso ensancha la
+    // fila de alzados, así que entra en la cuenta de la escala.
+    const cuartoDelAlzado = conAlzado ? cuartoPmr(tramoPrincipal, area.config) : null
+    const largoAlzadoCm = conAlzado ? anchoTotal(tramoPrincipal.cabinas) : 0
+    const anchoAlzadoCm = cuartoDelAlzado
+      ? largoAlzadoCm + SEPARA_ALZADOS_CM + cuartoDelAlzado.profCm + SOBRA_MURO_CM * 2
+      : 0
     const hPilastra = alturasDe(area.config.modelo).pilastra
     // lo que ocupan las dos vistas en cm, y aparte lo que ocupan en mm el aire
     // entre ellas y el rótulo de abajo
     const altoDibujo = caja.h + (conAlzado ? hPilastra : 0)
     const altoFijo = conAlzado ? SEPARA_VISTAS_MM + ROTULO_MM : 0
-    const k = Math.min(zonaW / caja.w, (zonaH - altoFijo) / altoDibujo)
+    // lo más ancho manda: la planta o la fila de alzados
+    const anchoNecesarioCm = Math.max(caja.w, anchoAlzadoCm)
+    const k = Math.min(zonaW / anchoNecesarioCm, (zonaH - altoFijo) / altoDibujo)
     const arriba = M + (zonaH - (altoDibujo * k + altoFijo)) / 2
     const e: Escala = {
       k,
-      ox: M + (zonaW - caja.w * k) / 2 - caja.x * k,
+      ox: M + (zonaW - anchoNecesarioCm * k) / 2 - caja.x * k,
       oy: arriba - caja.y * k,
     }
 
@@ -960,6 +1104,9 @@ export function generarPDF(proyecto: Proyecto, fecha = new Date().toLocaleDateSt
     if (conAlzado) {
       const piso = arriba + caja.h * k + SEPARA_VISTAS_MM + hPilastra * k
       alzado(doc, area, e, tramoPrincipal, piso)
+      if (cuartoDelAlzado) {
+        alzadoPmr(doc, area, e, cuartoDelAlzado, largoAlzadoCm + SEPARA_ALZADOS_CM, piso)
+      }
     }
     cuadroDePiezas(doc, area, HOJA.w - M - PANEL_W, M + 6, PANEL_W)
     cajetin(doc, proyecto, area, idx + 1, lista.length, fecha)
