@@ -250,8 +250,29 @@ export interface Descuento {
   pct: number
 }
 
+/**
+ * Una pieza EXTRA de la cotización: lo que se agrega a mano y no sale de la
+ * modulación. Las de familia se cobran por m² con las medidas que se le den;
+ * el herraje y el grabado se cobran por unidad, de la lista de México.
+ *
+ * `precioUnit` es la salida para lo que no está en ninguna lista: si viene,
+ * manda sobre el precio calculado.
+ */
+export interface Extra {
+  tipo: 'puerta' | 'panel' | 'pilastra' | 'mingitorio' | 'herraje' | 'grabado'
+  /** código del herraje o del grabado */
+  codigo?: string
+  descripcion?: string
+  cantidad: number
+  anchoCm?: number
+  altoCm?: number
+  precioUnit?: number
+}
+
 export interface Proyecto {
   numero: string
+  /** piezas sueltas que se agregan a la cotización, fuera de la modulación */
+  extras?: Extra[]
   /** los descuentos que se le agregaron a mano, en el orden en que se aplican */
   descuentos?: Descuento[]
   /** dónde se fabrica; define qué lista de colores se ofrece */

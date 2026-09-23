@@ -43,8 +43,12 @@ import DuplicarArea from './components/DuplicarArea'
 import { listarDistribuidores, type Distribuidor } from './distribuidores'
 import { alturasDeFabrica, cargarAlturas, usarAlturas, type TablaAlturas } from './alturas'
 import { cargarPiezas, usarPiezas } from './piezas'
+import {
+  articuloDe, catalogoDe, esPorM2, FAMILIAS_EXTRA, renglonesDeExtras,
+  type TipoExtra,
+} from './extras'
 import Proyectos from './components/Proyectos'
-import type { Descuento } from './types'
+import type { Descuento, Extra } from './types'
 import {
   codigoDe, guardarProyecto, huellaDe, listarProyectos, revisionAGuardar, type Revision,
 } from './proyectos'
@@ -1050,7 +1054,74 @@ export default function App() {
       })),
     [proyecto.areas, proyecto.paisFabricacion, moneda, tarifas, modulosDelProyecto],
   )
-  const renglones = useMemo(() => renglonesPorArea.flatMap((a) => a.renglones), [renglonesPorArea])
+  /**
+   * Las piezas extra se cobran con la misma tarifa, tier y moneda que el resto
+   * del proyecto. El tier sale del área uno: es el color del proyecto.
+   */
+  const opcionesExtra = useMemo(() => {
+    const cfg = proyecto.areas[0]?.config
+    return {
+      modeloCodigo: cfg?.modelo ?? 'ESTANDAR',
+      tier: tierDeColor(cfg?.color ?? '', proyecto.paisFabricacion, cfg?.linea),
+      moneda,
+      tipoCambio: TC,
+      tarifas: tarifas?.tabla,
+      modulos: modulosDelProyecto,
+    }
+  }, [proyecto.areas, proyecto.paisFabricacion, moneda, tarifas, modulosDelProyecto])
+
+  const renglonesExtra = useMemo(
+    () => renglonesDeExtras(proyecto.extras ?? [], opcionesExtra),
+    [proyecto.extras, opcionesExtra],
+  )
+
+  /**
+   * Los extras viajan como un "área" más, la última. Así entran solos en el
+   * total, en el cuadro de piezas y en el PDF, sin repetir la cuenta en cada
+   * lugar.
+   */
+  const bloquesCotizacion = useMemo(
+    () => (renglonesExtra.length > 0
+      ? [...renglonesPorArea, { nombre: 'Piezas extra', renglones: renglonesExtra }]
+      : renglonesPorArea),
+    [renglonesPorArea, renglonesExtra],
+  )
+
+  const renglones = useMemo(() => bloquesCotizacion.flatMap((a) => a.renglones), [bloquesCotizacion])
+
+  function agregarExtra() {
+    setProyecto({
+      ...proyecto,
+      extras: [...(proyecto.extras ?? []), { tipo: 'puerta', cantidad: 1, anchoCm: 60, altoCm: 150 }],
+    })
+  }
+
+  function cambiarExtra(i: number, cambio: Partial<Extra>) {
+    const lista = [...(proyecto.extras ?? [])]
+    if (!lista[i]) return
+    const nuevo = { ...lista[i], ...cambio }
+    // al cambiar de tipo se limpia lo que ya no aplica, para no arrastrar un
+    // código de herraje en una puerta ni medidas en un grabado
+    if (cambio.tipo && cambio.tipo !== lista[i].tipo) {
+      const porM2 = esPorM2(cambio.tipo)
+      nuevo.codigo = porM2 ? undefined : ''
+      nuevo.descripcion = undefined
+      nuevo.anchoCm = porM2 ? 60 : undefined
+      nuevo.altoCm = porM2 ? 150 : undefined
+      nuevo.precioUnit = undefined
+    }
+    // al elegir un artículo del catálogo se trae su descripción
+    if (cambio.codigo !== undefined) {
+      const art = articuloDe(nuevo.tipo, cambio.codigo)
+      if (art) nuevo.descripcion = art.descripcion
+    }
+    lista[i] = nuevo
+    setProyecto({ ...proyecto, extras: lista })
+  }
+
+  function quitarExtra(i: number) {
+    setProyecto({ ...proyecto, extras: (proyecto.extras ?? []).filter((_, k) => k !== i) })
+  }
 
   // el IVA lo trae el distribuidor; si no, el 13 % de Costa Rica
   const ivaPorcentaje = usuario?.ivaPorcentaje ?? IVA_CR
@@ -1199,7 +1270,7 @@ export default function App() {
     try {
       const doc = generarCotizacionPDF(proyectoConAutor, {
         renglones,
-        porArea: renglonesPorArea,
+        porArea: bloquesCotizacion,
         moneda,
         descuentos,
         para,
@@ -2276,10 +2347,10 @@ export default function App() {
                         </tr>
                       </thead>
                       <tbody>
-                        {renglonesPorArea.map((a, ia) => (
+                        {bloquesCotizacion.map((a, ia) => (
                           <Fragment key={`area-${ia}`}>
                             {/* con una sola área el rótulo no aporta nada */}
-                            {renglonesPorArea.length > 1 && a.renglones.length > 0 && (
+                            {bloquesCotizacion.length > 1 && a.renglones.length > 0 && (
                               <tr>
                                 <td colSpan={5} style={{ fontWeight: 700, paddingTop: 14 }}>{a.nombre}</td>
                                 <td className="der" style={{ fontWeight: 700, paddingTop: 14 }}>
@@ -2331,6 +2402,104 @@ export default function App() {
                     </table>
                   </div>
 
+                  {/* ---------- piezas extra ---------- */}
+                  <div style={{ margin: '22px 0 0', maxWidth: 940 }}>
+                    <h4 style={{ margin: '0 0 4px' }}>
+                      Piezas extra <span className="num">· lo que se agrega a mano, fuera de la modulación</span>
+                    </h4>
+                    <p className="sub" style={{ margin: '0 0 8px' }}>
+                      Puertas, paneles, pilastras y mamparas se cobran por m² con la tarifa del proyecto.
+                      Los herrajes y los grabados van por pieza, de la lista de LATAM en dólares o la de
+                      México en pesos; en colones se pasa con el tipo de cambio.
+                    </p>
+                    {(proyecto.extras ?? []).map((x, i) => {
+                      const porM2 = esPorM2(x.tipo)
+                      const catalogo = catalogoDe(x.tipo)
+                      const renglon = renglonesExtra[i]
+                      const sinPrecio = renglon && !renglon.tarifaReal
+                      return (
+                        <div key={`extra-${i}`} className="campos" style={{ alignItems: 'flex-end', marginBottom: 6 }}>
+                          <label className="campo" style={{ width: 150 }}>
+                            <span>Qué es</span>
+                            <select
+                              value={x.tipo}
+                              onChange={(e) => cambiarExtra(i, { tipo: e.target.value as TipoExtra })}
+                            >
+                              {FAMILIAS_EXTRA.map((f) => (
+                                <option key={f.tipo} value={f.tipo}>{f.etiqueta}</option>
+                              ))}
+                            </select>
+                          </label>
+
+                          {porM2 ? (
+                            <>
+                              <label className="campo" style={{ width: 104 }}>
+                                <span>Ancho (cm)</span>
+                                <input
+                                  className="celda-precio num" type="number" min={1} step="1"
+                                  value={x.anchoCm ?? ''}
+                                  onChange={(e) => cambiarExtra(i, { anchoCm: Number(e.target.value) || 0 })}
+                                />
+                              </label>
+                              <label className="campo" style={{ width: 104 }}>
+                                <span>Alto (cm)</span>
+                                <input
+                                  className="celda-precio num" type="number" min={1} step="1"
+                                  value={x.altoCm ?? ''}
+                                  onChange={(e) => cambiarExtra(i, { altoCm: Number(e.target.value) || 0 })}
+                                />
+                              </label>
+                            </>
+                          ) : (
+                            <label className="campo" style={{ flex: '1 1 320px' }}>
+                              <span>Artículo</span>
+                              <select
+                                value={x.codigo ?? ''}
+                                onChange={(e) => cambiarExtra(i, { codigo: e.target.value })}
+                              >
+                                <option value="">— elegir de la lista —</option>
+                                {catalogo.map((a) => (
+                                  <option key={a.codigo} value={a.codigo}>
+                                    {a.codigo} · {a.descripcion}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          )}
+
+                          <label className="campo" style={{ width: 90 }}>
+                            <span>Cant.</span>
+                            <input
+                              className="celda-precio num" type="number" min={1} step="1"
+                              value={x.cantidad}
+                              onChange={(e) => cambiarExtra(i, { cantidad: Number(e.target.value) || 0 })}
+                            />
+                          </label>
+                          <label className="campo" style={{ width: 130 }}>
+                            <span>Precio unitario</span>
+                            <input
+                              className="celda-precio num" type="number" min={0} step="0.01"
+                              placeholder={renglon ? String(Math.round(renglon.precioUnit * 100) / 100) : ''}
+                              value={x.precioUnit ?? ''}
+                              onChange={(e) => cambiarExtra(i, {
+                                precioUnit: e.target.value === '' ? undefined : Number(e.target.value),
+                              })}
+                            />
+                          </label>
+                          <button className="btn" style={{ flex: '0 0 auto' }} onClick={() => quitarExtra(i)}>Quitar</button>
+                          {renglon && (
+                            <span className="num" style={{ color: sinPrecio ? 'var(--amber)' : undefined }}>
+                              {sinPrecio
+                                ? 'sin precio de lista: escribilo a mano'
+                                : money(renglon.cantidad * renglon.precioUnit)}
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })}
+                    <button className="btn contorno chico" onClick={agregarExtra}>+ Agregar pieza extra</button>
+                  </div>
+
                   {/* ---------- descuentos en cascada ---------- */}
                   <div style={{ margin: '22px 0 0', maxWidth: 720 }}>
                     <h4 style={{ margin: '0 0 4px' }}>
@@ -2362,7 +2531,7 @@ export default function App() {
                         <button className="btn" style={{ flex: "0 0 auto" }} onClick={() => quitarDescuento(i)}>Quitar</button>
                       </div>
                     ))}
-                    <button className="btn plano chico" onClick={agregarDescuento}>+ Agregar descuento</button>
+                    <button className="btn contorno chico" onClick={agregarDescuento}>+ Agregar descuento</button>
                     {descuentos.length > 0 && (
                       <p className="sub" style={{ marginTop: 8 }}>
                         En total se descuenta {money(descuento)} sobre {money(neto)}

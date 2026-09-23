@@ -190,6 +190,17 @@ input, select { font: inherit; }
 .btn.plano { background: transparent; border-color: transparent; color: var(--text-2); }
 .btn.plano:hover { background: var(--surface-2); color: var(--text); }
 .btn.chico { padding: 5px 10px; font-size: 13px; }
+/*
+ * "+ Agregar…": tiene que verse que es un botón sin competir con el primario.
+ * Con .plano quedaba sin borde y sin fondo, o sea invisible sobre la tarjeta.
+ */
+.btn.contorno {
+  background: transparent;
+  border: 1px dashed var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+.btn.contorno:hover { background: var(--surface-2); border-style: solid; }
 
 /* ---------- pasos ---------- */
 .pasos {
