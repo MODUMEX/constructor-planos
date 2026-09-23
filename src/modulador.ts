@@ -424,6 +424,17 @@ export interface OpcionesPilastras {
   extremoAbierto?: boolean
   /** pilastras ya clavadas a mano, una entrada por posición (null = libre) */
   fijas?: (number | null | undefined)[]
+  /**
+   * La tira tiene un ESPACIO LIBRE que se lleva lo que sobre del claro.
+   *
+   * Cambia el criterio de la búsqueda: sin hueco hay que cerrar clavado, así
+   * que gana la combinación que deje la diferencia más chica y las pilastras se
+   * estiran hasta 50 cm con tal de llenar el claro. Con hueco eso no tiene
+   * sentido —el espacio libre es lo que se está dejando a propósito—, así que
+   * gana la tira más CORTA que entre: las piezas quedan de su medida natural y
+   * todo el sobrante cae en el hueco.
+   */
+  huecoLibre?: boolean
 }
 
 export interface Pilastreo {
@@ -462,7 +473,9 @@ export function ajustarPilastras(o: OpcionesPilastras): Pilastreo | null {
       for (const ae2 of PILASTRAS_EXTREMO) {
         const total = cuerpos + internas * api + ae1 + ae2
         const dif = objetivo - total
-        const score = Math.abs(dif) + (dosMuros && total > objetivo ? (total - objetivo) * PENALIZA_PASARSE : 0)
+        const score = o.huecoLibre
+          ? total + (total > objetivo ? (total - objetivo) * PENALIZA_PASARSE : 0)
+          : Math.abs(dif) + (dosMuros && total > objetivo ? (total - objetivo) * PENALIZA_PASARSE : 0)
         const cand = { api, ae1, ae2, total, score }
         if (!mejor || score < mejor.score) mejor = cand
         if (total <= objetivo + (o.extremoAbierto ? 5 : 0) && (!mejorCabe || score < mejorCabe.score)) {
@@ -477,7 +490,7 @@ export function ajustarPilastras(o: OpcionesPilastras): Pilastreo | null {
 
   // Si con internas parejas no cierra, se mezclan medidas antes de recurrir a
   // la canaleta: las pilastras no tienen por qué medir todas lo mismo.
-  if (!cabe(objetivo - mejor.total, o.extremoAbierto, o.murosPilastra)) {
+  if (!o.huecoLibre && !cabe(objetivo - mejor.total, o.extremoAbierto, o.murosPilastra)) {
     const mezcla = repartirPilastras(
       objetivo - cuerpos, internas, INTERNAS_AUTO, PILASTRAS_EXTREMO, o.fijas,
     )
@@ -504,7 +517,12 @@ export function ajustarPilastras(o: OpcionesPilastras): Pilastreo | null {
 
   let ajuste: TipoAjuste
   let mensaje: string
-  if (cabe(diferencia, o.extremoAbierto, o.murosPilastra)) {
+  if (o.huecoLibre && diferencia >= 0) {
+    ajuste = 'exacto'
+    mensaje = abs > 0.5
+      ? `Calza; el espacio libre se lleva ${abs.toFixed(1)} cm`
+      : 'Calza exacto'
+  } else if (cabe(diferencia, o.extremoAbierto, o.murosPilastra)) {
     ajuste = 'exacto'
     mensaje = abs > 0.5 ? `Calza; ${abs.toFixed(1)} cm los absorbe la instalación` : 'Calza exacto'
   } else if (diferencia > 0 && abs <= CANALETA_MAX_CM) {

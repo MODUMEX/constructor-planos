@@ -76,6 +76,16 @@ export interface Cabina {
   anchoCm: number
   tipo: TipoCabina
   puerta: Puerta
+  /**
+   * El ancho PEDIDO para un espacio libre —un lugar sin puerta—, en cm.
+   *
+   * Sin este dato el hueco se lleva todo lo que sobre del claro, que es lo
+   * razonable cuando nadie lo midió. Pero el hueco casi siempre viene del plano
+   * del arquitecto —una columna, un lavamanos, un paso— y entonces la medida la
+   * pone el vendedor: acá queda clavada y son las PILASTRAS las que se
+   * reacomodan para cerrar el claro, como en cualquier otra tira.
+   */
+  libreCm?: number
   /** panel divisor a la derecha de esta cabina */
   panel: {
     recorte: 'ninguno' | 'simple' | 'doble'

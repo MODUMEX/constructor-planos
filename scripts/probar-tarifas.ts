@@ -18,11 +18,11 @@ function revisar(caso: string, obtenido: number, esperado: number) {
 const t = (modelo: string, juego: string, familia: string): number =>
   (TARIFAS_BASE[modelo] as never as Record<string, Record<string, number>>)[juego][familia]
 
-console.log('— puerta 95 × 150, ESTANDAR, color de línea, dólares')
+console.log('— puerta 90 × 150, ESTANDAR, color de línea, dólares')
 revisar(
-  'puerta 95',
-  precioPieza({ familia: 'PT', anchoCm: 95, altoCm: 150 }, { modeloCodigo: 'ESTANDAR', tier: 'linea', moneda: 'USD', tipoCambio: 512 }),
-  ((95 * 150) / 1e4) * t('ESTANDAR', 'linea', 'puerta'),
+  'puerta 90',
+  precioPieza({ familia: 'PT', anchoCm: 90, altoCm: 150 }, { modeloCodigo: 'ESTANDAR', tier: 'linea', moneda: 'USD', tipoCambio: 512 }),
+  ((90 * 150) / 1e4) * t('ESTANDAR', 'linea', 'puerta'),
 )
 
 console.log('\n— la puerta de 92 se cobra como 100 (anchoCobradoPuerta)')
@@ -50,13 +50,13 @@ revisar(
 console.log('\n— Superior es usdOnly: en colones convierte con el tipo de cambio y la tarifa lineaCR')
 revisar(
   'pilastra Superior en colones',
-  precioPieza({ familia: 'PL', anchoCm: 16, altoCm: 180 }, { modeloCodigo: 'SUP_REFORZADO', tier: 'linea', moneda: 'CRC', tipoCambio: 512 }),
-  ((16 * 180) / 1e4) * t('SUP_REFORZADO', 'lineaCR', 'pilastra') * 512,
+  precioPieza({ familia: 'PL', anchoCm: 17, altoCm: 180 }, { modeloCodigo: 'SUP_REFORZADO', tier: 'linea', moneda: 'CRC', tipoCambio: 512 }),
+  ((17 * 180) / 1e4) * t('SUP_REFORZADO', 'lineaCR', 'pilastra') * 512,
 )
 revisar(
   'pilastra Superior en dólares',
-  precioPieza({ familia: 'PL', anchoCm: 16, altoCm: 180 }, { modeloCodigo: 'SUP_REFORZADO', tier: 'linea', moneda: 'USD', tipoCambio: 512 }),
-  ((16 * 180) / 1e4) * t('SUP_REFORZADO', 'linea', 'pilastra'),
+  precioPieza({ familia: 'PL', anchoCm: 17, altoCm: 180 }, { modeloCodigo: 'SUP_REFORZADO', tier: 'linea', moneda: 'USD', tipoCambio: 512 }),
+  ((17 * 180) / 1e4) * t('SUP_REFORZADO', 'linea', 'pilastra'),
 )
 
 console.log('\n— un modelo que no existe cae en ESTANDAR, como en el Constructor')
@@ -76,6 +76,21 @@ revisar(
     { modeloCodigo: 'ESTANDAR', tier: 'linea', moneda: 'USD', tipoCambio: 512, tarifas: conNube },
   ),
   1 * 999,
+)
+
+// Una medida que no está en las fichas se cobra como la de catálogo de
+// ARRIBA, porque en planta sale de esa pieza. Las puertas van 55, 60, 70,
+// 75, 85, 90 y 100; las pilastras arrancan en 10, 12, 15, 17…
+console.log('\n— una medida que no existe se cobra como la de arriba')
+revisar(
+  'puerta 95 se cobra como 100',
+  precioPieza({ familia: 'PT', anchoCm: 95, altoCm: 150 }, { modeloCodigo: 'ESTANDAR', tier: 'linea', moneda: 'USD', tipoCambio: 512 }),
+  ((100 * 150) / 1e4) * t('ESTANDAR', 'linea', 'puerta'),
+)
+revisar(
+  'pilastra 16 se cobra como 17',
+  precioPieza({ familia: 'PL', anchoCm: 16, altoCm: 180 }, { modeloCodigo: 'SUP_REFORZADO', tier: 'linea', moneda: 'USD', tipoCambio: 512 }),
+  ((17 * 180) / 1e4) * t('SUP_REFORZADO', 'linea', 'pilastra'),
 )
 
 console.log(fallos === 0 ? '\nTodo cuadra.' : `\n${fallos} caso(s) mal.`)

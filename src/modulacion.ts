@@ -234,7 +234,7 @@ export function modularConCatalogo(
   const cabinas: Cabina[] = []
   for (let i = 0; i < cantidad; i++) {
     const { izq, der } = ladosDeCabina(
-      Array.from({ length: cantidad }, (_, k) => k >= cantidad - nMing),
+      Array.from({ length: cantidad }, (_, k) => ({ orinal: k >= cantidad - nMing, libre: false })),
       (k) => pilastras[k],
       i,
     )
@@ -325,6 +325,15 @@ export function reajustarConPuertas(
   extremoAbierto: boolean,
   /** el cuarto PMR, que se planta y deja modular solo el resto */
   cuartoPmrCm = 0,
+  /**
+   * Pilastras que el vendedor ya clavó a mano, por posición de frontera.
+   *
+   * Solo se respetan cuando la tira tiene un ESPACIO LIBRE: ahí el hueco
+   * absorbe lo que sobre, así que cualquier juego de pilastras cierra y se
+   * puede dejar la que él eligió. Sin hueco, las pilastras son justamente lo
+   * único que puede cuadrar el claro y las decide el buscador.
+   */
+  fijas?: (number | null | undefined)[],
 ): { cabinas: Cabina[]; pilastras: number[]; canaletaCm: number; ajuste: Tramo['ajuste']; mensaje: string } | null {
   const n = cabinas.length
   if (n === 0) return null
@@ -338,6 +347,7 @@ export function reajustarConPuertas(
     }
     const resto = reajustarConPuertas(
       cabinas.slice(1), claroCm - cuartoPmrCm, Math.max(0, murosPilastra - 1), extremoAbierto,
+      0, fijas ? fijas.slice(1) : undefined,
     )
     if (!resto) return null
     return {
@@ -349,8 +359,18 @@ export function reajustarConPuertas(
     }
   }
 
-  const cuerpos = cabinas.map((c) => (c.tipo === 'orinal' ? c.anchoCm : c.puerta.anchoCm))
-  const conPuerta = cabinas.filter((c) => c.tipo !== 'orinal').length
+  // El ESPACIO LIBRE no es una cabina: no aporta cuerpo a la tira ni pide
+  // puerta. Lo que mide sale al final, de lo que sobre del claro.
+  const lugares = lugaresDe(cabinas)
+  // Un hueco con medida pedida NO negocia: entra a la tira como un cuerpo más y
+  // el claro lo cierran las pilastras. Los que se llevan el sobrante son solo
+  // los que nadie midió.
+  const absorbe = (c: Cabina) => esEspacioLibre(c) && !(c.libreCm && c.libreCm > 0)
+  const libres = cabinas.filter(absorbe).length
+  const cuerpoDe = (c: Cabina) =>
+    esEspacioLibre(c) ? (c.libreCm ?? 0) : c.tipo === 'orinal' ? c.anchoCm : c.puerta.anchoCm
+  const cuerpos = cabinas.map(cuerpoDe)
+  const conPuerta = cabinas.filter((c) => c.tipo !== 'orinal' && !esEspacioLibre(c)).length
   // entre dos orinales va mampara, no pilastra
   let internas = 0
   let grosorMG = 0
@@ -366,6 +386,7 @@ export function reajustarConPuertas(
     internas,
     murosPilastra,
     extremoAbierto,
+    huecoLibre: libres > 0,
   })
   if (!r) return null
 
@@ -378,15 +399,31 @@ export function reajustarConPuertas(
   }
   pilastras.push(r.pilastras[r.pilastras.length - 1])
 
+  // Con un hueco en la tira, la pilastra que el vendedor clavó a mano se
+  // respeta tal cual: lo que cambie de largo se lo come el espacio libre.
+  if (libres > 0 && fijas) {
+    for (let k = 0; k < pilastras.length; k++) {
+      const f = fijas[k]
+      if (f != null && f > 0 && !entreDosOrinales(lugares, k)) pilastras[k] = f
+    }
+  }
+
   const nuevas = cabinas.map((c, i) => {
-    const { izq, der } = ladosDeCabina(
-      cabinas.map((x) => x.tipo === 'orinal'),
-      (k) => pilastras[k],
-      i,
-    )
-    const cuerpo = c.tipo === 'orinal' ? c.anchoCm : c.puerta.anchoCm
-    return { ...c, anchoCm: izq + cuerpo + der }
+    const { izq, der } = ladosDeCabina(lugares, (k) => pilastras[k], i)
+    return { ...c, anchoCm: izq + cuerpoDe(c) + der }
   })
+
+  // Lo que sobró del claro es, justamente, el ESPACIO LIBRE: se lo reparten los
+  // huecos que haya. Con esto la tira cierra sola y las cabinas conservan su
+  // medida natural —puerta más lo que les toca de pilastra— en vez de estirarse
+  // para tapar el claro.
+  if (libres > 0) {
+    const piezas = cuerpos.reduce((s, x) => s + x, 0) + pilastras.reduce((s, x) => s + x, 0)
+    const sobra = Math.max(0, snap((r.claroAjustado - piezas) / libres))
+    for (let i = 0; i < nuevas.length; i++) {
+      if (absorbe(cabinas[i])) nuevas[i] = { ...nuevas[i], anchoCm: snap(nuevas[i].anchoCm + sobra) }
+    }
+  }
 
   return {
     cabinas: nuevas,
@@ -399,15 +436,78 @@ export function reajustarConPuertas(
 
 /** cuántas pilastras lleva un tramo: una por divisor interno y una en cada extremo */
 /**
+ * Un lugar de la tira, visto desde las piezas que lo rodean.
+ */
+export interface Lugar {
+  /** es un orinal: entre dos de ellos va mampara, no pilastra */
+  orinal: boolean
+  /** es un ESPACIO LIBRE: un hueco sin puerta, que no llega a ser cabina */
+  libre: boolean
+}
+
+/**
+ * Un lugar SIN PUERTA que no es orinal ni el cuarto accesible no es una cabina:
+ * es un ESPACIO LIBRE. Se deja abierto a propósito —un paso, un lavamanos, una
+ * columna que se respeta— y por eso no se modula como cabina: no pide puerta y
+ * se lleva lo que sobre del claro.
+ */
+export function esEspacioLibre(c: Cabina): boolean {
+  return c.tipo !== 'orinal' && c.tipo !== 'accesible' && c.puerta.tipo === 'ninguna'
+}
+
+/** la frontera k cae entre dos orinales: ahí va mampara, no pilastra */
+function entreDosOrinales(lugares: Lugar[], k: number): boolean {
+  return k > 0 && k < lugares.length && lugares[k - 1].orinal && lugares[k].orinal
+}
+
+export function lugaresDe(cabinas: Cabina[]): Lugar[] {
+  return cabinas.map((c) => ({ orinal: c.tipo === 'orinal', libre: esEspacioLibre(c) }))
+}
+
+/**
+ * De quién es la pilastra de la frontera `k`: entera de la cabina de la
+ * IZQUIERDA, entera de la de la DERECHA, o media para cada una.
+ *
+ * Casi todas se parten por la mitad: son las CENTRALES, que el dibujo pone a
+ * caballo del corte. Van enteras para un solo lado —son LATERALES— cuando del
+ * otro lado no hay una cabina que las comparta:
+ *
+ *   · las dos de punta, que apoyan contra el muro;
+ *   · la que cierra la tira de baños contra el campo de orinales, porque el
+ *     campo empieza DESPUÉS de ella;
+ *   · la que sale del CUARTO ACCESIBLE, que cierra con su propio divisor;
+ *   · la que toca un ESPACIO LIBRE: ahí no hay cabina que se lleve la mitad,
+ *     así que apoya entera del lado de la cabina que sí tiene puerta.
+ *
+ * Esta es la ÚNICA cuenta de laterales que hay: de acá salen tanto el ancho de
+ * cada cabina como el centro con el que se dibuja la pilastra. Cuando estaba
+ * copiada en el dibujo, en el PDF y en las cotas, se desincronizaron.
+ */
+export function ladoDePilastra(
+  lugares: Lugar[],
+  k: number,
+  /** en qué lugar está el cuarto accesible, o -1 si el área no lo lleva */
+  indiceCuarto = -1,
+): 'izq' | 'der' | 'mitades' {
+  const n = lugares.length
+  if (k <= 0) return 'der'
+  if (k >= n) return 'izq'
+  if (!lugares[k - 1].orinal && lugares[k].orinal) return 'izq'
+  if (indiceCuarto >= 0 && k === indiceCuarto + 1) return 'der'
+  if (lugares[k - 1].libre && !lugares[k].libre) return 'der'
+  if (lugares[k].libre && !lugares[k - 1].libre) return 'izq'
+  return 'mitades'
+}
+
+/**
  * Lo que cada cabina se lleva de las piezas que tiene a los lados.
  *
  * Una pilastra central la comparten las dos cabinas vecinas, media para cada
- * una. Pero la LATERAL con la que cierra la tira de baños es entera de la tira:
- * el campo de orinales empieza DESPUÉS de ella, no en su mitad. Si se reparte a
- * medias queda dibujada a caballo sobre la frontera y se lee como una central.
+ * una; una lateral va entera de un solo lado. Quién es cuál lo decide
+ * `ladoDePilastra`.
  */
 export function ladosDeCabina(
-  esOrinal: boolean[],
+  lugares: Lugar[],
   pilastra: (k: number) => number,
   i: number,
   /**
@@ -418,19 +518,14 @@ export function ladosDeCabina(
    */
   arrancaElCuarto = false,
 ): { izq: number; der: number } {
-  const n = esOrinal.length
-  /** la frontera k cierra la tira de baños: baño a la izquierda, orinal a la derecha */
-  const cierra = (k: number) => k > 0 && k < n && !esOrinal[k - 1] && esOrinal[k]
-  /** la frontera que sale del cuarto PMR: entera de la cabina siguiente */
-  const delCuarto = (k: number) => arrancaElCuarto && k === 1
-  const izq = i === 0 ? pilastra(0)
-    : cierra(i) ? 0
-      : delCuarto(i) ? pilastra(i)
-        : pilastra(i) / 2
-  const der = i === n - 1 ? pilastra(n)
-    : cierra(i + 1) ? pilastra(i + 1)
-      : delCuarto(i + 1) ? 0
-        : pilastra(i + 1) / 2
+  const cuarto = arrancaElCuarto ? 0 : -1
+  const lado = (k: number) => ladoDePilastra(lugares, k, cuarto)
+  // la frontera izquierda de la cabina es la i; si la pilastra es de la cabina
+  // de la derecha, esa cabina es justamente esta
+  const dIzq = lado(i)
+  const izq = dIzq === 'der' ? pilastra(i) : dIzq === 'izq' ? 0 : pilastra(i) / 2
+  const dDer = lado(i + 1)
+  const der = dDer === 'izq' ? pilastra(i + 1) : dDer === 'der' ? 0 : pilastra(i + 1) / 2
   return { izq, der }
 }
 

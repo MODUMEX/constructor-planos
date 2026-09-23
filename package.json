@@ -1,7 +1,7 @@
 {
   "name": "constructor-de-planos",
   "private": true,
-  "version": "2.59.0",
+  "version": "2.60.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -16,6 +16,7 @@
     "app": "tauri dev",
     "exe": "tauri build",
     "probar-modulador": "esbuild scripts/probar-modulador.ts --bundle --platform=node --format=esm --outfile=.modulador.mjs --log-level=warning && node .modulador.mjs",
+    "probar-libre": "esbuild scripts/probar-libre.ts --bundle --platform=node --format=esm --outfile=.libre.mjs --log-level=warning --define:import.meta.env={} && node .libre.mjs",
     "probar-orinales": "esbuild scripts/probar-orinales.ts --bundle --platform=node --format=esm --outfile=.orinales.mjs --log-level=warning && node .orinales.mjs",
     "probar-orinales-layouts": "esbuild scripts/probar-orinales-layouts.ts --bundle --platform=node --format=esm --outfile=.orinlay.mjs --log-level=warning && node .orinlay.mjs",
     "probar-mamparas": "esbuild scripts/probar-mamparas.ts --bundle --platform=node --format=esm --outfile=.mamp.mjs --log-level=warning && node .mamp.mjs",

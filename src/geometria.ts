@@ -1,6 +1,6 @@
 import type { Cabina, Config, Tramo } from './types'
 import { ANCHOS_PILASTRA, GRUESO_PILASTRA } from './catalog'
-import { anchoTotal, ladosDeCabina } from './modulacion'
+import { anchoTotal, ladoDePilastra, ladosDeCabina, lugaresDe } from './modulacion'
 import { medidaCercana } from './modulador'
 
 /** espesor con el que se dibuja la pared, en cm */
@@ -46,7 +46,7 @@ export function anchoDeOrinal(tramo: Tramo, i: number, anchoPilastraCm: number):
   const cab = tramo.cabinas[i]
   if (!cab) return 0
   const pil = (k: number) => tramo.pilastras?.[k] ?? anchoPilastraCm
-  const { izq, der } = ladosDeCabina(tramo.cabinas.map((c) => c.tipo === 'orinal'), pil, i)
+  const { izq, der } = ladosDeCabina(lugaresDe(tramo.cabinas), pil, i)
   // a medios centímetros, como el resto de las medidas del plano: la cabina ya
   // viene redondeada así y sin esto un orinal pedido de 60 se leía 59.9
   return Math.round((cab.anchoCm - izq - der) * 2) / 2
@@ -196,6 +196,33 @@ export interface CuartoPmr {
   pilastraCm: number
   /** qué avisar cuando el divisor no cierra justo contra el fondo */
   aviso: string | null
+}
+
+
+/**
+ * Dónde queda el CENTRO de la pilastra del corte `k`, en unidades de dibujo.
+ *
+ * Una CENTRAL va a caballo del corte; una LATERAL entra entera para el lado de
+ * la cabina que se la lleva. Quién es cuál NO se decide acá: sale de
+ * `ladoDePilastra`, la misma regla con la que se reparte el ancho de las
+ * cabinas. Así la pieza se dibuja donde de verdad está y su cota coincide.
+ *
+ * Vive ACÁ y no en el dibujo porque la planta de la pantalla, la del PDF y sus
+ * dos cadenas de cotas tienen que poner cada pieza en el mismo sitio. Cuando
+ * la cuenta estaba copiada en cada uno, se desincronizaron.
+ */
+export function centroPilastra(
+  tramo: Tramo,
+  cortes: number[],
+  k: number,
+  ancho: number,
+  cuarto: CuartoPmr | null,
+): number {
+  const u = cortes[k]
+  const lado = ladoDePilastra(lugaresDe(tramo.cabinas), k, cuarto ? cuarto.indice : -1)
+  if (lado === 'der') return u + ancho / 2
+  if (lado === 'izq') return u - ancho / 2
+  return u
 }
 
 /** la profundidad del lugar, que nunca puede ser menor que la de la cabina */

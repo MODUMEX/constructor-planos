@@ -29,7 +29,7 @@ import Solicitudes from './components/Solicitudes'
 import { contarSolicitudes } from './solicitudes'
 import { coloresMxPara, slugRenderMx } from './coloresMx'
 import { fotoDe, fotosHerraje, faltanFotosHerraje, terminacionesDe } from './renders'
-import { anchoAccesibleDe, anchoTotal, bom, claroDeOrinales, crearTramos, modularConCatalogo, nuevoId, reajustarConPuertas } from './modulacion'
+import { anchoAccesibleDe, anchoTotal, bom, claroDeOrinales, crearTramos, esEspacioLibre, modularConCatalogo, nuevoId, reajustarConPuertas } from './modulacion'
 import { anchoDeOrinal } from './geometria'
 import { cargarTarifas, type ResultadoTarifas } from './tarifas'
 import { buscarActualizacion, type FaseActualizacion } from './actualizar'
@@ -763,6 +763,88 @@ export default function App() {
     })
   }
 
+  /**
+   * Vuelve a repartir una tira que tiene un ESPACIO LIBRE.
+   *
+   * Estas tiras NO se pueden volver a modular de cero: el buscador arma cabinas
+   * con puerta, así que el hueco se convertiría en una cabina más y se perdería
+   * sin avisar. Se reacomoda sobre lo que ya hay —las puertas mandan, el hueco
+   * se lleva lo que sobre— y la pilastra que el vendedor movió se respeta.
+   */
+  function repartirConLibre(
+    t: Tramo,
+    cabinas: Cabina[],
+    fijas?: (number | null | undefined)[],
+    /** las posiciones que quedan clavadas para la próxima vez */
+    clavadas?: number[],
+  ) {
+    const muros = (t.muroInicio ? 1 : 0) + (t.muroFin ? 1 : 0)
+    const r = reajustarConPuertas(
+      cabinas, t.claroCm, muros, muros < 2,
+      config.tipologia === 'PMR' && llevaAccesible ? anchoAccesibleDe(config) : 0,
+      fijas,
+    )
+    if (!r) return false
+    setArea({
+      tramos: area.tramos.map((x) =>
+        x.id !== t.id
+          ? x
+          : { ...x, cabinas: r.cabinas, pilastras: r.pilastras, canaletaCm: r.canaletaCm, ajuste: r.ajuste, mensaje: r.mensaje, pilastrasFijas: clavadas ?? x.pilastrasFijas },
+      ),
+    })
+    return true
+  }
+
+  /**
+   * Se quitó o se puso la PUERTA de un lugar de la tira.
+   *
+   * No es un detalle del dibujo: un lugar sin puerta que no es orinal deja de
+   * ser cabina y pasa a ser ESPACIO LIBRE —un paso, un lavamanos, una columna
+   * que se respeta—. Por eso hay que volver a modular: el hueco no pide puerta,
+   * las pilastras que lo tocan apoyan enteras del lado de la cabina vecina y
+   * todo lo que sobra del claro se lo lleva el hueco, en vez de repartirse
+   * entre las cabinas.
+   */
+  function onTipoPuerta(tramoId: string, indice: number, tipo: 'puerta' | 'ninguna') {
+    const t = area.tramos.find((x) => x.id === tramoId)
+    if (!t) return
+    // al volver a ser cabina, la medida que tenía como hueco ya no aplica
+    const cabinas = t.cabinas.map((c, i) =>
+      i === indice ? { ...c, puerta: { ...c.puerta, tipo }, libreCm: tipo === 'ninguna' ? c.libreCm : undefined } : c,
+    )
+    const muros = (t.muroInicio ? 1 : 0) + (t.muroFin ? 1 : 0)
+    const r = reajustarConPuertas(
+      cabinas, t.claroCm, muros, muros < 2,
+      config.tipologia === 'PMR' && llevaAccesible ? anchoAccesibleDe(config) : 0,
+    )
+    setArea({
+      tramos: area.tramos.map((x) =>
+        x.id !== tramoId
+          ? x
+          : r
+            ? { ...x, cabinas: r.cabinas, pilastras: r.pilastras, canaletaCm: r.canaletaCm, ajuste: r.ajuste, mensaje: r.mensaje, pilastrasFijas: undefined }
+            : { ...x, cabinas },
+      ),
+    })
+  }
+
+  /**
+   * Se le escribió la medida a un ESPACIO LIBRE. A partir de ahí el hueco vale
+   * eso —viene del plano del arquitecto— y lo que se reacomoda para cerrar el
+   * claro son las pilastras, igual que en cualquier otra tira.
+   */
+  function onAnchoLibre(tramoId: string, indice: number, anchoCm: number) {
+    const t = area.tramos.find((x) => x.id === tramoId)
+    if (!t) return
+    repartirConLibre(
+      t,
+      t.cabinas.map((c, i) => (i === indice ? { ...c, libreCm: anchoCm } : c)),
+      Array.from({ length: t.cabinas.length + 1 }, (_, i) =>
+        (t.pilastrasFijas ?? []).includes(i) ? (t.pilastras?.[i] ?? null) : null,
+      ),
+    )
+  }
+
   function onCabinas(tramoId: string, cabinas: Cabina[]) {
     setArea({ tramos: area.tramos.map((t) => (t.id === tramoId ? { ...t, cabinas } : t)) })
   }
@@ -793,6 +875,18 @@ export default function App() {
     const anchos = Array.from({ length: cuantos }, (_, k) => config.anchosOrinalCm?.[k] ?? null)
     if (anchos[orden] === ancho) return
     anchos[orden] = ancho
+
+    if (t.cabinas.some(esEspacioLibre)) {
+      setConfig({ anchosOrinalCm: anchos })
+      repartirConLibre(
+        t,
+        t.cabinas.map((c, i) => (i === indice ? { ...c, anchoCm: ancho } : c)),
+        Array.from({ length: t.cabinas.length + 1 }, (_, i) =>
+          (t.pilastrasFijas ?? []).includes(i) ? (t.pilastras?.[i] ?? null) : null,
+        ),
+      )
+      return
+    }
 
     const muros = (t.muroInicio ? 1 : 0) + (t.muroFin ? 1 : 0)
     const r = modularConCatalogo(
@@ -853,6 +947,14 @@ export default function App() {
     const clavadas = Array.from({ length: t.cabinas.length + 1 }, (_, i) =>
       i === indice ? anchoCm : elegidas.includes(i) ? (t.pilastras?.[i] ?? null) : null,
     )
+
+    // Con un espacio libre en la tira no se vuelve a modular de cero: se
+    // reacomoda respetando la pilastra que se movió, y el hueco absorbe la
+    // diferencia de largo.
+    if (t.cabinas.some(esEspacioLibre)) {
+      repartirConLibre(t, t.cabinas, clavadas, elegidas)
+      return
+    }
     const r = modularConCatalogo(
       t.claroCm,
       t.cabinas.length,
@@ -1636,6 +1738,8 @@ export default function App() {
                     onPilastra={onPilastra}
                     onOrinal={onOrinal}
                     onPuerta={onPuerta}
+                    onTipoPuerta={onTipoPuerta}
+                    onAnchoLibre={onAnchoLibre}
                   />
                 </div>
 

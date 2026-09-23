@@ -1,11 +1,11 @@
 import { useMemo, useRef, useState } from 'react'
 import type { Cabina, Config, Pais, Tramo } from '../types'
 import { anchosPilastra, esEspecial, puertasPosibles, tipologia } from '../catalog'
-import { anchoTotal, arrancaElCuartoPmr, minimoDe, nuevaCabina, puertaSugerida, snap, cierraConMingitorio, ladosDeCabina, mamparaEn } from '../modulacion'
+import { anchoTotal, arrancaElCuartoPmr, esEspacioLibre, minimoDe, nuevaCabina, puertaSugerida, snap, cierraConMingitorio, ladoDePilastra, ladosDeCabina, lugaresDe, mamparaEn } from '../modulacion'
 import { medidaCercana, PILASTRAS_INTERNAS, PUERTA_ACCESIBLE_MIN } from '../modulador'
 import { Grupo, Item, Menu, Raya } from './Menu'
 import {
-  anchoDeOrinal, cajaDelPlano, cuartoPmr, ESPESOR_MURO, esMingitorio, marcosDe, profundidadDeDivisor,
+  anchoDeOrinal, cajaDelPlano, centroPilastra, cuartoPmr, ESPESOR_MURO, esMingitorio, marcosDe, profundidadDeDivisor,
   profundidadDeTramo,
   profundidadDelLugar, pt, SOBRA_MURO_CM,
   type Marco,
@@ -56,6 +56,14 @@ interface Props {
   onOrinal: (tramoId: string, indice: number, cuerpoCm: number) => void
   /** al elegir una medida de puerta: manda la puerta y las pilastras se adaptan */
   onPuerta: (tramoId: string, indice: number, anchoPuertaCm: number) => void
+  /**
+   * Se quitó o se puso la PUERTA de un lugar. No es un cambio de dibujo: sin
+   * puerta el lugar deja de ser cabina y pasa a ser espacio libre, así que la
+   * tira se vuelve a modular.
+   */
+  onTipoPuerta: (tramoId: string, indice: number, tipo: 'puerta' | 'ninguna') => void
+  /** se le escribió la medida a un ESPACIO LIBRE: queda clavada y modulan las pilastras */
+  onAnchoLibre: (tramoId: string, indice: number, anchoCm: number) => void
 
 }
 
@@ -76,6 +84,8 @@ export default function EditorPlano({
   onCabinas,
   onPilastra,
   onPuerta,
+  onTipoPuerta,
+  onAnchoLibre,
   onOrinal,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
@@ -273,25 +283,48 @@ export default function EditorPlano({
     const pedido = Number(String(texto).replace(',', '.'))
     if (!Number.isFinite(pedido) || pedido <= 0) return
 
+    // En un ESPACIO LIBRE lo que se escribe es el hueco mismo, no una cabina:
+    // queda clavado y son las pilastras las que se mueven para cerrar el claro.
+    if (esEspacioLibre(cab)) {
+      onAnchoLibre(tramoId, indice, snap(pedido))
+      return
+    }
+
     const n = t.cabinas.length
     if (n < 2) return
     const anchoPil = (j: number) => t.pilastras?.[j] ?? config.anchoPilastraCm
     const cuerpo = cab.tipo === 'orinal' ? cab.anchoCm : cab.puerta.anchoCm
 
-    // Todas las pilastras internas comparten medida, así que:
-    //  · una cabina del medio tiene media pilastra a cada lado → ancho = pilastra + puerta
-    //  · la primera y la última llevan su pilastra de extremo entera más media interna
-    const primera = indice === 0
-    const ultima = indice === n - 1
-    const necesaria = primera
-      ? (pedido - cuerpo - anchoPil(0)) * 2
-      : ultima
-        ? (pedido - cuerpo - anchoPil(n)) * 2
-        : pedido - cuerpo
+    // Cuánto de cada pilastra vecina entra en el ancho de ESTA cabina. No
+    // siempre es la mitad: una LATERAL entra entera y del otro lado puede no
+    // entrar nada. Antes se daba por hecho el medio y medio, así que escribirle
+    // la medida a la cabina de al lado del cuarto PMR —o de un espacio libre—
+    // movía la pilastra el doble de lo que hacía falta.
+    const lugares = lugaresDe(t.cabinas)
+    const cuarto = arrancaElCuartoPmr(t, config) ? 0 : -1
+    const parte = (k: number, cabinaALaDerecha: boolean) => {
+      const lado = ladoDePilastra(lugares, k, cuarto)
+      if (lado === 'mitades') return 0.5
+      return (lado === 'der') === cabinaALaDerecha ? 1 : 0
+    }
+    const fIzq = parte(indice, true)
+    const fDer = parte(indice + 1, false)
 
-    const jMover = primera ? 1 : ultima ? n - 1 : indice + 1
+    // Qué pilastra mover. Las de punta no se tocan: se mueve una interna. Se
+    // prefiere la que da contra un ESPACIO LIBRE, porque ahí el cambio se lo
+    // come el hueco y no se corre ninguna otra cabina.
+    const tocaLibre = (k: number) =>
+      (lugares[k - 1]?.libre ?? false) || (lugares[k]?.libre ?? false)
+    const opciones = [
+      { k: indice, f: fIzq, otro: fDer * anchoPil(indice + 1) },
+      { k: indice + 1, f: fDer, otro: fIzq * anchoPil(indice) },
+    ].filter((o) => o.f > 0 && o.k > 0 && o.k < n)
+    if (opciones.length === 0) return
+    const elegir = opciones.find((o) => tocaLibre(o.k)) ?? opciones[opciones.length - 1]
+
+    const necesaria = (pedido - cuerpo - elegir.otro) / elegir.f
     const elegida = medidaCercana(PILASTRAS_INTERNAS, necesaria)
-    if (elegida !== anchoPil(jMover)) onPilastra(tramoId, jMover, elegida)
+    if (elegida !== anchoPil(elegir.k)) onPilastra(tramoId, elegir.k, elegida)
   }
   function centrarPanel(tramoId: string, indice: number) {
     const t = tramoPorId(tramoId)
@@ -429,7 +462,7 @@ export default function EditorPlano({
                 const anchoPil = (j: number) => tramo.pilastras?.[j] ?? config.anchoPilastraCm
                 // la puerta cuelga de la CARA de la pilastra: con la lateral que cierra
                 // la tira hay que tomarla entera, o el pivote cae dentro de la pieza
-                const { izq: caraIzq, der: caraDer } = ladosDeCabina(tramo.cabinas.map((x) => x.tipo === 'orinal'), anchoPil, i, arrancaElCuartoPmr(tramo, config))
+                const { izq: caraIzq, der: caraDer } = ladosDeCabina(lugaresDe(tramo.cabinas), anchoPil, i, arrancaElCuartoPmr(tramo, config))
 
                 // pivote de la puerta y hoja
                 const pivU = cab.puerta.mano === 'der' ? u1 - caraDer : u0 + caraIzq
@@ -459,12 +492,17 @@ export default function EditorPlano({
                     />
 
                     {/* cota de la puerta: horizontal, centrada en el vano entre pilastras */}
-                    {verCotas && cab.puerta.tipo !== 'ninguna' && cuarto?.indice !== i && (
+                    {verCotas && (cab.puerta.tipo !== 'ninguna' || esEspacioLibre(cab)) && cuarto?.indice !== i && (
                       <text
                         x={cotaPuerta.x} y={cotaPuerta.y + (horizontal ? 26 : 0)}
                         textAnchor="middle" fontSize={14} fill="#8fa2bb" pointerEvents="none"
                       >
-                        {formatear(cab.puerta.anchoCm, unidad)}
+                        {formatear(
+                          esEspacioLibre(cab)
+                            ? Math.round((cab.anchoCm - caraIzq - caraDer) * 10) / 10
+                            : cab.puerta.anchoCm,
+                          unidad,
+                        )}
                       </text>
                     )}
 
@@ -481,7 +519,7 @@ export default function EditorPlano({
                     )}
 
                     {/* sanitario: el dibujo real del catálogo, con el fluxómetro contra el muro */}
-                    {verInodoros && cab.tipo !== 'vacia' && (() => {
+                    {verInodoros && cab.tipo !== 'vacia' && !esEspacioLibre(cab) && (() => {
                       const dibujo = cab.tipo === 'orinal' ? ORINAL : cab.tipo === 'regadera' ? REGADERA : WC
                       const alto = cab.tipo === 'orinal' ? ALTO_ORINAL_CM : cab.tipo === 'regadera' ? ALTO_REGADERA_CM : ALTO_WC_CM
                       const ancho = (alto * dibujo.ancho) / dibujo.alto
@@ -731,23 +769,14 @@ export default function EditorPlano({
                       x1={f0.x} y1={f0.y} x2={f1.x} y2={f1.y}
                       stroke="#9aa8b8" strokeWidth={1.2} strokeDasharray="10 7" pointerEvents="none"
                     />
-                    {cortes.map((u2, k) => {
+                    {cortes.map((_u2, k) => {
                       // en las fronteras de mingitorio no hay pilastra que dibujar
                       if (esMingitorio(tramo, k)) return null
                       // La pilastra se dibuja con SU ancho (el de la pieza, 10–85 cm según
                       // catálogo), no con el espesor del material: son cosas distintas y
                       // dibujarla de 1.27 cm la volvía invisible en planta.
                       const ancho = Math.max(tramo.pilastras?.[k] ?? config.anchoPilastraCm, grueso)
-                      // en los extremos se corre hacia adentro para no invadir el muro
-                        // la lateral que cierra la tira de baños va entera adentro de la
-                        // tira, como las de punta: centrada se leería como una central
-                        const cierraLaTira = esMingitorio(tramo, k + 1) && !esMingitorio(tramo, k)
-                      const centro =
-                        k === 0
-                          ? u2 + ancho / 2
-                          : k === cortes.length - 1 || cierraLaTira
-                            ? u2 - ancho / 2
-                            : u2
+                      const centro = centroPilastra(tramo, cortes, k, ancho, cuartoPmr(tramo, config))
                       const a = pt(m, centro - ancho / 2, prof - grueso)
                       const b = pt(m, centro + ancho / 2, prof)
                       const extremo = k === 0 || k === cortes.length - 1
@@ -1009,8 +1038,8 @@ export default function EditorPlano({
             <Item activo={cab.tipo === 'orinal'} onClick={() => { cambiarCabina(menu.tramoId, menu.indice, { tipo: 'orinal', puerta: { ...cab.puerta, tipo: 'ninguna' } }); cerrar() }}>Orinal</Item>
             <Raya />
             <Grupo>Puerta</Grupo>
-            <Item activo={cab.puerta.tipo === 'puerta'} onClick={() => { cambiarPuerta(menu.tramoId, menu.indice, { tipo: 'puerta' }); cerrar() }}>Con puerta</Item>
-            <Item activo={cab.puerta.tipo === 'ninguna'} onClick={() => { cambiarPuerta(menu.tramoId, menu.indice, { tipo: 'ninguna' }); cerrar() }}>Sin puerta</Item>
+            <Item activo={cab.puerta.tipo === 'puerta'} onClick={() => { onTipoPuerta(menu.tramoId, menu.indice, 'puerta'); cerrar() }}>Con puerta</Item>
+            <Item activo={cab.puerta.tipo === 'ninguna'} onClick={() => { onTipoPuerta(menu.tramoId, menu.indice, 'ninguna'); cerrar() }}>Sin puerta</Item>
             <Raya />
             <Item onClick={() => { agregarCabina(menu.tramoId, menu.indice); cerrar() }}>Partir en dos cabinas</Item>
             <Item disabled={t.cabinas.length <= 1} onClick={() => { quitarCabina(menu.tramoId, menu.indice); cerrar() }}>

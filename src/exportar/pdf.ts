@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf'
 import type { Area, Cabina, Proyecto, Tramo } from '../types'
 import {
-  acumulado, anchoDeOrinal, cajaDelPlano, cuartoPmr, esMingitorio, ESPESOR_MURO, marcosDe,
+  acumulado, anchoDeOrinal, cajaDelPlano, centroPilastra, cuartoPmr, esMingitorio, ESPESOR_MURO, marcosDe,
   PROF_ORINAL_CM,
   profundidadDeDivisor,
   profundidadDeTramo,
@@ -9,7 +9,7 @@ import {
   type Marco,
 } from '../geometria'
 import { alturasDe, mamparaDe, nombreHerraje, tipologia } from '../catalog'
-import { anchoTotal, arrancaElCuartoPmr, ladosDeCabina, mamparaEn } from '../modulacion'
+import { anchoTotal, arrancaElCuartoPmr, esEspacioLibre, ladosDeCabina, lugaresDe, mamparaEn } from '../modulacion'
 import type { CuartoPmr } from '../geometria'
 import { agrupar, modeloParaCsv, nombreLinea, nombreSistema, piezasDeArea } from './piezas'
 import { ALTO_ORINAL_CM, ALTO_REGADERA_CM, ALTO_WC_CM, ORINAL, REGADERA, WC } from '../assets/sanitarios'
@@ -152,37 +152,6 @@ function muro(doc: jsPDF, x: number, y: number, w: number, h: number) {
   doc.setDrawColor(70)
   doc.setLineWidth(0.4)
   doc.rect(x, y, w, h)
-}
-
-/**
- * Dónde queda el CENTRO de la pilastra del corte `k`.
- *
- * Casi todas van a caballo del corte, media pilastra en cada cabina: son
- * CENTRALES. Entran enteras para adentro las dos de punta, la que cierra
- * contra un mingitorio y la que sigue al CUARTO ACCESIBLE.
- *
- * Esa última es LATERAL: a su izquierda no hay cabina sino el cuarto, que
- * cierra con su propio divisor corriendo a lo hondo. Dibujada centrada se
- * corría media pilastra sobre el cuarto y dejaba de coincidir con su cota y
- * con el arranque de la puerta de al lado.
- *
- * Está en un solo lugar a propósito: la planta y el alzado tienen que poner
- * cada pieza en el mismo sitio, y antes la cuenta estaba copiada cuatro veces.
- */
-function centroPilastra(
-  tramo: Tramo,
-  cortes: number[],
-  k: number,
-  ancho: number,
-  cuarto: CuartoPmr | null,
-): number {
-  const u = cortes[k]
-  if (k === 0) return u + ancho / 2
-  if (k === cortes.length - 1) return u - ancho / 2
-  // la lateral que cierra la tira de baños contra los orinales
-  if (esMingitorio(tramo, k + 1) && !esMingitorio(tramo, k)) return u - ancho / 2
-  if (cuarto && k === cuarto.indice + 1) return u + ancho / 2
-  return u
 }
 
 /**
@@ -383,7 +352,7 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
       }
 
       // sanitario: el mismo dibujo del catálogo que se ve en pantalla
-      if (cab.tipo !== 'vacia') {
+      if (cab.tipo !== 'vacia' && !esEspacioLibre(cab)) {
         const dibujo = cab.tipo === 'orinal' ? ORINAL : cab.tipo === 'regadera' ? REGADERA : WC
         const altoCm = cab.tipo === 'orinal' ? ALTO_ORINAL_CM : cab.tipo === 'regadera' ? ALTO_REGADERA_CM : ALTO_WC_CM
         const anchoCm = (altoCm * dibujo.ancho) / dibujo.alto
@@ -409,13 +378,13 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
           doc.addImage(dibujo.src, 'PNG', x, y, w, h, undefined, 'FAST', (-giro * 180) / Math.PI)
         }
       }
-      if (cab.tipo === 'accesible' || cab.tipo === 'vacia') {
+      if (cab.tipo === 'accesible' || cab.tipo === 'vacia' || esEspacioLibre(cab)) {
         // en el cuarto el rótulo va abajo, para no caer sobre el inodoro girado
         const [cx, cy] = aHoja(
           e,
           cuarto?.indice === i ? pt(m, (u0 + u1) / 2, cuarto.profCm * 0.9) : pt(m, (u0 + u1) / 2, prof * 0.78),
         )
-        texto(doc, cab.tipo === 'accesible' ? 'ACCESIBLE' : 'VACÍA', cx, cy, { size: 5.5, align: 'center', color: GRIS })
+        texto(doc, cab.tipo === 'accesible' ? 'ACCESIBLE' : esEspacioLibre(cab) ? 'LIBRE' : 'VACÍA', cx, cy, { size: 5.5, align: 'center', color: GRIS })
       }
 
       // La puerta cuelga de la PILASTRA, no del límite de la cabina: ese límite
@@ -424,7 +393,7 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
       const anchoPil = (j: number) => tramo.pilastras?.[j] ?? area.config.anchoPilastraCm
       // la puerta cuelga de la CARA de la pilastra: con la lateral que cierra la
       // tira hay que tomarla entera, o el pivote cae dentro de la pieza
-      const { izq: caraIzq, der: caraDer } = ladosDeCabina(tramo.cabinas.map((x) => x.tipo === 'orinal'), anchoPil, i, arrancaElCuartoPmr(tramo, area.config))
+      const { izq: caraIzq, der: caraDer } = ladosDeCabina(lugaresDe(tramo.cabinas), anchoPil, i, arrancaElCuartoPmr(tramo, area.config))
 
       // puerta: hoja a 45° y arco de barrido. La del cuarto accesible no va acá:
       // va en su divisor, sobre la profundidad, porque al cuarto se entra por el costado.
@@ -568,7 +537,7 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
         if (cuarto?.indice === i) return
         const u0 = acum[i]
         const u1 = u0 + cab.anchoCm
-        const { izq, der } = ladosDeCabina(tramo.cabinas.map((x) => x.tipo === 'orinal'), anchoPilDe, i, arrancaElCuartoPmr(tramo, area.config))
+        const { izq, der } = ladosDeCabina(lugaresDe(tramo.cabinas), anchoPilDe, i, arrancaElCuartoPmr(tramo, area.config))
         // El orinal no lleva puerta, pero sí tiene su medida, que NO es la de su
         // cabina: la cabina se lleva además media pilastra de cada lado.
         if (cab.tipo === 'orinal') {
@@ -580,8 +549,13 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
           })
           return
         }
-        if (cab.puerta.tipo === 'ninguna') return
-        cotaEntre(doc, e, m, u0 + izq, u1 - der, prof - 20, prof - 12, String(cab.puerta.anchoCm), {
+        // El ESPACIO LIBRE no tiene puerta que acotar, pero sí tiene medida: el
+        // hueco que queda entre las caras de las dos pilastras. Es lo que el
+        // instalador necesita leer, así que se acota igual que un vano.
+        const libre = esEspacioLibre(cab)
+        if (cab.puerta.tipo === 'ninguna' && !libre) return
+        const medida = libre ? Math.round((u1 - der - (u0 + izq)) * 10) / 10 : cab.puerta.anchoCm
+        cotaEntre(doc, e, m, u0 + izq, u1 - der, prof - 20, prof - 12, String(medida), {
           size: 6,
           rot,
           vTexto: prof - 22,
@@ -785,7 +759,7 @@ function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) 
     if (cuarto?.indice === i) return
     const u0 = acum[i]
     const u1 = u0 + cab.anchoCm
-    const { izq, der } = ladosDeCabina(tramo.cabinas.map((x: Cabina) => x.tipo === 'orinal'), anchoPil, i, arrancaElCuartoPmr(tramo, area.config))
+    const { izq, der } = ladosDeCabina(lugaresDe(tramo.cabinas), anchoPil, i, arrancaElCuartoPmr(tramo, area.config))
     if (cab.tipo === 'orinal') return
     if (cab.puerta.tipo === 'ninguna') return
     doc.setFillColor(248, 249, 251)
@@ -836,7 +810,7 @@ function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) 
     if (cuarto?.indice === i) return
     const u0 = acum[i]
     const u1 = u0 + cab.anchoCm
-    const { izq, der } = ladosDeCabina(tramo.cabinas.map((x: Cabina) => x.tipo === 'orinal'), anchoPil, i, arrancaElCuartoPmr(tramo, area.config))
+    const { izq, der } = ladosDeCabina(lugaresDe(tramo.cabinas), anchoPil, i, arrancaElCuartoPmr(tramo, area.config))
     const medida = cab.tipo === 'orinal' ? anchoDeOrinal(tramo, i, area.config.anchoPilastraCm) : cab.puerta.anchoCm
     if (cab.tipo !== 'orinal' && cab.puerta.tipo === 'ninguna') return
     cotaAncho(doc, aX(u0 + izq), aX(u1 - der), yPiezas, `${medida}`)
