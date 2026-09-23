@@ -337,3 +337,104 @@ export function revisionAGuardar(
   if (libre) return { revision: libre, nueva: true, sinLetras: false }
   return { revision: actual ?? REVISIONES[REVISIONES.length - 1], nueva: false, sinLetras: true }
 }
+
+/**
+ * Cómo se parte un número de plano en prefijo, dígitos y ancho.
+ *
+ * Los números no son solo dígitos: hay "1042" pelado y hay "S000" o "CR-120".
+ * Para dar el siguiente hay que respetar la forma del que ya está escrito, o
+ * el botón le cambiaría la numeración a quien usa prefijos.
+ */
+export function partirNumero(numero: string): { prefijo: string; digitos: string; ancho: number } {
+  const limpio = (numero ?? '').trim()
+  const m = /^(.*?)(\d*)$/.exec(limpio)
+  const prefijo = m?.[1] ?? ''
+  const digitos = m?.[2] ?? ''
+  return { prefijo, digitos, ancho: digitos.length }
+}
+
+/** arma "S" + 1 con tres dígitos -> "S001" */
+export function armarNumero(prefijo: string, n: number, ancho: number): string {
+  return `${prefijo}${String(n).padStart(Math.max(ancho, 1), '0')}`
+}
+
+/**
+ * El siguiente número de plano libre, mirando TODA la tabla.
+ *
+ * Va por la función `siguiente_numero_plano` de la base porque la RLS le
+ * esconde a cada distribuidor los proyectos de los demás: contar desde acá
+ * daría un número que otro ya usó. Si la función todavía no está —falta correr
+ * el SQL 30— se cae a la cuenta vieja, que solo ve lo propio, y se avisa.
+ */
+export async function siguienteNumeroPlano(
+  usuario: Usuario | null,
+  prefijo = '',
+): Promise<Resultado<number>> {
+  if (!URL_SUPABASE || !LLAVE_SUPABASE) return sinNube()
+  const falta = sesionValida(usuario)
+  if (falta) return { ok: false, mensaje: falta }
+
+  try {
+    const r = await fetch(`${URL_SUPABASE}/rest/v1/rpc/siguiente_numero_plano`, {
+      method: 'POST',
+      headers: cabeceras(usuario!.token!),
+      body: JSON.stringify({ p_prefijo: prefijo }),
+    })
+    if (r.ok) {
+      const n = Number(await r.json())
+      if (Number.isFinite(n) && n > 0) return { ok: true, dato: n, mensaje: '' }
+    }
+    if (r.status !== 404) return { ok: false, mensaje: await detalle(r) }
+  } catch (e) {
+    return { ok: false, mensaje: e instanceof Error ? e.message : 'No se pudo consultar.' }
+  }
+
+  // sin la función: lo mejor que se puede hacer desde acá
+  const viejo = await siguienteNumero(usuario)
+  if (!viejo.ok) return { ok: false, mensaje: viejo.mensaje }
+  return {
+    ok: true,
+    dato: Number(viejo.dato),
+    mensaje: 'Falta correr el SQL 30: este número sale solo de los proyectos que vos ves, así que otro distribuidor podría tenerlo.',
+  }
+}
+
+/**
+ * Si un número de plano ya está usado, y si lo que hay con ese número es de
+ * uno mismo. `es_mio` en falso quiere decir que lo tiene otro distribuidor:
+ * ahí ni siquiera se puede guardar, porque la RLS rechaza el upsert.
+ */
+export async function numeroTomado(
+  usuario: Usuario | null,
+  numero: string,
+): Promise<Resultado<{ existe: boolean; esMio: boolean }>> {
+  if (!URL_SUPABASE || !LLAVE_SUPABASE) return sinNube()
+  const falta = sesionValida(usuario)
+  if (falta) return { ok: false, mensaje: falta }
+
+  try {
+    const r = await fetch(`${URL_SUPABASE}/rest/v1/rpc/numero_plano_tomado`, {
+      method: 'POST',
+      headers: cabeceras(usuario!.token!),
+      body: JSON.stringify({ p_numero: numero.trim() }),
+    })
+    if (r.ok) {
+      const filas = (await r.json()) as { existe: boolean; es_mio: boolean }[]
+      const f = Array.isArray(filas) ? filas[0] : (filas as unknown as { existe: boolean; es_mio: boolean })
+      return { ok: true, dato: { existe: !!f?.existe, esMio: !!f?.es_mio }, mensaje: '' }
+    }
+    if (r.status !== 404) return { ok: false, mensaje: await detalle(r) }
+  } catch (e) {
+    return { ok: false, mensaje: e instanceof Error ? e.message : 'No se pudo consultar.' }
+  }
+
+  // sin la función se revisa contra lo que uno ve, que es mejor que nada
+  const lista = await listarProyectos(usuario)
+  if (!lista.ok) return { ok: false, mensaje: lista.mensaje }
+  const existe = (lista.dato ?? []).some((p) => p.numeroPlano === numero.trim())
+  return {
+    ok: true,
+    dato: { existe, esMio: existe },
+    mensaje: existe ? '' : 'Falta correr el SQL 30: solo se revisó contra tus proyectos.',
+  }
+}

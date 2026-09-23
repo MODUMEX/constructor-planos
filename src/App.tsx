@@ -8,7 +8,7 @@ import {
   generarCotizacionPDF, nombreArchivoCotizacion, resumenDePiezas, totalesDe,
 } from './exportar/cotizacion'
 import { csvABytes, FILTRO_CSV, FILTRO_PDF, guardarArchivo } from './exportar/guardar'
-import { abrirProyecto } from './proyectos'
+import { abrirProyecto, armarNumero, numeroTomado, partirNumero, siguienteNumeroPlano } from './proyectos'
 import {
   autorizar as autorizarEnOdoo, cuadran, guardarCotizacion, lineasParaOdoo, rechazar as rechazarCotizacion,
 } from './odoo/enviar'
@@ -231,7 +231,16 @@ export default function App() {
    * cambió desde el último guardado, que es lo que hace nacer la letra
    * siguiente. En null mientras el proyecto no se haya guardado nunca.
    */
-  const [revisionGuardada, setRevisionGuardada] = useState<{ revision: Revision; huella: string } | null>(null)
+  /**
+   * La revisión con la que este proyecto está guardado en la nube, y el NÚMERO
+   * con el que quedó. El número hace falta para saber si el que está escrito
+   * ahora es "el de este plano" —y entonces guardar sube de letra— o uno que
+   * se acaba de escribir y que puede chocar con otro proyecto.
+   */
+  const [revisionGuardada, setRevisionGuardada] = useState<{ revision: Revision; huella: string; numero: string } | null>(null)
+  /** qué se sabe del número escrito: si está libre, si lo tiene otro, o nada todavía */
+  const [numeroLibre, setNumeroLibre] = useState<{ estado: 'libre' | 'tomado' | 'ajeno'; mensaje: string } | null>(null)
+  const [revisandoNumero, setRevisandoNumero] = useState(false)
   const [guardandoProyecto, setGuardandoProyecto] = useState(false)
   const [avisoProyecto, setAvisoProyecto] = useState<{ ok: boolean; mensaje: string } | null>(null)
   const [version, setVersion] = useState(VERSION_COMPILADA)
@@ -498,6 +507,55 @@ export default function App() {
   const hayCambiosSinGuardar = revisionGuardada ? huellaDe(proyecto) !== revisionGuardada.huella : true
 
   /**
+   * El número escrito es el de ESTE plano: o sea, con el que ya está guardado
+   * en la nube. Solo en ese caso repetirlo está bien —es una revisión más—; en
+   * cualquier otro, si el número existe es que lo tiene otro proyecto.
+   */
+  const numeroEsDeEstePlano =
+    !!revisionGuardada && revisionGuardada.numero.trim() === proyecto.numero.trim()
+
+  /**
+   * Revisa contra la base si el número escrito ya está usado.
+   *
+   * Va a la base y no a la lista de pantalla porque la RLS le esconde a cada
+   * distribuidor los proyectos de los demás: el choque que más duele es
+   * justamente con uno que no se ve.
+   */
+  async function revisarNumero(numero: string) {
+    const n = numero.trim()
+    setNumeroLibre(null)
+    if (!n || !usuario) return
+    if (revisionGuardada && revisionGuardada.numero.trim() === n) return
+    setRevisandoNumero(true)
+    const r = await numeroTomado(usuario, n)
+    setRevisandoNumero(false)
+    if (!r.ok) { setNumeroLibre({ estado: 'libre', mensaje: r.mensaje }); return }
+    if (!r.dato!.existe) {
+      setNumeroLibre({ estado: 'libre', mensaje: r.mensaje || `El ${n} está libre.` })
+      return
+    }
+    setNumeroLibre({
+      estado: r.dato!.esMio ? 'tomado' : 'ajeno',
+      mensaje: r.dato!.esMio
+        ? `El plano ${n} ya existe. Si es este mismo plano, abrilo desde Mis proyectos para que la revisión suba sola; si es otro, tomá el siguiente libre.`
+        : `El plano ${n} ya lo tiene otro distribuidor. Guardar con ese número va a fallar: tomá el siguiente libre.`,
+    })
+  }
+
+  /** trae el primer número libre, respetando el prefijo y los ceros que ya haya escritos */
+  async function tomarSiguienteNumero() {
+    if (!usuario) return
+    const { prefijo, ancho } = partirNumero(proyecto.numero)
+    setRevisandoNumero(true)
+    const r = await siguienteNumeroPlano(usuario, prefijo)
+    setRevisandoNumero(false)
+    if (!r.ok) { setNumeroLibre({ estado: 'ajeno', mensaje: r.mensaje }); return }
+    const nuevo = armarNumero(prefijo, r.dato!, ancho)
+    setProyecto({ ...proyecto, numero: nuevo })
+    setNumeroLibre({ estado: 'libre', mensaje: r.mensaje || `${nuevo} está libre.` })
+  }
+
+  /**
    * Guarda el proyecto en la nube. La letra NO se elige: la calcula
    * `revisionAGuardar` con lo que ya hay en la nube y con si se tocó algo.
    * Guardar dos veces seguidas sin editar no inventa una revisión nueva.
@@ -507,6 +565,23 @@ export default function App() {
     const numero = proyecto.numero.trim()
     if (!numero) return { ok: false, mensaje: 'Falta el número de plano.' }
     setGuardandoProyecto(true)
+    // Un número que ya está usado por OTRO proyecto no se puede guardar: el
+    // upsert va por código y terminaría pisando ese plano, o rebotando contra
+    // la RLS si es de otro distribuidor.
+    if (!numeroEsDeEstePlano) {
+      const tomado = await numeroTomado(usuario, numero)
+      if (tomado.ok && tomado.dato!.existe) {
+        setGuardandoProyecto(false)
+        const r = {
+          ok: false,
+          mensaje: tomado.dato!.esMio
+            ? `El plano ${numero} ya existe. Para seguir ese plano abrilo desde Mis proyectos; si este es otro, dale a "Siguiente libre".`
+            : `El plano ${numero} ya lo tiene otro distribuidor. Dale a "Siguiente libre" para tomar uno.`,
+        }
+        setAvisoProyecto(r)
+        return r
+      }
+    }
     setAvisoProyecto(null)
     const fallar = (mensaje: string) => {
       setGuardandoProyecto(false)
@@ -523,7 +598,7 @@ export default function App() {
     const g = await guardarProyecto(usuario, proyecto, elegida.revision)
     if (!g.ok) return fallar(g.mensaje)
     setGuardandoProyecto(false)
-    setRevisionGuardada({ revision: elegida.revision, huella })
+    setRevisionGuardada({ revision: elegida.revision, huella, numero })
     const codigo = codigoDe(numero, elegida.revision)
     const r = {
       ok: true,
@@ -563,6 +638,7 @@ export default function App() {
     setActiva(0)
     setSeleccion(null)
     setRevisionGuardada(null)
+    setNumeroLibre(null)
     setAvisoProyecto(null)
     setGuardado(null)
     setPaso(1)
@@ -1550,7 +1626,7 @@ export default function App() {
             setProyecto(p)
             // lo que se abre YA está guardado con esa letra: desde acá, la
             // siguiente nace solo si se edita algo
-            setRevisionGuardada({ revision, huella: huellaDe(p) })
+            setRevisionGuardada({ revision, huella: huellaDe(p), numero: p.numero })
             setAvisoProyecto(null)
             // el proyecto que llega trae sus propias áreas y su plano ya armado:
             // se vuelve al área uno y al paso del plano, no al principio
@@ -1839,9 +1915,29 @@ export default function App() {
                   )}
 
                   <div className="campos">
-                    <div className={`campo${avisoDatos && !proyecto.numero.trim() ? ' falta' : ''}`}>
+                    <div className={`campo${avisoDatos && !proyecto.numero.trim() ? ' falta' : ''}${numeroLibre && numeroLibre.estado !== 'libre' ? ' tomado' : ''}`}>
                       <label>N° de plano</label>
-                      <input value={proyecto.numero} onChange={(e) => setProyecto({ ...proyecto, numero: e.target.value })} />
+                      <div className="con-boton">
+                        <input
+                          value={proyecto.numero}
+                          onChange={(e) => { setProyecto({ ...proyecto, numero: e.target.value }); setNumeroLibre(null) }}
+                          onBlur={(e) => revisarNumero(e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          className="btn contorno chico"
+                          onClick={tomarSiguienteNumero}
+                          disabled={revisandoNumero || !usuario}
+                          title="Trae el primer número que no esté usado. Si el que hay escrito lleva prefijo —S000, CR-120— lo respeta."
+                        >
+                          {revisandoNumero ? '…' : 'Siguiente libre'}
+                        </button>
+                      </div>
+                      {numeroLibre && (
+                        <span className={`ayuda ${numeroLibre.estado === 'libre' ? 'bien' : 'mal'}`}>
+                          {numeroLibre.mensaje}
+                        </span>
+                      )}
                     </div>
                     <div className={`campo${avisoDatos && !proyecto.obra.trim() ? ' falta' : ''}`}>
                       <label>Obra</label>

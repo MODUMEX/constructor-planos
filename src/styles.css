@@ -1007,3 +1007,15 @@ input[type="password"]::-ms-clear {
 
 /* el detalle bajo el estado de la cotización: el N° de Odoo, el vencimiento */
 td .ayuda { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+
+/*
+ * El N° de plano: el campo y el botón que trae el siguiente libre, en la misma
+ * línea. El botón no crece, así que el ancho se lo lleva el input.
+ */
+.campo .con-boton { display: flex; gap: 6px; align-items: stretch; }
+.campo .con-boton input { flex: 1 1 auto; min-width: 0; }
+.campo .con-boton .btn { flex: 0 0 auto; white-space: nowrap; }
+/* el aviso de que ese número ya lo tiene otro plano */
+.campo .ayuda.mal { color: var(--bad); }
+.campo .ayuda.bien { color: var(--ok); }
+.campo.tomado input { border-color: var(--bad); }
