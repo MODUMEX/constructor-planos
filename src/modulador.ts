@@ -354,7 +354,7 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
     mensaje = `Calza con canaleta de ${abs.toFixed(1)} cm (rellena el hueco)`
   } else if (diferencia > 0) {
     ajuste = 'sobra'
-    mensaje = `Falta material: hueco de ${abs.toFixed(1)} cm, más de lo que rellena una canaleta`
+    mensaje = `Falta material: hueco de ${abs.toFixed(1)} cm, más de lo que rellena una canaleta. Si no hay pilastra que lo cierre, poné un PANEL de frente desde el menú del divisor.`
   } else {
     ajuste = 'falta'
     mensaje = `Las piezas se pasan ${abs.toFixed(1)} cm: la canaleta rellena, no recorta. Reduce una pieza`
@@ -530,7 +530,7 @@ export function ajustarPilastras(o: OpcionesPilastras): Pilastreo | null {
     mensaje = `Calza con canaleta de ${abs.toFixed(1)} cm (rellena el hueco)`
   } else if (diferencia > 0) {
     ajuste = 'sobra'
-    mensaje = `Con esas puertas queda un hueco de ${abs.toFixed(1)} cm: más de lo que rellena una canaleta`
+    mensaje = `Con esas puertas queda un hueco de ${abs.toFixed(1)} cm: más de lo que rellena una canaleta. Si no hay pilastra que lo cierre, poné un PANEL de frente desde el menú del divisor.`
   } else {
     ajuste = 'falta'
     mensaje = `Con esas puertas las piezas se pasan ${abs.toFixed(1)} cm del claro`

@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import type { Cabina, Config, Pais, Tramo } from '../types'
-import { anchosPilastra, esEspecial, puertasPosibles, tipologia } from '../catalog'
+import { anchosPilastra, esEspecial, familiaDelFrente, medidasDeFrente, puertasPosibles, tipologia } from '../catalog'
 import { anchoTotal, arrancaElCuartoPmr, esEspacioLibre, minimoDe, nuevaCabina, puertaSugerida, snap, cierraConMingitorio, ladoDePilastra, ladosDeCabina, lugaresDe, mamparaEn } from '../modulacion'
 import { medidaCercana, PILASTRAS_INTERNAS, PUERTA_ACCESIBLE_MIN } from '../modulador'
 import { Grupo, Item, Menu, Raya } from './Menu'
@@ -206,9 +206,16 @@ export default function EditorPlano({
       // como los 55 del extremo derecho de algunos baños ya fabricados.
       // las especiales del modelo se pueden poner en cualquier posición: se
       // dieron de alta a mano justo para casos que el catálogo no resuelve
-      const opciones = anchosPilastra(config.modelo).filter(
-        (a) => p.extremo || PILASTRAS_INTERNAS.includes(a) || esEspecial('PL', a, config.modelo),
-      )
+      // Pasado el tope de pilastra —120 cm— no hay pieza que ponga, así que
+      // entran los PANELES: son el relleno de frente cuando el claro se pasa.
+      // Como abajo de 120 las pilastras están mucho más juntas, arrastrar de a
+      // poco sigue cayendo en pilastra; solo estirando de verdad llega a panel.
+      const opciones = [
+        ...anchosPilastra(config.modelo).filter(
+          (a) => p.extremo || PILASTRAS_INTERNAS.includes(a) || esEspecial('PL', a, config.modelo),
+        ),
+        ...medidasDeFrente(config.modelo).filter((m) => m.familia === 'PN').map((m) => m.anchoCm),
+      ]
       onPilastra(p.tramoId, p.indice, medidaCercana(opciones, deseado))
       return
     }
@@ -1065,6 +1072,42 @@ export default function EditorPlano({
             <Item onClick={() => { centrarPanel(menu.tramoId, menu.indice); cerrar() }} atajo="=">
               Centrar entre las dos cabinas
             </Item>
+            <Raya />
+            {(() => {
+              // La pieza que va al FRENTE en esta frontera. Casi siempre es una
+              // pilastra, pero arriba del tope del catálogo no existe pilastra y
+              // la que cierra es un panel: por eso las dos listas van juntas acá,
+              // con el corte marcado.
+              const k = menu.indice + 1
+              const actual = t.pilastras?.[k] ?? config.anchoPilastraCm
+              const medidas = medidasDeFrente(config.modelo)
+              const pilastras = medidas.filter((m) => m.familia === 'PL' && (PILASTRAS_INTERNAS.includes(m.anchoCm) || m.anchoCm === actual))
+              const paneles = medidas.filter((m) => m.familia === 'PN')
+              const boton = (m: { anchoCm: number; familia: 'PL' | 'PN' }) => (
+                <button
+                  key={m.familia + m.anchoCm}
+                  className={actual === m.anchoCm ? 'on' : ''}
+                  title={m.familia === 'PN' ? `Panel de relleno de ${m.anchoCm} cm` : `Pilastra de ${m.anchoCm} cm`}
+                  onClick={() => { onPilastra(menu.tramoId, k, m.anchoCm); cerrar() }}
+                  type="button"
+                >
+                  {m.anchoCm}
+                </button>
+              )
+              return (
+                <>
+                  <Grupo>Pieza del frente · pilastra</Grupo>
+                  <div className="anchos">{pilastras.map(boton)}</div>
+                  <Grupo>…y de {Math.max(...medidas.filter((m) => m.familia === 'PL').map((m) => m.anchoCm))} para arriba, panel</Grupo>
+                  <div className="anchos">{paneles.map(boton)}</div>
+                  <div className="nota-menu">
+                    {familiaDelFrente(actual, config.modelo) === 'PN'
+                      ? `Hoy hay un PANEL de ${actual} cm: no existe pilastra tan ancha.`
+                      : `Hoy hay una pilastra de ${actual} cm.`}
+                  </div>
+                </>
+              )
+            })()}
             <Raya />
             <Grupo>Recorte del panel</Grupo>
             <Item activo={cab.panel.recorte === 'ninguno'} onClick={() => { cambiarCabina(menu.tramoId, menu.indice, { panel: { ...cab.panel, recorte: 'ninguno' } }); cerrar() }}>Sin recorte</Item>

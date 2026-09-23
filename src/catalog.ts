@@ -672,3 +672,38 @@ export function anchosPilastra(modelo?: string): number[] {
 export function mgFabrica(modelo: string): MedidaMG[] {
   return (modelo || '').toUpperCase().startsWith('SUP_') ? MG_SUPERIOR : MG_MEDIDAS
 }
+
+/**
+ * De qué FAMILIA es la pieza que va al frente, en una frontera entre cabinas.
+ *
+ * Normalmente es una PILASTRA. Pero la pilastra más ancha que existe mide 120
+ * cm, y hay claros que piden más de eso para cerrar: ahí no hay pilastra que
+ * ponga, así que la pieza pasa a ser un PANEL, que sí se fabrica hasta 180
+ * según el modelo. Es la misma regla que ya usaba el Constructor viejo para el
+ * separador del cuarto PMR.
+ *
+ * El tope NO está escrito a mano: sale del catálogo del modelo, así que una
+ * pilastra ESPECIAL de 130 dada de alta por un administrador sigue siendo
+ * pilastra.
+ */
+export function familiaDelFrente(anchoCm: number, modelo?: string): 'PL' | 'PN' {
+  const tope = Math.max(...anchosPilastra(modelo))
+  return anchoCm > tope ? 'PN' : 'PL'
+}
+
+/**
+ * Las medidas que se pueden poner en una frontera, de la más chica a la más
+ * grande: las pilastras del modelo y, pasado el tope de pilastra, los paneles.
+ *
+ * Los paneles entran como relleno de frente, que es para lo que sirven cuando
+ * el claro se pasa de lo que cierra una pilastra.
+ */
+export function medidasDeFrente(modelo?: string): { anchoCm: number; familia: 'PL' | 'PN' }[] {
+  const pilastras = anchosPilastra(modelo)
+  const tope = Math.max(...pilastras)
+  const paneles = anchosPanel(modelo ?? '').filter((a) => a > tope)
+  return [
+    ...pilastras.map((anchoCm) => ({ anchoCm, familia: 'PL' as const })),
+    ...paneles.map((anchoCm) => ({ anchoCm, familia: 'PN' as const })),
+  ]
+}

@@ -1,5 +1,5 @@
 import type { Area, Cabina, Config, Tramo } from '../types'
-import { alturasDe, esSoloOrinales, mamparaDe, nombreModelo, tipologia } from '../catalog'
+import { alturasDe, esSoloOrinales, familiaDelFrente, mamparaDe, nombreModelo, tipologia } from '../catalog'
 import { cierraConMingitorio, fronteraDeOrinal } from '../modulacion'
 import { cuartoPmr } from '../geometria'
 
@@ -167,6 +167,15 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
     // posición. Los tramos guardados antes de eso no traen la lista: ahí se cae
     // en el ancho único de la configuración, como se hacía antes.
     const anchoDe = (i: number) => tramo.pilastras?.[i] ?? config.anchoPilastraCm
+    /**
+     * La pieza del frente no siempre es pilastra: pasado el tope del catálogo
+     * —120 cm— es un PANEL, porque no hay pilastra tan ancha. Cambia la familia
+     * y con ella el subtipo, que es lo que el CIP lee para saber qué está
+     * cortando.
+     */
+    const familiaDe = (i: number) => familiaDelFrente(anchoDe(i), config.modelo)
+    const subTipoDe = (i: number, lateral: boolean) =>
+      familiaDe(i) === 'PN' ? (lateral ? 'PNLAT' : 'PNCEN') : lateral ? 'PLLAT' : 'PLCEN'
     // En el campo de orinales no hay pilastras: solo los espacios y los
     // mingitorios que los separan. La pilastra de arranque solo va si esa
     // frontera no es del campo.
@@ -175,10 +184,11 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
     const arrancaElCuarto = config.tipologia === 'PMR' && tramo.cabinas[0]?.tipo === 'accesible'
     if (!omitirPilastraInicial && !fronteraDeOrinal(tramo, 0) && !arrancaElCuarto) {
       piezas.push({
-        familia: 'PL',
+        familia: familiaDe(0),
         anchoCm: anchoDe(0),
         altoCm: altoPil,
-        subTipo: tramo.muroInicio ? 'PLLATMUR' : 'PLLAT',
+        // contra el muro la pilastra tiene su propio subtipo; un panel no
+        subTipo: familiaDe(0) === 'PN' ? 'PNLAT' : tramo.muroInicio ? 'PLLATMUR' : 'PLLAT',
         area,
       })
     }
@@ -193,10 +203,10 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
       // y arranca la tira, así que es LATERAL.
       const salaDelCuarto = config.tipologia === 'PMR' && tramo.cabinas[i].tipo === 'accesible'
       piezas.push({
-        familia: 'PL',
+        familia: familiaDe(i + 1),
         anchoCm: anchoDe(i + 1),
         altoCm: altoPil,
-        subTipo: cierraLaTira || salaDelCuarto ? 'PLLAT' : 'PLCEN',
+        subTipo: subTipoDe(i + 1, cierraLaTira || salaDelCuarto),
         area,
       })
     }
@@ -204,10 +214,10 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
     // o nada si el último orinal da contra la pared
     if (!fronteraDeOrinal(tramo, n)) {
       piezas.push({
-        familia: 'PL',
+        familia: familiaDe(n),
         anchoCm: anchoDe(n),
         altoCm: altoPil,
-        subTipo: tramo.muroFin ? 'PLLATMUR' : 'PLLAT',
+        subTipo: familiaDe(n) === 'PN' ? 'PNLAT' : tramo.muroFin ? 'PLLATMUR' : 'PLLAT',
         area,
       })
     }

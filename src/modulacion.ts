@@ -3,7 +3,7 @@ import {
   LARGO_SECUNDARIO_CM,
 } from './catalog'
 import type { Cabina, Config, Moneda, Pais, Tramo, TipologiaId, RenglonBOM } from './types'
-import { alturasDe, esSoloOrinales, mamparaDe, tipologia, tierDeColor, type MedidaMG } from './catalog'
+import { alturasDe, esSoloOrinales, familiaDelFrente, mamparaDe, tipologia, tierDeColor, type MedidaMG } from './catalog'
 import { ajustarPilastras, GRUESO_MG_PIEZA, modularTira } from './modulador'
 import { precioPieza, type TablaTarifas } from './tarifas'
 
@@ -758,6 +758,12 @@ export function bom(
   // medida de catálogo que le toca a cada posición, así que se cuentan por
   // ancho para que la cotización cobre los m² de verdad.
   const pilastrasPorAncho = new Map<number, number>()
+  /**
+   * Lo que va al frente pero NO es pilastra: pasado el tope del catálogo —120
+   * cm de pilastra— la pieza que cierra es un PANEL. Se cuentan aparte porque
+   * se cobran con la tarifa de panel y salen con su propio código.
+   */
+  const panelesDeFrentePorAncho = new Map<number, number>()
   let paneles = 0
   /**
    * Las mamparas se cuentan DESDE LA TIRA, igual que las pilastras y las
@@ -772,7 +778,8 @@ export function bom(
     const n = pilastrasDe(tramo)
     for (let i = 0; i < n; i++) {
       const ancho = tramo.pilastras?.[i] ?? config.anchoPilastraCm
-      pilastrasPorAncho.set(ancho, (pilastrasPorAncho.get(ancho) ?? 0) + 1)
+      const donde = familiaDelFrente(ancho, config.modelo) === 'PN' ? panelesDeFrentePorAncho : pilastrasPorAncho
+      donde.set(ancho, (donde.get(ancho) ?? 0) + 1)
     }
     paneles += panelesDe(tramo)
     let nMg = 0
@@ -836,6 +843,18 @@ export function bom(
         { familia: 'PN', anchoCm: config.profundidadCm, altoCm: alturas.panel },
         opciones,
       ),
+      tarifaReal: tarifaExacta,
+    })
+  }
+  // Un panel de frente se cobra con la tarifa de PANEL, no de pilastra: es otra
+  // pieza y otro precio por m².
+  for (const [ancho, cantidad] of [...panelesDeFrentePorAncho.entries()].sort((a, b) => a[0] - b[0])) {
+    renglones.push({
+      sku: `${codigoLinea}-PN${ancho}`,
+      descripcion: `Panel de frente ${ancho} × ${altoPil} cm`,
+      tipo: 'Panel',
+      cantidad,
+      precioUnit: precioPieza({ familia: 'PN', anchoCm: ancho, altoCm: altoPil }, opciones),
       tarifaReal: tarifaExacta,
     })
   }
