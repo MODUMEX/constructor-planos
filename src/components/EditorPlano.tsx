@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import type { Cabina, Config, Pais, Tramo } from '../types'
-import { anchosPilastra, esEspecial, familiaDelFrente, medidasDeFrente, puertasPosibles, tipologia } from '../catalog'
+import { anchosPanelFabrica, anchosPilastra, esEspecial, familiaDelFrente, medidasDeFrente, puertasPosibles, tipologia } from '../catalog'
 import { anchoTotal, arrancaElCuartoPmr, esEspacioLibre, minimoDe, nuevaCabina, pilastrasParaAncho, puertaSugerida, snap, cierraConMingitorio, ladosDeCabina, lugaresDe, mamparaEn } from '../modulacion'
 import { medidaCercana, PILASTRAS_INTERNAS, PUERTA_ACCESIBLE_MIN } from '../modulador'
 import { Grupo, Item, Menu, Raya } from './Menu'
@@ -14,6 +14,16 @@ import { ALTO_ORINAL_CM, ALTO_REGADERA_CM, ALTO_WC_CM, ORINAL, REGADERA, WC } fr
 
 /** medio alto de la zona invisible para agarrar una pilastra, en cm de plano */
 const AGARRE_CM = 9
+/**
+ * Lo más angosta que puede ser la zona para agarrar una pilastra, en cm de
+ * dibujo.
+ *
+ * La zona valía lo mismo que la pieza, así que una pilastra de 10 cm dejaba
+ * unos 16 píxeles para acertarle y en la práctica no se podía mover. Se
+ * ensancha hacia los dos lados sin tocar el dibujo: la pieza se sigue viendo
+ * con su medida de verdad.
+ */
+const AGARRE_ANCHO_CM = 24
 
 /**
  * Lo más delgada que se dibuja una pieza, en píxeles. El grueso de verdad son
@@ -193,15 +203,18 @@ export default function EditorPlano({
     py: number
     escala: number
     ancho0: number
+    /** el fondo del lugar y la puerta del cuarto: con ellos se sabe qué panel queda */
+    fondo: number
+    puerta: number
   } | null>(null)
 
-  function empezarArrastrePmr(e: React.PointerEvent, m: Marco, ancho0: number) {
+  function empezarArrastrePmr(e: React.PointerEvent, m: Marco, ancho0: number, fondo: number, puerta: number) {
     e.stopPropagation()
     const svg = svgRef.current
     if (!svg) return
     const r = svg.getBoundingClientRect()
     arrastrePmr.current = {
-      x0: e.clientX, y0: e.clientY, px: m.px, py: m.py, escala: r.width / caja.w, ancho0,
+      x0: e.clientX, y0: e.clientY, px: m.px, py: m.py, escala: r.width / caja.w, ancho0, fondo, puerta,
     }
     setArrastrando('pmr')
     try {
@@ -260,7 +273,15 @@ export default function EditorPlano({
       const dy = (e.clientY - q.y0) / q.escala
       // la pilastra está contra el muro del fondo: tirando hacia el frente crece
       const deseado = q.ancho0 - (dx * q.px + dy * q.py)
-      const elegida = medidaCercana(anchosPilastra(config.modelo), Math.max(0, deseado))
+      // El panel del divisor es lo que queda del fondo, y tiene que ser una
+      // medida que se fabrique: con el fondo en 255 y la puerta en 90, una
+      // pilastra de 12 pediría un panel de 153 y no existe, solo el de 150. Así
+      // que las medidas que se ofrecen son SOLO las que dejan un panel de ficha.
+      const deFicha = anchosPanelFabrica(config.modelo)
+      const calzan = anchosPilastra(config.modelo).filter((p) =>
+        deFicha.includes(Math.round((q.fondo - q.puerta - p) * 10) / 10),
+      )
+      const elegida = medidaCercana(calzan.length ? calzan : anchosPilastra(config.modelo), Math.max(0, deseado))
       if (elegida !== (config.pilastraPmrCm ?? q.ancho0)) onPilastraPmr(elegida)
       return
     }
@@ -838,8 +859,9 @@ export default function EditorPlano({
                       // En planta la pilastra es una tira del grueso del material: en
                       // pantalla quedan 3 o 4 píxeles, imposibles de agarrar. Por eso
                       // encima va una zona de agarre invisible, mucho más alta.
-                      const g0 = pt(m, centro - ancho / 2, prof - AGARRE_CM)
-                      const g1 = pt(m, centro + ancho / 2, prof + AGARRE_CM)
+                      const agarre = Math.max(ancho, AGARRE_ANCHO_CM)
+                      const g0 = pt(m, centro - agarre / 2, prof - AGARRE_CM)
+                      const g1 = pt(m, centro + agarre / 2, prof + AGARRE_CM)
                       const cursor = horizontal ? 'ew-resize' : 'ns-resize'
                       return (
                         <g key={k}>
@@ -950,7 +972,15 @@ export default function EditorPlano({
                             height={Math.max(Math.abs(b.y - a.y), MIN_PIEZA_PX)}
                             fill="#22303f"
                             style={seArrastra ? { cursor: horizontal ? 'ns-resize' : 'ew-resize' } : undefined}
-                            onPointerDown={seArrastra ? (ev) => empezarArrastrePmr(ev, m, largoPieza) : undefined}
+                            onPointerDown={seArrastra
+                              ? (ev) => empezarArrastrePmr(
+                                  ev, m, largoPieza, cuarto.profCm,
+                                  cuarto.divisor.find((x) => x.tipo === 'puerta')?.hastaCm != null
+                                    ? (cuarto.divisor.find((x) => x.tipo === 'puerta')!.hastaCm
+                                       - cuarto.divisor.find((x) => x.tipo === 'puerta')!.desdeCm)
+                                    : 0,
+                                )
+                              : undefined}
                           >
                             {seArrastra && <title>Pilastra contra el muro: arrastrala para cambiarla. El panel del divisor se estira solo.</title>}
                           </rect>

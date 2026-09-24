@@ -345,6 +345,15 @@ export function reajustarConPuertas(
    * ~10 cm por vez. Con eso la tira terminaba pasándose del claro por metros.
    */
   pilastrasActuales?: number[],
+  /**
+   * El ancho PEDIDO para cada orinal, por posición de cabina.
+   *
+   * El espacio entre orinales es una medida FIJA: la pone el vendedor y no se
+   * negocia. Lo único que se mueve para cerrar el claro son las cabinas. Sin
+   * esto, el orinal se quedaba con lo que tuviera de antes y cualquier sobrante
+   * terminaba engordándolo.
+   */
+  orinalesPedidos?: (number | null | undefined)[],
 ): { cabinas: Cabina[]; pilastras: number[]; canaletaCm: number; ajuste: Tramo['ajuste']; mensaje: string } | null {
   const n = cabinas.length
   if (n === 0) return null
@@ -360,6 +369,7 @@ export function reajustarConPuertas(
       cabinas.slice(1), claroCm - cuartoPmrCm, Math.max(0, murosPilastra - 1), extremoAbierto,
       0, fijas ? fijas.slice(1) : undefined,
       pilastrasActuales ? pilastrasActuales.slice(1) : undefined,
+      orinalesPedidos ? orinalesPedidos.slice(1) : undefined,
     )
     if (!resto) return null
     return {
@@ -386,6 +396,9 @@ export function reajustarConPuertas(
    * se usa el ancho tal cual, que es como se hacía antes.
    */
   const cuerpoOrinal = (c: Cabina, i: number) => {
+    // lo que pidió el vendedor manda: es una medida fija
+    const pedido = orinalesPedidos?.[i]
+    if (pedido != null && pedido > 0) return pedido
     if (!pilastrasActuales) return c.anchoCm
     const { izq, der } = ladosDeCabina(lugares, (k) => pilastrasActuales[k] ?? 0, i)
     return Math.max(0, Math.round((c.anchoCm - izq - der) * 10) / 10)

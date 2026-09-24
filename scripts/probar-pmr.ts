@@ -73,5 +73,22 @@ const renglones = bom([tramo], config, { moneda: 'USD', tipoCambio: 512, pais: '
 for (const r of renglones.filter((x) => x.tipo === 'Panel')) console.log(`  ${r.sku}  ${r.descripcion}  × ${r.cantidad}  ${r.precioUnit.toFixed(2)}`)
 ok(renglones.some((r) => r.descripcion.includes('cuarto accesible')), 'la cotización lo cobra aparte')
 
+
+console.log('\n— qué pilastras se pueden poner sin inventar un panel')
+{
+  const { anchosPanelFabrica, anchosPilastra } = await import('../src/catalog')
+  const fondo = 255
+  const puerta = 90
+  const deFicha = anchosPanelFabrica('REFORZADO')
+  const calzan = anchosPilastra('REFORZADO').filter((p) =>
+    deFicha.includes(Math.round((fondo - puerta - p) * 10) / 10),
+  )
+  console.log(`  fondo ${fondo}, puerta ${puerta} → pilastras ${calzan.join(' · ')}`)
+  for (const p of calzan) console.log(`    pilastra ${String(p).padStart(3)} → panel ${fondo - puerta - p}`)
+  ok(calzan.length > 0, 'hay al menos una combinación que se fabrica')
+  ok(!calzan.includes(12), 'la de 12 NO se ofrece: pediría un panel de 153, que no existe')
+  ok(calzan.includes(15), 'la de 15 sí: deja un panel de 150')
+}
+
 console.log(mal === 0 ? '\nTodo cuadra.' : `\n${mal} caso(s) mal.`)
 process.exit(mal === 0 ? 0 : 1)

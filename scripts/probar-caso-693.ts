@@ -39,7 +39,8 @@ function pintar(t: Tramo, titulo: string) {
 /** lo que hace la app cuando se toca algo con un hueco en la tira */
 function repartir(t: Tramo, cabinas: Cabina[], cambios?: (number | null)[]): Tramo {
   const fijas = Array.from({ length: cabinas.length + 1 }, (_, k) => cambios?.[k] ?? t.pilastras?.[k] ?? null)
-  const r = reajustarConPuertas(cabinas, t.claroCm, 1, false, 159, fijas, t.pilastras)
+  const pedidos = cabinas.map((c) => (c.tipo === 'orinal' ? 90 : null))
+  const r = reajustarConPuertas(cabinas, t.claroCm, 1, false, 159, fijas, t.pilastras, pedidos)
   return r ? { ...t, ...r } : t
 }
 

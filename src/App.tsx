@@ -827,7 +827,7 @@ export default function App() {
     const r = reajustarConPuertas(
       cabinas, t.claroCm, muros, muros < 2,
       config.tipologia === 'PMR' && llevaAccesible ? anchoAccesibleDe(config) : 0,
-      undefined, t.pilastras,
+      undefined, t.pilastras, orinalesPedidosDe(t),
     )
     setArea({
       tramos: area.tramos.map((x) =>
@@ -837,6 +837,22 @@ export default function App() {
             ? { ...x, cabinas: r.cabinas, pilastras: r.pilastras, canaletaCm: r.canaletaCm, ajuste: r.ajuste, mensaje: r.mensaje, pilastrasFijas: undefined }
             : { ...x, cabinas, pilastrasFijas: undefined },
       ),
+    })
+  }
+
+  /**
+   * El ancho PEDIDO de cada orinal, por posición de cabina.
+   *
+   * El espacio entre orinales no se negocia: lo escribe el vendedor y se
+   * respeta. Lo que se mueve para cerrar el claro son las cabinas.
+   */
+  function orinalesPedidosDe(t: Tramo): (number | null)[] {
+    let n = 0
+    return t.cabinas.map((c) => {
+      if (c.tipo !== 'orinal') return null
+      const pedido = config.anchosOrinalCm?.[n] ?? config.anchoOrinalCm ?? null
+      n += 1
+      return pedido && pedido > 0 ? pedido : null
     })
   }
 
@@ -868,7 +884,7 @@ export default function App() {
     const r = reajustarConPuertas(
       cabinas, t.claroCm, muros, muros < 2,
       config.tipologia === 'PMR' && llevaAccesible ? anchoAccesibleDe(config) : 0,
-      fijas, t.pilastras,
+      fijas, t.pilastras, orinalesPedidosDe(t),
     )
     if (!r) return false
     setArea({
@@ -909,7 +925,7 @@ export default function App() {
       hayHueco
         ? Array.from({ length: cabinas.length + 1 }, (_, k) => t.pilastras?.[k] ?? null)
         : undefined,
-      t.pilastras,
+      t.pilastras, orinalesPedidosDe(t),
     )
     setArea({
       tramos: area.tramos.map((x) =>
