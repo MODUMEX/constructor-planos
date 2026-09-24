@@ -220,8 +220,6 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
     const pedido = o.anchosOrinal?.[i]
     return pedido && pedido > 0 ? pedido : anchoBaseOrinal
   })
-  /** si alguno se pidió a medida, los orinales NO se ensanchan para cerrar */
-  const orinalesAMedida = anchosOrinal.some((_, i) => (o.anchosOrinal?.[i] ?? 0) > 0)
   // N orinales llevan N−1 mingitorios entre ellos, y uno más si cierran contra
   // un extremo sin muro.
   const cierreMG = o.cierreMingitorio === true && nMing > 0
@@ -368,22 +366,19 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
         })()
       : null
 
-  // Con orinales, el sobrante NO va a canaleta: se reparte ensanchandolos, que es
-  // lo que hace el Constructor actual. La canaleta queda para cuando no los hay.
-  let anchoOrinal = anchoBaseOrinal
+  // EL ORINAL NO SE ENSANCHA.
+  //
+  // El Constructor viejo repartía el sobrante entre los orinales, y esta app
+  // lo copió: con orinales pedidos de 90 salían de 105. La regla de Dayanna es
+  // la contraria y es la que vale: el espacio entre orinales es una medida
+  // FIJA —la escribe el vendedor— y lo único que se mueve para cerrar el claro
+  // son las cabinas, o sea las pilastras. Si aun así sobra, se dice: mejor un
+  // aviso que un orinal de 105 que nadie pidió.
+  const anchoOrinal = anchoBaseOrinal
   const anchosFinal = anchosOrinal.slice()
-  let ajusteFinal = ajuste
-  let mensajeFinal = mensaje
-  let canaletaFinal = canaleta
-  // Solo se ensanchan los que NO tienen medida pedida: si el cliente dio la
-  // medida, esa manda y el sobrante lo cierran las pilastras.
-  if (nMing > 0 && diferencia > 0.5 && !orinalesAMedida) {
-    anchoOrinal = anchoBaseOrinal + diferencia / nMing
-    for (let i = 0; i < anchosFinal.length; i++) anchosFinal[i] = anchoOrinal
-    ajusteFinal = "exacto"
-    mensajeFinal = `Calza; los ${abs.toFixed(1)} cm de sobra se reparten entre los ${nMing} orinales`
-    canaletaFinal = null
-  }
+  const ajusteFinal = ajuste
+  const mensajeFinal = mensaje
+  const canaletaFinal = canaleta
 
 
   return {
