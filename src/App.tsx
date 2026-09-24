@@ -29,7 +29,7 @@ import Solicitudes from './components/Solicitudes'
 import { contarSolicitudes } from './solicitudes'
 import { coloresMxPara, slugRenderMx } from './coloresMx'
 import { fotoDe, fotosHerraje, faltanFotosHerraje, terminacionesDe } from './renders'
-import { anchoAccesibleDe, anchoTotal, bom, claroDeOrinales, crearTramos, esEspacioLibre, modularConCatalogo, nuevoId, reajustarConPuertas } from './modulacion'
+import { anchoAccesibleDe, anchoTotal, bom, claroDeOrinales, crearTramos, esEspacioLibre, invertirTramo, modularConCatalogo, nuevoId, reajustarConPuertas } from './modulacion'
 import { anchoDeOrinal } from './geometria'
 import { cargarTarifas, type ResultadoTarifas } from './tarifas'
 import { buscarActualizacion, type FaseActualizacion } from './actualizar'
@@ -841,6 +841,22 @@ export default function App() {
   }
 
   /**
+   * Modula un tramo SIN el espejo y devuelve el resultado ya espejado.
+   *
+   * El buscador arma siempre la tira canónica: el cuarto accesible primero y
+   * los orinales al final. Si el área está invertida y se le pasa tal cual,
+   * vuelve a armarla al derecho y el área se da vuelta sola al mover cualquier
+   * pieza. Así que se desespeja, se modula y se vuelve a espejar.
+   */
+  function sinEspejo(t: Tramo): Tramo {
+    return t.espejo ? invertirTramo(t) : t
+  }
+  function conEspejo(t: Tramo, nuevo: Partial<Tramo>): Tramo {
+    const armado = { ...sinEspejo(t), ...nuevo }
+    return t.espejo ? { ...invertirTramo(armado), espejo: true } : armado
+  }
+
+  /**
    * El ancho PEDIDO de cada orinal, por posición de cabina.
    *
    * El espacio entre orinales no se negocia: lo escribe el vendedor y se
@@ -974,8 +990,11 @@ export default function App() {
    * al volver a modular: es igual que escribirla en el paso de medidas.
    */
   function onOrinal(tramoId: string, indice: number, cuerpoCm: number) {
-    const t = area.tramos.find((x) => x.id === tramoId)
-    if (!t || t.cabinas[indice]?.tipo !== 'orinal') return
+    const espejado = area.tramos.find((x) => x.id === tramoId)
+    if (!espejado || espejado.cabinas[indice]?.tipo !== 'orinal') return
+    // en un área invertida la cabina i de lo que se ve es la n−1−i de la canónica
+    const t = sinEspejo(espejado)
+    if (espejado.espejo) indice = espejado.cabinas.length - 1 - indice
     if (!Number.isFinite(cuerpoCm)) return
     const ancho = Math.max(30, Math.round(cuerpoCm * 2) / 2)
 
@@ -1038,7 +1057,7 @@ export default function App() {
     setArea({
       tramos: area.tramos.map((x) =>
         x.id === tramoId
-          ? { ...x, cabinas: r.cabinas, pilastras: r.pilastras, canaletaCm: r.canaletaCm, ajuste: r.ajuste, mensaje: r.mensaje, avisoAccesible: r.avisoAccesible }
+          ? conEspejo(x, { cabinas: r.cabinas, pilastras: r.pilastras, canaletaCm: r.canaletaCm, ajuste: r.ajuste, mensaje: r.mensaje, avisoAccesible: r.avisoAccesible })
           : x,
       ),
     })
@@ -1134,7 +1153,7 @@ export default function App() {
     setArea({
       tramos: area.tramos.map((x) =>
         x.id === tramoId
-          ? { ...x, cabinas: r.cabinas, pilastras: r.pilastras, canaletaCm: r.canaletaCm, ajuste: r.ajuste, mensaje: r.mensaje, avisoAccesible: r.avisoAccesible, pilastrasFijas: elegidas }
+          ? conEspejo(x, { cabinas: r.cabinas, pilastras: r.pilastras, canaletaCm: r.canaletaCm, ajuste: r.ajuste, mensaje: r.mensaje, avisoAccesible: r.avisoAccesible, pilastrasFijas: elegidas })
           : x,
       ),
     })
@@ -1160,18 +1179,7 @@ export default function App() {
    */
   function invertirArea() {
     setArea({
-      tramos: area.tramos.map((t) => ({
-        ...t,
-        // el espejo cambia de lado los muros del tramo: si no, el cierre con
-        // mingitorio y las pilastras de punta quedan del lado equivocado
-        muroInicio: t.muroFin,
-        muroFin: t.muroInicio,
-        pilastras: t.pilastras ? [...t.pilastras].reverse() : undefined,
-        cabinas: [...t.cabinas].reverse().map((c) => ({
-          ...c,
-          puerta: { ...c.puerta, mano: c.puerta.mano === 'der' ? 'izq' : 'der' },
-        })),
-      })),
+      tramos: area.tramos.map((t) => ({ ...invertirTramo(t), espejo: !t.espejo })),
     })
     const espejo = tipologiaEspejo(config.tipologia)
     if (espejo !== config.tipologia) setConfig({ tipologia: espejo })

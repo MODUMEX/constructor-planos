@@ -405,6 +405,25 @@ export function reajustarConPuertas(
   }
   const cuerpoDe = (c: Cabina, i: number) =>
     esEspacioLibre(c) ? (c.libreCm ?? 0) : c.tipo === 'orinal' ? cuerpoOrinal(c, i) : c.puerta.anchoCm
+  // El mismo trato cuando el cuarto CIERRA la tira, que es como queda al
+  // invertir el área: se planta con su medida y se modula lo que va antes.
+  if (cuartoPmrCm > 0 && cabinas[n - 1]?.tipo === 'accesible') {
+    const resto = reajustarConPuertas(
+      cabinas.slice(0, n - 1), claroCm - cuartoPmrCm, Math.max(0, murosPilastra - 1), extremoAbierto,
+      0, fijas ? fijas.slice(0, n) : undefined,
+      pilastrasActuales ? pilastrasActuales.slice(0, n) : undefined,
+      orinalesPedidos ? orinalesPedidos.slice(0, n - 1) : undefined,
+    )
+    if (!resto) return null
+    return {
+      cabinas: [...resto.cabinas, { ...cabinas[n - 1], anchoCm: cuartoPmrCm }],
+      pilastras: [...resto.pilastras, 0],
+      canaletaCm: resto.canaletaCm,
+      ajuste: resto.ajuste,
+      mensaje: resto.mensaje,
+    }
+  }
+
   const cuerpos = cabinas.map(cuerpoDe)
   const conPuerta = cabinas.filter((c) => c.tipo !== 'orinal' && !esEspacioLibre(c)).length
   // entre dos orinales va mampara, no pilastra
@@ -562,7 +581,11 @@ export function ladoDePilastra(
   if (k <= 0) return 'der'
   if (k >= n) return 'izq'
   if (!lugares[k - 1].orinal && lugares[k].orinal) return 'izq'
+  // La que separa el cuarto de la tira es LATERAL, y apoya del lado de la
+  // TIRA: si el cuarto arranca, hacia la derecha; si el cuarto cierra —área
+  // invertida—, hacia la izquierda.
   if (indiceCuarto >= 0 && k === indiceCuarto + 1) return 'der'
+  if (indiceCuarto >= 0 && k === indiceCuarto && indiceCuarto === n - 1) return 'izq'
   if (lugares[k - 1].libre && !lugares[k].libre) return 'der'
   if (lugares[k].libre && !lugares[k - 1].libre) return 'izq'
   return 'mitades'
@@ -603,6 +626,51 @@ export function arrancaElCuartoPmr(tramo: Tramo, config: Config): boolean {
   return config.tipologia === 'PMR' && tramo.cabinas[0]?.tipo === 'accesible'
 }
 
+/**
+ * El cuarto accesible cierra la tira en vez de arrancarla.
+ *
+ * Pasa al INVERTIR el área: el cuarto se va al otro extremo. Todo lo que vale
+ * para el cuarto —que contra ese muro no va pilastra, que la que lo separa de
+ * la tira es lateral, que su panel es el del divisor— sigue valiendo, pero
+ * mirando hacia el otro lado.
+ */
+export function cierraElCuartoPmr(tramo: Tramo, config: Config): boolean {
+  const n = tramo.cabinas.length
+  return config.tipologia === 'PMR' && n > 1 && tramo.cabinas[n - 1]?.tipo === 'accesible'
+}
+
+/** en qué punta está el cuarto accesible, o null si el área no lo lleva */
+export function ladoDelCuarto(tramo: Tramo, config: Config): 'inicio' | 'fin' | null {
+  if (arrancaElCuartoPmr(tramo, config)) return 'inicio'
+  if (cierraElCuartoPmr(tramo, config)) return 'fin'
+  return null
+}
+
+/**
+ * Voltea un tramo como en un espejo: la última cabina pasa a ser la primera,
+ * las puertas cambian de mano y los muros se intercambian.
+ *
+ * NO re-modula: son las mismas piezas en otro orden, así que el despiece tiene
+ * que salir idéntico. El PANEL sí se corre una posición, porque cada cabina
+ * guarda el divisor que tiene A SU DERECHA y al espejar ese divisor pasa a
+ * quedarle a la izquierda, o sea que es el de la cabina anterior.
+ */
+export function invertirTramo(tramo: Tramo): Tramo {
+  const alReves = [...tramo.cabinas].reverse()
+  const paneles = alReves.map((_, i) => alReves[i + 1]?.panel ?? tramo.cabinas[0].panel)
+  return {
+    ...tramo,
+    muroInicio: tramo.muroFin,
+    muroFin: tramo.muroInicio,
+    pilastras: tramo.pilastras ? [...tramo.pilastras].reverse() : undefined,
+    cabinas: alReves.map((c, i) => ({
+      ...c,
+      puerta: { ...c.puerta, mano: c.puerta.mano === 'der' ? 'izq' : 'der' },
+      panel: paneles[i],
+    })),
+  }
+}
+
 /** entre dos orinales va un mingitorio, no una pilastra ni un panel de cabina */
 function entreOrinales(tramo: Tramo, i: number): boolean {
   return tramo.cabinas[i]?.tipo === 'orinal' && tramo.cabinas[i + 1]?.tipo === 'orinal'
@@ -633,6 +701,19 @@ export function cierraConMingitorio(tramo: Tramo): boolean {
   if (tramo.cabinas[n - 1].tipo !== 'orinal') return false
   const ultima = tramo.pilastras?.[n]
   return ultima === undefined || ultima <= GRUESO_MG_CM + 0.01
+}
+
+/**
+ * Lo mismo que `cierraConMingitorio` pero del otro lado: el campo de orinales
+ * ARRANCA la tira y ese extremo no topa contra pared, así que lleva mampara de
+ * cierre. Pasa al invertir el área.
+ */
+export function arrancaConMingitorio(tramo: Tramo): boolean {
+  const n = tramo.cabinas.length
+  if (n === 0 || tramo.muroInicio) return false
+  if (tramo.cabinas[0].tipo !== 'orinal') return false
+  const primera = tramo.pilastras?.[0]
+  return primera === undefined || primera <= GRUESO_MG_CM + 0.01
 }
 
 /**

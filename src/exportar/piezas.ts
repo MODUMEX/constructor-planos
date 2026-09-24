@@ -1,5 +1,6 @@
 import type { Area, Cabina, Config, Tramo } from '../types'
 import { alturasDe, esSoloOrinales, familiaDelFrente, mamparaDe, nombreModelo, tipologia } from '../catalog'
+import { arrancaConMingitorio } from '../modulacion'
 import { cierraConMingitorio, fronteraDeOrinal } from '../modulacion'
 import { cuartoPmr } from '../geometria'
 
@@ -124,9 +125,12 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
     // extremo sin muro, ese lado cierra con otro mingitorio y no con panel de
     // cierre: N orinales contra un extremo abierto llevan N mingitorios.
     const cierraMG = cierraConMingitorio(tramo)
+    // El campo de orinales puede quedar al PRINCIPIO —área invertida—, y ahí la
+    // mampara de cierre va del otro lado: es la del primer orinal.
+    const arrancaMG = arrancaConMingitorio(tramo)
     const llevaDivisor =
       cab.tipo === 'orinal'
-        ? tramo.cabinas[i + 1]?.tipo === 'orinal' || (esUltima && cierraMG)
+        ? tramo.cabinas[i + 1]?.tipo === 'orinal' || (esUltima && cierraMG) || (i === 0 && arrancaMG)
         : !esUltima || !tramo.muroFin
     if (llevaDivisor) {
       if (cab.tipo === 'orinal') {
@@ -157,6 +161,20 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
     }
   })
 
+  // La mampara que CIERRA el campo de orinales cuando el campo arranca la tira
+  // —área invertida— no la puede emitir el recorrido: cada cabina emite el
+  // divisor que tiene A SU DERECHA, y esta va a la izquierda de la primera.
+  if (arrancaConMingitorio(tramo)) {
+    const mg = mamparaDe(config, nMg++)
+    piezas.push({
+      familia: 'MG',
+      anchoCm: mg.anchoCm,
+      altoCm: mg.altoCm,
+      subTipo: mg.altoCm >= 150 ? 'MG150' : 'MG120',
+      area,
+    })
+  }
+
   // pilastra de cierre al inicio cuando el tramo no arranca contra pared
   if (n > 0 && !tramo.muroInicio) {
     piezas.push({ familia: 'PN', anchoCm: config.profundidadCm, altoCm: altoPanel, subTipo: 'PNLAT', area })
@@ -185,6 +203,9 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
     // El cuarto PMR arranca contra el muro y lo cierra ese muro, no una
     // pilastra: la que lleva es la del divisor, contra el muro del fondo.
     const arrancaElCuarto = config.tipologia === 'PMR' && tramo.cabinas[0]?.tipo === 'accesible'
+    // Al invertir el área el cuarto se va a la otra punta: ahí la pilastra que
+    // no va es la del FINAL. Sin esto salía una pilastra de 0 cm en el despiece.
+    const cierraElCuarto = config.tipologia === 'PMR' && n > 1 && tramo.cabinas[n - 1]?.tipo === 'accesible'
     if (!omitirPilastraInicial && !fronteraDeOrinal(tramo, 0) && !arrancaElCuarto) {
       piezas.push({
         familia: familiaDe(0),
@@ -204,7 +225,9 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
         tramo.cabinas[i].tipo !== 'orinal' && tramo.cabinas[i + 1].tipo === 'orinal'
       // La que sale del cuarto PMR tampoco divide dos cabinas: cierra el cuarto
       // y arranca la tira, así que es LATERAL.
-      const salaDelCuarto = config.tipologia === 'PMR' && tramo.cabinas[i].tipo === 'accesible'
+      const salaDelCuarto =
+        config.tipologia === 'PMR' &&
+        (tramo.cabinas[i].tipo === 'accesible' || tramo.cabinas[i + 1].tipo === 'accesible')
       piezas.push({
         familia: familiaDe(i + 1),
         anchoCm: anchoDe(i + 1),
@@ -215,7 +238,7 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
     }
     // el campo de orinales no lleva pilastra de punta: es el mingitorio de cierre,
     // o nada si el último orinal da contra la pared
-    if (!fronteraDeOrinal(tramo, n)) {
+    if (!fronteraDeOrinal(tramo, n) && !cierraElCuarto) {
       piezas.push({
         familia: familiaDe(n),
         anchoCm: anchoDe(n),

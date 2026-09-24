@@ -105,6 +105,17 @@ export interface Tramo {
   muroFin: boolean
   cabinas: Cabina[]
   /**
+   * El tramo está ESPEJADO: se invirtió con el botón ⇄.
+   *
+   * Las piezas guardadas ya están en el orden que se ve, así que el dibujo y el
+   * despiece salen de ellas sin más. Hace falta saberlo para volver a modular:
+   * el buscador arma siempre la tira canónica —el cuarto accesible primero, los
+   * orinales al final—, así que antes de modular se desespeja y después se
+   * vuelve a espejar. Sin esto, mover una pilastra en un área invertida la
+   * daba vuelta sola.
+   */
+  espejo?: boolean
+  /**
    * Ancho de cada pilastra, en orden y en cm: son `cabinas.length + 1` piezas,
    * porque la tira es PILASTRA · PUERTA · PILASTRA · PUERTA … PILASTRA.
    * Salen del catálogo (familia PI), no son un ancho libre.

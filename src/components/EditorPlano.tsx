@@ -905,11 +905,28 @@ export default function EditorPlano({
                 const u = cuarto.hastaCm
                 const profC = cuarto.profCm
                 // la pared opuesta del lugar: contra ella cierra el cuarto por el frente
-                const pa = pt(m, cuarto.desdeCm - (tramo.muroInicio ? ESPESOR_MURO : 0), profC)
-                const pb = pt(m, largo + SOBRA_MURO_CM, profC + ESPESOR_MURO)
+                // El muro del fondo va desde el cuarto hasta la otra punta de la
+                // tira. Con el área invertida el cuarto queda del otro lado, así
+                // que el muro también: si no, quedaba dibujado solo debajo del
+                // cuarto y el resto de la tira sin pared.
+                const alFin = cuarto.lado === 'fin'
+                const pa = pt(
+                  m,
+                  alFin ? -SOBRA_MURO_CM : cuarto.desdeCm - (tramo.muroInicio ? ESPESOR_MURO : 0),
+                  profC,
+                )
+                const pb = pt(
+                  m,
+                  alFin ? cuarto.hastaCm + (tramo.muroFin ? ESPESOR_MURO : 0) : largo + SOBRA_MURO_CM,
+                  profC + ESPESOR_MURO,
+                )
                 // la cota de la profundidad va por fuera del muro de arranque
-                const c0 = pt(m, cuarto.desdeCm - ESPESOR_MURO - 24, 0)
-                const c1 = pt(m, cuarto.desdeCm - ESPESOR_MURO - 24, profC)
+                // la cota del fondo va por fuera del cuarto, del lado del muro
+                const uCota = alFin
+                  ? cuarto.hastaCm + ESPESOR_MURO + 24
+                  : cuarto.desdeCm - ESPESOR_MURO - 24
+                const c0 = pt(m, uCota, 0)
+                const c1 = pt(m, uCota, profC)
                 return (
                   // El grupo no atrapa el puntero: el divisor del cuarto cae justo
                   // encima de la primera pilastra de la tira y, si lo atrapa, esa

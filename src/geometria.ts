@@ -191,6 +191,8 @@ export interface CuartoPmr {
   profCm: number
   /** hasta acá llegan las cabinas normales, que es menos */
   profCabinasCm: number
+  /** de qué punta de la tira arranca el cuarto */
+  lado: 'inicio' | 'fin'
   /** con muro (P+) o con panel (PP) del lado de afuera */
   cierre: 'muros' | 'panel'
   divisor: PiezaDivisorPmr[]
@@ -274,6 +276,9 @@ export function cuartoPmr(tramo: Tramo, config: Config): CuartoPmr | null {
     anchoCm: cab.anchoCm,
     profCm: prof,
     profCabinasCm: config.profundidadCm,
+    // de qué punta de la tira es el cuarto: al invertir el área se va a la otra,
+    // y el muro del fondo y la cota tienen que irse con él
+    lado: i === 0 ? 'inicio' : 'fin',
     cierre: config.cierrePmr ?? 'muros',
     divisor,
     pilastraCm: pilastra,

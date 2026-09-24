@@ -428,8 +428,19 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
     // ------------------------------------------------------------------
     if (cuarto) {
       // la pared opuesta del lugar, contra la que cierra el cuarto
-      const [wx, wy] = aHoja(e, pt(m, cuarto.desdeCm - (tramo.muroInicio ? ESPESOR_MURO : 0), cuarto.profCm))
-      const [wx2, wy2] = aHoja(e, pt(m, largo + SOBRA_MURO_CM, cuarto.profCm + ESPESOR_MURO))
+      // con el área invertida el cuarto queda en la otra punta y el muro se va
+      // con él; si no, la tira quedaba sin pared de fondo
+      const alFin = cuarto.lado === 'fin'
+      const [wx, wy] = aHoja(e, pt(
+        m,
+        alFin ? -SOBRA_MURO_CM : cuarto.desdeCm - (tramo.muroInicio ? ESPESOR_MURO : 0),
+        cuarto.profCm,
+      ))
+      const [wx2, wy2] = aHoja(e, pt(
+        m,
+        alFin ? cuarto.hastaCm + (tramo.muroFin ? ESPESOR_MURO : 0) : largo + SOBRA_MURO_CM,
+        cuarto.profCm + ESPESOR_MURO,
+      ))
       muro(doc, Math.min(wx, wx2), Math.min(wy, wy2), Math.abs(wx2 - wx), Math.abs(wy2 - wy))
 
       const u = cuarto.hastaCm
