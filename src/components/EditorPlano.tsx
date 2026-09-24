@@ -244,6 +244,15 @@ export default function EditorPlano({
   }
 
   function moviendo(e: React.PointerEvent) {
+    // Si se soltó el botón fuera del plano, el arrastre puede quedar colgado y
+    // tragarse todo lo que se intente mover después. Sin botón no hay arrastre.
+    if (e.buttons === 0 && (arrastre.current || arrastrePil.current || arrastrePmr.current)) {
+      arrastre.current = null
+      arrastrePil.current = null
+      arrastrePmr.current = null
+      setArrastrando(null)
+      return
+    }
     const q = arrastrePmr.current
     if (q) {
       if (!Number.isFinite(q.escala) || q.escala <= 0) return
@@ -880,9 +889,12 @@ export default function EditorPlano({
                 const c0 = pt(m, cuarto.desdeCm - ESPESOR_MURO - 24, 0)
                 const c1 = pt(m, cuarto.desdeCm - ESPESOR_MURO - 24, profC)
                 return (
-                  <g>
+                  // El grupo no atrapa el puntero: el divisor del cuarto cae justo
+                  // encima de la primera pilastra de la tira y, si lo atrapa, esa
+                  // pilastra deja de poder arrastrarse. Solo la pieza que SÍ se
+                  // arrastra vuelve a prenderlo.
+                  <g pointerEvents="none">
                     <rect
-                      pointerEvents="none"
                       x={Math.min(pa.x, pb.x)} y={Math.min(pa.y, pb.y)}
                       width={horizontal ? Math.abs(pb.x - pa.x) : ESPESOR_MURO}
                       height={horizontal ? ESPESOR_MURO : Math.abs(pb.y - pa.y)}
