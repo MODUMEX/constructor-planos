@@ -827,6 +827,7 @@ export default function App() {
     const r = reajustarConPuertas(
       cabinas, t.claroCm, muros, muros < 2,
       config.tipologia === 'PMR' && llevaAccesible ? anchoAccesibleDe(config) : 0,
+      undefined, t.pilastras,
     )
     setArea({
       tramos: area.tramos.map((x) =>
@@ -850,15 +851,24 @@ export default function App() {
   function repartirConLibre(
     t: Tramo,
     cabinas: Cabina[],
-    fijas?: (number | null | undefined)[],
+    /** solo lo que se acaba de cambiar; el resto de la tira se queda como está */
+    cambios?: (number | null | undefined)[],
     /** las posiciones que quedan clavadas para la próxima vez */
     clavadas?: number[],
   ) {
     const muros = (t.muroInicio ? 1 : 0) + (t.muroFin ? 1 : 0)
+    // Con un ESPACIO LIBRE en la tira, el hueco absorbe lo que haga falta, así
+    // que NO hay por qué recalcular las demás pilastras: se dejan las que ya
+    // tiene y solo se aplica lo que se tocó. Antes se volvían a buscar todas y
+    // el buscador, sin nada que lo obligue, las elegía lo más chicas posible:
+    // mover un panel encogía toda la tira y las cabinas se corrían enteras.
+    const fijas = Array.from({ length: cabinas.length + 1 }, (_, k) =>
+      cambios?.[k] ?? t.pilastras?.[k] ?? null,
+    )
     const r = reajustarConPuertas(
       cabinas, t.claroCm, muros, muros < 2,
       config.tipologia === 'PMR' && llevaAccesible ? anchoAccesibleDe(config) : 0,
-      fijas,
+      fijas, t.pilastras,
     )
     if (!r) return false
     setArea({
@@ -889,9 +899,17 @@ export default function App() {
       i === indice ? { ...c, puerta: { ...c.puerta, tipo }, libreCm: tipo === 'ninguna' ? c.libreCm : undefined } : c,
     )
     const muros = (t.muroInicio ? 1 : 0) + (t.muroFin ? 1 : 0)
+    // Sacar o poner la puerta no es motivo para mover el resto: si queda un
+    // espacio libre, es el hueco el que absorbe la diferencia. Por eso se
+    // conservan las pilastras que la tira ya tenía.
+    const hayHueco = cabinas.some(esEspacioLibre)
     const r = reajustarConPuertas(
       cabinas, t.claroCm, muros, muros < 2,
       config.tipologia === 'PMR' && llevaAccesible ? anchoAccesibleDe(config) : 0,
+      hayHueco
+        ? Array.from({ length: cabinas.length + 1 }, (_, k) => t.pilastras?.[k] ?? null)
+        : undefined,
+      t.pilastras,
     )
     setArea({
       tramos: area.tramos.map((x) =>
@@ -1011,17 +1029,33 @@ export default function App() {
   }
 
   function onPilastra(tramoId: string, indice: number, anchoCm: number) {
+    onPilastras(tramoId, [{ indice, anchoCm }])
+  }
+
+  /**
+   * Mover VARIAS pilastras de una sola vez.
+   *
+   * De a una no sirve cuando hay que cambiar dos: cada llamada vuelve a modular
+   * la tira y la segunda deshace lo que hizo la primera. Escribir el ancho de
+   * una cabina necesita justamente eso, porque la cabina se arma con las
+   * pilastras de los dos lados.
+   */
+  function onPilastras(tramoId: string, cambios: { indice: number; anchoCm: number }[]) {
     const t = area.tramos.find((x) => x.id === tramoId)
-    if (!t || t.cabinas.length === 0) return
+    if (!t || t.cabinas.length === 0 || cambios.length === 0) return
+    const ultimo = cambios[cambios.length - 1]
+    const indice = ultimo.indice
+    const anchoCm = ultimo.anchoCm
+    const nuevo = new Map(cambios.map((c) => [c.indice, c.anchoCm]))
     const extremo = indice === 0 || indice === t.cabinas.length
     const muros = (t.muroInicio ? 1 : 0) + (t.muroFin ? 1 : 0)
 
     // Las medidas las decide el cliente, así que lo que ya eligió se queda:
-    // esta pilastra se suma a la lista y solo se reacomodan las que no tocó.
+    // estas pilastras se suman a la lista y solo se reacomodan las que no tocó.
     // Sin esto, elegir la segunda deshacía la primera y salían emparejadas.
-    const elegidas = [...new Set([...(t.pilastrasFijas ?? []), indice])].sort((a, b) => a - b)
+    const elegidas = [...new Set([...(t.pilastrasFijas ?? []), ...nuevo.keys()])].sort((a, b) => a - b)
     const clavadas = Array.from({ length: t.cabinas.length + 1 }, (_, i) =>
-      i === indice ? anchoCm : elegidas.includes(i) ? (t.pilastras?.[i] ?? null) : null,
+      nuevo.has(i) ? nuevo.get(i)! : elegidas.includes(i) ? (t.pilastras?.[i] ?? null) : null,
     )
 
     // Con un espacio libre en la tira no se vuelve a modular de cero: se
@@ -1812,6 +1846,7 @@ export default function App() {
                     onSeleccion={setSeleccion}
                     onCabinas={onCabinas}
                     onPilastra={onPilastra}
+                    onPilastras={onPilastras}
                     onOrinal={onOrinal}
                     onPuerta={onPuerta}
                     onTipoPuerta={onTipoPuerta}

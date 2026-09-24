@@ -334,6 +334,17 @@ export function reajustarConPuertas(
    * único que puede cuadrar el claro y las decide el buscador.
    */
   fijas?: (number | null | undefined)[],
+  /**
+   * Las pilastras que la tira tiene AHORA MISMO.
+   *
+   * Hacen falta para sacarle a un orinal su medida limpia. El ancho guardado de
+   * un orinal es el de su LUGAR: el orinal más lo que le toca de las piezas de
+   * al lado. Si se vuelve a repartir tomando ese ancho como si fuera el orinal
+   * pelado, en cada pasada se le suman otra vez esas piezas y el orinal crece
+   * solo: 90 → 91,3 → 92,6… y el de la punta, que se lleva una pilastra entera,
+   * ~10 cm por vez. Con eso la tira terminaba pasándose del claro por metros.
+   */
+  pilastrasActuales?: number[],
 ): { cabinas: Cabina[]; pilastras: number[]; canaletaCm: number; ajuste: Tramo['ajuste']; mensaje: string } | null {
   const n = cabinas.length
   if (n === 0) return null
@@ -348,6 +359,7 @@ export function reajustarConPuertas(
     const resto = reajustarConPuertas(
       cabinas.slice(1), claroCm - cuartoPmrCm, Math.max(0, murosPilastra - 1), extremoAbierto,
       0, fijas ? fijas.slice(1) : undefined,
+      pilastrasActuales ? pilastrasActuales.slice(1) : undefined,
     )
     if (!resto) return null
     return {
@@ -367,8 +379,19 @@ export function reajustarConPuertas(
   // los que nadie midió.
   const absorbe = (c: Cabina) => esEspacioLibre(c) && !(c.libreCm && c.libreCm > 0)
   const libres = cabinas.filter(absorbe).length
-  const cuerpoDe = (c: Cabina) =>
-    esEspacioLibre(c) ? (c.libreCm ?? 0) : c.tipo === 'orinal' ? c.anchoCm : c.puerta.anchoCm
+  /**
+   * El ORINAL guardado trae el ancho de su lugar, no el del orinal: hay que
+   * descontarle lo que se lleva de las piezas de al lado con las pilastras que
+   * la tira tiene ahora. Sin las pilastras a mano no se puede descontar nada y
+   * se usa el ancho tal cual, que es como se hacía antes.
+   */
+  const cuerpoOrinal = (c: Cabina, i: number) => {
+    if (!pilastrasActuales) return c.anchoCm
+    const { izq, der } = ladosDeCabina(lugares, (k) => pilastrasActuales[k] ?? 0, i)
+    return Math.max(0, Math.round((c.anchoCm - izq - der) * 10) / 10)
+  }
+  const cuerpoDe = (c: Cabina, i: number) =>
+    esEspacioLibre(c) ? (c.libreCm ?? 0) : c.tipo === 'orinal' ? cuerpoOrinal(c, i) : c.puerta.anchoCm
   const cuerpos = cabinas.map(cuerpoDe)
   const conPuerta = cabinas.filter((c) => c.tipo !== 'orinal' && !esEspacioLibre(c)).length
   // entre dos orinales va mampara, no pilastra
@@ -410,7 +433,7 @@ export function reajustarConPuertas(
 
   const nuevas = cabinas.map((c, i) => {
     const { izq, der } = ladosDeCabina(lugares, (k) => pilastras[k], i)
-    return { ...c, anchoCm: izq + cuerpoDe(c) + der }
+    return { ...c, anchoCm: izq + cuerpos[i] + der }
   })
 
   // Lo que sobró del claro es, justamente, el ESPACIO LIBRE: se lo reparten los
@@ -952,3 +975,67 @@ export function totalBOM(renglones: RenglonBOM[]): number {
 
 export const GRUESO = GRUESO_PILASTRA
 
+
+/**
+ * Qué pilastras hay que poner para que una cabina mida EXACTAMENTE lo pedido.
+ *
+ * La cabina no es una pieza: es la puerta más lo que le toca de la pilastra de
+ * cada lado —media si es central, entera si es lateral—. Con una sola pilastra
+ * muchas medidas no se pueden armar: para una cabina de 92 con puerta de 60
+ * hacen falta 32 cm repartidos y no existe la pilastra de 32. Con la PAREJA sí:
+ * 17 y 15. Por eso se buscan las dos a la vez.
+ *
+ * Las de punta no se tocan: esas cierran contra el muro. Entre dos soluciones
+ * igual de buenas gana la que mueva menos piezas.
+ *
+ * Vive acá y no en el plano porque es la cuenta que decide la medida de la
+ * cabina, y la tienen que dar igual la pantalla y cualquier prueba.
+ */
+export function pilastrasParaAncho(
+  tramo: Tramo,
+  indice: number,
+  pedidoCm: number,
+  medidas: number[],
+  anchoPilastra: (k: number) => number,
+  arrancaElCuarto = false,
+): { indice: number; anchoCm: number }[] {
+  const n = tramo.cabinas.length
+  const cab = tramo.cabinas[indice]
+  if (!cab || n < 2) return []
+  const lugares = lugaresDe(tramo.cabinas)
+  const cuarto = arrancaElCuarto ? 0 : -1
+  /** cuánto de la pilastra de la frontera k entra en ESTA cabina */
+  const parte = (k: number, cabinaALaDerecha: boolean) => {
+    const lado = ladoDePilastra(lugares, k, cuarto)
+    if (lado === 'mitades') return 0.5
+    return (lado === 'der') === cabinaALaDerecha ? 1 : 0
+  }
+  const fIzq = parte(indice, true)
+  const fDer = parte(indice + 1, false)
+  const cuerpo = cab.tipo === 'orinal' ? cab.anchoCm : cab.puerta.anchoCm
+  const objetivo = pedidoCm - cuerpo
+  const movible = (k: number) => k > 0 && k < n
+  const aIzq = anchoPilastra(indice)
+  const aDer = anchoPilastra(indice + 1)
+  const revuelto = (izq: number, der: number) =>
+    (fIzq > 0 && izq !== aIzq ? 1 : 0) + (fDer > 0 && der !== aDer ? 1 : 0)
+
+  let mejor: { izq: number; der: number; dif: number } | null = null
+  const opcionesIzq = fIzq > 0 && movible(indice) ? medidas : [aIzq]
+  const opcionesDer = fDer > 0 && movible(indice + 1) ? medidas : [aDer]
+  for (const izq of opcionesIzq) {
+    for (const der of opcionesDer) {
+      const dif = Math.abs(fIzq * izq + fDer * der - objetivo)
+      if (!mejor) { mejor = { izq, der, dif }; continue }
+      if (dif < mejor.dif - 0.001) { mejor = { izq, der, dif }; continue }
+      if (Math.abs(dif - mejor.dif) <= 0.001 && revuelto(izq, der) < revuelto(mejor.izq, mejor.der)) {
+        mejor = { izq, der, dif }
+      }
+    }
+  }
+  if (!mejor) return []
+  const cambios: { indice: number; anchoCm: number }[] = []
+  if (fIzq > 0 && movible(indice) && mejor.izq !== aIzq) cambios.push({ indice, anchoCm: mejor.izq })
+  if (fDer > 0 && movible(indice + 1) && mejor.der !== aDer) cambios.push({ indice: indice + 1, anchoCm: mejor.der })
+  return cambios
+}

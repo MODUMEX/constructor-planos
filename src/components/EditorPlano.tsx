@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import type { Cabina, Config, Pais, Tramo } from '../types'
 import { anchosPilastra, esEspecial, familiaDelFrente, medidasDeFrente, puertasPosibles, tipologia } from '../catalog'
-import { anchoTotal, arrancaElCuartoPmr, esEspacioLibre, minimoDe, nuevaCabina, puertaSugerida, snap, cierraConMingitorio, ladoDePilastra, ladosDeCabina, lugaresDe, mamparaEn } from '../modulacion'
+import { anchoTotal, arrancaElCuartoPmr, esEspacioLibre, minimoDe, nuevaCabina, pilastrasParaAncho, puertaSugerida, snap, cierraConMingitorio, ladosDeCabina, lugaresDe, mamparaEn } from '../modulacion'
 import { medidaCercana, PILASTRAS_INTERNAS, PUERTA_ACCESIBLE_MIN } from '../modulador'
 import { Grupo, Item, Menu, Raya } from './Menu'
 import {
@@ -50,6 +50,16 @@ interface Props {
   /** al arrastrar una pilastra: se elige su medida y el resto se reacomoda */
   onPilastra: (tramoId: string, indice: number, anchoCm: number) => void
   /**
+   * varias pilastras a la vez.
+   *
+   * Hace falta para que escribir el ancho de una cabina dé EXACTAMENTE ese
+   * número: la cabina es la puerta más lo que le toca de las pilastras de los
+   * dos lados, así que a veces no hay una sola medida que cuadre y sí hay una
+   * pareja. Mandarlas de a una no sirve: cada una vuelve a modular y deshace
+   * la anterior.
+   */
+  onPilastras: (tramoId: string, cambios: { indice: number; anchoCm: number }[]) => void
+  /**
    * al arrastrar un MINGITORIO: cambia el ancho del orinal que tiene a la
    * izquierda, que es la única medida libre de esa parte de la tira
    */
@@ -89,6 +99,7 @@ export default function EditorPlano({
   onSeleccion,
   onCabinas,
   onPilastra,
+  onPilastras,
   onPuerta,
   onTipoPuerta,
   onAnchoLibre,
@@ -352,38 +363,13 @@ export default function EditorPlano({
     const n = t.cabinas.length
     if (n < 2) return
     const anchoPil = (j: number) => t.pilastras?.[j] ?? config.anchoPilastraCm
-    const cuerpo = cab.tipo === 'orinal' ? cab.anchoCm : cab.puerta.anchoCm
-
-    // Cuánto de cada pilastra vecina entra en el ancho de ESTA cabina. No
-    // siempre es la mitad: una LATERAL entra entera y del otro lado puede no
-    // entrar nada. Antes se daba por hecho el medio y medio, así que escribirle
-    // la medida a la cabina de al lado del cuarto PMR —o de un espacio libre—
-    // movía la pilastra el doble de lo que hacía falta.
-    const lugares = lugaresDe(t.cabinas)
-    const cuarto = arrancaElCuartoPmr(t, config) ? 0 : -1
-    const parte = (k: number, cabinaALaDerecha: boolean) => {
-      const lado = ladoDePilastra(lugares, k, cuarto)
-      if (lado === 'mitades') return 0.5
-      return (lado === 'der') === cabinaALaDerecha ? 1 : 0
-    }
-    const fIzq = parte(indice, true)
-    const fDer = parte(indice + 1, false)
-
-    // Qué pilastra mover. Las de punta no se tocan: se mueve una interna. Se
-    // prefiere la que da contra un ESPACIO LIBRE, porque ahí el cambio se lo
-    // come el hueco y no se corre ninguna otra cabina.
-    const tocaLibre = (k: number) =>
-      (lugares[k - 1]?.libre ?? false) || (lugares[k]?.libre ?? false)
-    const opciones = [
-      { k: indice, f: fIzq, otro: fDer * anchoPil(indice + 1) },
-      { k: indice + 1, f: fDer, otro: fIzq * anchoPil(indice) },
-    ].filter((o) => o.f > 0 && o.k > 0 && o.k < n)
-    if (opciones.length === 0) return
-    const elegir = opciones.find((o) => tocaLibre(o.k)) ?? opciones[opciones.length - 1]
-
-    const necesaria = (pedido - cuerpo - elegir.otro) / elegir.f
-    const elegida = medidaCercana(PILASTRAS_INTERNAS, necesaria)
-    if (elegida !== anchoPil(elegir.k)) onPilastra(tramoId, elegir.k, elegida)
+    // La cuenta vive en modulación: es la que decide la medida de la cabina y
+    // tiene que dar igual acá que en las pruebas.
+    const medidas = anchosPilastra(config.modelo).filter(
+      (a) => PILASTRAS_INTERNAS.includes(a) || esEspecial('PL', a, config.modelo),
+    )
+    const cambios = pilastrasParaAncho(t, indice, pedido, medidas, anchoPil, arrancaElCuartoPmr(t, config))
+    if (cambios.length) onPilastras(tramoId, cambios)
   }
   function centrarPanel(tramoId: string, indice: number) {
     const t = tramoPorId(tramoId)
