@@ -133,6 +133,60 @@ export function alturasDe(modelo: string): AlturasModelo {
   return alturasCorregidas?.[codigo] ?? ALTURAS_POR_MODELO[codigo] ?? ALTURAS_POR_MODELO.ESTANDAR
 }
 
+/** Cómo se ve el modelo DE FRENTE, para dibujar el alzado. */
+export interface AlzadoModelo {
+  /** del piso al borde de abajo de la puerta y de los paneles, en cm */
+  pisoCm: number
+  /** alto del refuerzo superior de aluminio; 0 en los que no lo llevan */
+  refuerzoCm: number
+}
+
+/**
+ * De las fichas técnicas ABR-2026, una por modelo.
+ *
+ * El hueco del piso NO es la resta pilastra − puerta. En Reforzado la pilastra
+ * mide 210 y la puerta 150, pero la puerta no cuelga a 60 del suelo: va a 30, y
+ * los otros 30 quedan ARRIBA, entre el borde de la puerta y el tope de la
+ * pilastra, donde va el refuerzo de aluminio. Con la resta salía al doble.
+ *
+ *   modelo          pilastra  puerta   piso   arriba   refuerzo
+ *   Estándar          180       150      30      0        no
+ *   Estándar 170      180       170      10      0        no
+ *   Reforzado         210       150      30     30        sí (2,14 m en total)
+ *   Reforzado 170     230       170      30     30        sí (2,34 m en total)
+ *   Kids              150       130      20      0        no
+ *   Scudo             210       200      30      0        sí, y lleva antepecho
+ *   Touchless S3      210       150      30     30        sí (2,14 m en total)
+ */
+export const ALZADO_POR_MODELO: Record<string, AlzadoModelo> = {
+  ESTANDAR: { pisoCm: 30, refuerzoCm: 0 },
+  ESTANDAR170: { pisoCm: 10, refuerzoCm: 0 },
+  REFORZADO: { pisoCm: 30, refuerzoCm: 4 },
+  REFORZADO170: { pisoCm: 30, refuerzoCm: 4 },
+  IMPERIAL: { pisoCm: 10, refuerzoCm: 0 },
+  REGADERAS: { pisoCm: 0, refuerzoCm: 0 },
+  SCUDO: { pisoCm: 30, refuerzoCm: 4 },
+  KIDS: { pisoCm: 20, refuerzoCm: 0 },
+  COLGANTE: { pisoCm: 40, refuerzoCm: 0 },
+  SUP_ESTANDAR: { pisoCm: 30, refuerzoCm: 0 },
+  SUP_ESTANDAR170: { pisoCm: 10, refuerzoCm: 0 },
+  SUP_REFORZADO: { pisoCm: 30, refuerzoCm: 4 },
+  SUP_REFORZADO170: { pisoCm: 30, refuerzoCm: 4 },
+  TL_S3: { pisoCm: 30, refuerzoCm: 4 },
+}
+
+/**
+ * Cómo se dibuja el alzado de un modelo. De uno desconocido se cae en la resta
+ * de siempre, que es lo que hacía el plano antes de tener esta tabla.
+ */
+export function alzadoDe(modelo: string): AlzadoModelo {
+  const codigo = (modelo || '').toUpperCase()
+  const suyo = ALZADO_POR_MODELO[codigo]
+  if (suyo) return suyo
+  const h = alturasDe(modelo)
+  return { pisoCm: Math.max(0, h.pilastra - h.puerta), refuerzoCm: 0 }
+}
+
 /**
  * Acabados por línea, igual que `acabadosDeLinea()` del Constructor actual:
  * solo Superior 2.0 ofrece esmaltada y acero.

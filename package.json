@@ -1,7 +1,7 @@
 {
   "name": "constructor-de-planos",
   "private": true,
-  "version": "2.64.4",
+  "version": "2.65.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -21,6 +21,7 @@
     "probar-invertir": "esbuild scripts/probar-invertir.ts --bundle --platform=node --format=esm --outfile=.inv.mjs --log-level=warning --define:import.meta.env={} && node .inv.mjs",
     "probar-caso-693": "esbuild scripts/probar-caso-693.ts --bundle --platform=node --format=esm --outfile=.c693.mjs --log-level=warning --define:import.meta.env={} && node .c693.mjs",
     "probar-pilastra-60": "esbuild scripts/probar-pilastra-60.ts --bundle --platform=node --format=esm --outfile=.p60.mjs --log-level=warning --define:import.meta.env={} && node .p60.mjs",
+    "probar-alzado": "esbuild scripts/probar-alzado.ts --bundle --platform=node --format=esm --outfile=.alz.mjs --log-level=warning --define:import.meta.env={} && node .alz.mjs",
     "probar-iva": "esbuild scripts/probar-iva.ts --bundle --platform=node --format=esm --outfile=.iva.mjs --log-level=warning --define:import.meta.env={} && node .iva.mjs",
     "probar-pmr": "esbuild scripts/probar-pmr.ts --bundle --platform=node --format=esm --outfile=.pmr.mjs --log-level=warning --define:import.meta.env={} && node .pmr.mjs",
     "probar-frente": "esbuild scripts/probar-frente.ts --bundle --platform=node --format=esm --outfile=.frente.mjs --log-level=warning --define:import.meta.env={} && node .frente.mjs",

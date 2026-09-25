@@ -8,7 +8,7 @@ import {
   profundidadDelLugar, pt, SOBRA_MURO_CM,
   type Marco,
 } from '../geometria'
-import { alturasDe, mamparaDe, nombreHerraje, tipologia } from '../catalog'
+import { alturasDe, alzadoDe, mamparaDe, nombreHerraje, tipologia } from '../catalog'
 import { anchoTotal, arrancaElCuartoPmr, esEspacioLibre, ladosDeCabina, lugaresDe, mamparaEn } from '../modulacion'
 import type { CuartoPmr } from '../geometria'
 import { agrupar, modeloParaCsv, nombreLinea, nombreSistema, piezasDeArea } from './piezas'
@@ -650,7 +650,8 @@ function alzadoPmr(
   const hPilastra = alturas.pilastra
   const hPuerta = alturas.puerta
   const hPanel = alturas.panel
-  const hueco = Math.max(0, hPilastra - hPuerta)
+  // el mismo hueco del piso que en el alzado de frente: sale de la ficha
+  const hueco = alzadoDe(area.config.modelo).pisoCm
   const largo = cuarto.profCm
 
   const aY = (h: number) => pisoY - h * e.k
@@ -723,8 +724,14 @@ function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) 
   const alturas = alturasDe(area.config.modelo)
   const hPilastra = alturas.pilastra
   const hPuerta = alturas.puerta
-  /** lo que queda del piso a la puerta: la pilastra baja hasta el suelo y la puerta no */
-  const hueco = Math.max(0, hPilastra - hPuerta)
+  /**
+   * Del piso al borde de abajo de la puerta, según la FICHA del modelo. No es
+   * la resta pilastra − puerta: en Reforzado eso daba 60 y son 30, porque los
+   * otros 30 quedan arriba, bajo el refuerzo de aluminio.
+   */
+  const { pisoCm: hueco, refuerzoCm } = alzadoDe(area.config.modelo)
+  /** lo que queda entre el borde de arriba de la puerta y el tope de la pilastra */
+  const aire = Math.max(0, hPilastra - hueco - hPuerta)
   const largo = anchoTotal(tramo.cabinas)
   const acum = acumulado(tramo.cabinas)
   const anchoPil = (j: number) => tramo.pilastras?.[j] ?? area.config.anchoPilastraCm
@@ -769,6 +776,18 @@ function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) 
     doc.setFillColor(120, 120, 120)
   })
 
+  // El refuerzo superior de aluminio: una barra que corre de punta a punta por
+  // encima de las pilastras. Lo llevan Reforzado, Scudo y Touchless, y es lo
+  // que cierra el aire que queda sobre las puertas.
+  if (refuerzoCm > 0) {
+    doc.setFillColor(150, 153, 158)
+    doc.setDrawColor(70)
+    doc.setLineWidth(0.25)
+    const x0 = aX(cortes[0] - anchoPil(0) / 2)
+    const x1 = aX(cortes[cortes.length - 1] + anchoPil(cortes.length - 1) / 2)
+    doc.rect(x0, aY(hPilastra + refuerzoCm), x1 - x0, refuerzoCm * e.k, 'FD')
+  }
+
   // puertas y mingitorios, colgados a la altura que les toca
   tramo.cabinas.forEach((cab: Cabina, i: number) => {
     if (cuarto?.indice === i) return
@@ -782,11 +801,13 @@ function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) 
     doc.setLineWidth(0.35)
     const x = aX(u0 + izq)
     const w = (u1 - der - (u0 + izq)) * e.k
-    doc.rect(x, aY(hPilastra), w, hPuerta * e.k, 'FD')
+    // la puerta se apoya en su hueco del piso, no en el tope de la pilastra:
+    // en Reforzado quedan 30 abajo y otros 30 arriba, no 60 abajo
+    doc.rect(x, aY(hueco + hPuerta), w, hPuerta * e.k, 'FD')
     // la manija, del lado que abre
     const lado = cab.puerta.mano === 'der' ? x + 3 : x + w - 3
     doc.setFillColor(MARCA[0], MARCA[1], MARCA[2])
-    doc.circle(lado, aY(hPilastra - hPuerta / 2), 0.7, 'F')
+    doc.circle(lado, aY(hueco + hPuerta / 2), 0.7, 'F')
   })
 
   /**
@@ -844,7 +865,9 @@ function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) 
   const xCota = aX(finBanos) + 5
   cotaAlto(doc, e, xCota, pisoY, hPuerta + hueco, hueco, `${hPuerta}`)
   if (hueco > 0) cotaAlto(doc, e, xCota, pisoY, hueco, 0, `${hueco}`)
-  cotaAlto(doc, e, aX(largo + SOBRA_MURO_CM) + 8, pisoY, hPilastra, 0, `${hPilastra}`)
+  // el aire de arriba, que es lo que el refuerzo viene a tapar
+  if (aire > 0) cotaAlto(doc, e, xCota, pisoY, hPilastra, hueco + hPuerta, `${aire}`)
+  cotaAlto(doc, e, aX(largo + SOBRA_MURO_CM) + 8, pisoY, hPilastra + refuerzoCm, 0, `${hPilastra + refuerzoCm}`)
   // Los 10 cm del zoclo o de la pata, del otro lado para no encimarse. Va
   // ROTULADO: un "10" suelto en la esquina se lee como una pieza que falta
   // dibujar, y de hecho ya pasó.
