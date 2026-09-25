@@ -1,7 +1,7 @@
 {
   "name": "constructor-de-planos",
   "private": true,
-  "version": "2.64.1",
+  "version": "2.64.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -17,6 +17,7 @@
     "exe": "tauri build",
     "probar-modulador": "esbuild scripts/probar-modulador.ts --bundle --platform=node --format=esm --outfile=.modulador.mjs --log-level=warning && node .modulador.mjs",
     "verificar-extras": "esbuild scripts/verificar-extras.ts --bundle --platform=node --format=esm --outfile=.verext.mjs --log-level=warning --external:xlsx --define:import.meta.env={} && node .verext.mjs",
+    "probar-invertir-pmr": "esbuild scripts/probar-invertir-pmr.ts --bundle --platform=node --format=esm --outfile=.invpmr.mjs --log-level=warning --define:import.meta.env={} && node .invpmr.mjs",
     "probar-invertir": "esbuild scripts/probar-invertir.ts --bundle --platform=node --format=esm --outfile=.inv.mjs --log-level=warning --define:import.meta.env={} && node .inv.mjs",
     "probar-caso-693": "esbuild scripts/probar-caso-693.ts --bundle --platform=node --format=esm --outfile=.c693.mjs --log-level=warning --define:import.meta.env={} && node .c693.mjs",
     "probar-pilastra-60": "esbuild scripts/probar-pilastra-60.ts --bundle --platform=node --format=esm --outfile=.p60.mjs --log-level=warning --define:import.meta.env={} && node .p60.mjs",

@@ -443,7 +443,11 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
       ))
       muro(doc, Math.min(wx, wx2), Math.min(wy, wy2), Math.abs(wx2 - wx), Math.abs(wy2 - wy))
 
-      const u = cuarto.hastaCm
+      // El divisor va en el borde de ADENTRO del cuarto, el que da a la tira.
+      // Invertida el area ese borde es el otro: puesto siempre en hastaCm, el
+      // divisor y la puerta salian dibujados encima del muro de la punta.
+      const u = alFin ? cuarto.desdeCm : cuarto.hastaCm
+      const haciaElPasillo = alFin ? -1 : 1
       for (const pieza of cuarto.divisor) {
         const largoPieza = pieza.hastaCm - pieza.desdeCm
         if (pieza.tipo === 'puerta') {
@@ -452,7 +456,7 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
           // de un panel: por eso el pivote es el extremo de la pilastra.
           const [pxx, pyy] = aHoja(e, pt(m, u, pieza.hastaCm))
           const [cxx, cyy] = aHoja(e, pt(m, u, pieza.desdeCm))
-          const [exx, eyy] = aHoja(e, pt(m, u + largoPieza * ABIERTA_45, pieza.hastaCm - largoPieza * ABIERTA_45))
+          const [exx, eyy] = aHoja(e, pt(m, u + haciaElPasillo * largoPieza * ABIERTA_45, pieza.hastaCm - largoPieza * ABIERTA_45))
           doc.setDrawColor(ARCO[0], ARCO[1], ARCO[2])
           doc.setLineWidth(0.2)
           doc.setLineDashPattern([1.2, 1], 0)

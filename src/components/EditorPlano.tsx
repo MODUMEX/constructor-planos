@@ -902,14 +902,20 @@ export default function EditorPlano({
                   el PMR se modula en las dos direcciones.
                   ------------------------------------------------------------ */}
               {cuarto && (() => {
-                const u = cuarto.hastaCm
+                const alFin = cuarto.lado === 'fin'
+                // El divisor separa el cuarto de la TIRA DE BANOS: va en su borde de
+                // ADENTRO. Al invertir el area el cuarto se va a la otra punta y ese
+                // borde es el otro; puesto siempre en hastaCm, el divisor y la puerta
+                // quedaban dibujados encima del muro de la punta, fuera del recinto.
+                const u = alFin ? cuarto.desdeCm : cuarto.hastaCm
+                // la puerta del cuarto abre hacia el pasillo, donde esta la tira
+                const haciaElPasillo = alFin ? -1 : 1
                 const profC = cuarto.profCm
                 // la pared opuesta del lugar: contra ella cierra el cuarto por el frente
                 // El muro del fondo va desde el cuarto hasta la otra punta de la
                 // tira. Con el área invertida el cuarto queda del otro lado, así
                 // que el muro también: si no, quedaba dibujado solo debajo del
                 // cuarto y el resto de la tira sin pared.
-                const alFin = cuarto.lado === 'fin'
                 const pa = pt(
                   m,
                   alFin ? -SOBRA_MURO_CM : cuarto.desdeCm - (tramo.muroInicio ? ESPESOR_MURO : 0),
@@ -953,7 +959,7 @@ export default function EditorPlano({
                         // la pilastra, no el del panel.
                         const pivote = pt(m, u, pieza.hastaCm)
                         const cerrada = pt(m, u, pieza.desdeCm)
-                        const extremo = pt(m, u + largoPieza * ABIERTA_45, pieza.hastaCm - largoPieza * ABIERTA_45)
+                        const extremo = pt(m, u + haciaElPasillo * largoPieza * ABIERTA_45, pieza.hastaCm - largoPieza * ABIERTA_45)
                         return (
                           <g key={pieza.tipo}>
                             <path
