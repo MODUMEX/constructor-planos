@@ -17,10 +17,15 @@ const FICHAS: [string, number, number, number][] = [
   ['ESTANDAR', 30, 0, 180],
   ['ESTANDAR170', 10, 0, 180],
   ['REFORZADO', 30, 30, 214],
+  // la pilastra es de 210, así que con la puerta a 30 del piso quedan 10 arriba
+  ['REFORZADO170', 30, 10, 214],
   ['KIDS', 20, 0, 150],
   ['SUP_ESTANDAR', 30, 0, 180],
   ['SUP_ESTANDAR170', 10, 0, 180],
   ['SUP_REFORZADO', 30, 30, 214],
+  // el Reforzado 170 de Superior NO es el de LEEDER: pilastra de 210 y el
+  // panel a 10 del piso, así que cierra en 2,14 y no en 2,34
+  ['SUP_REFORZADO170', 10, 30, 214],
 ]
 
 for (const [modelo, piso, aire, total] of FICHAS) {

@@ -103,6 +103,9 @@ export const ALTURAS_POR_MODELO: Record<string, AlturasModelo> = {
   ESTANDAR: { puerta: 150, panel: 150, pilastra: 180, mingitorio: 120 },
   ESTANDAR170: { puerta: 170, panel: 170, pilastra: 180, mingitorio: 120 },
   REFORZADO: { puerta: 150, panel: 150, pilastra: 210, mingitorio: 120 },
+  // La pilastra es de 210, no de 230: el dibujo de la ficha M1 acota 2,34 m,
+  // pero la pieza que se fabrica es de 210. Confirmado por Dayanna el
+  // 25-sep-2026.
   REFORZADO170: { puerta: 170, panel: 170, pilastra: 210, mingitorio: 120 },
   IMPERIAL: { puerta: 180, panel: 180, pilastra: 190, mingitorio: 120 },
   REGADERAS: { puerta: 180, panel: 180, pilastra: 180, mingitorio: 120 },
@@ -153,7 +156,8 @@ export interface AlzadoModelo {
  *   Estándar          180       150      30      0        no
  *   Estándar 170      180       170      10      0        no
  *   Reforzado         210       150      30     30        sí (2,14 m en total)
- *   Reforzado 170     230       170      30     30        sí (2,34 m en total)
+ *   Reforzado 170     210       170      30     10        sí (2,14 m en total)
+ *   Superior Ref.170  210       170      10     30        sí (2,14 m en total)
  *   Kids              150       130      20      0        no
  *   Scudo             210       200      30      0        sí, y lleva antepecho
  *   Touchless S3      210       150      30     30        sí (2,14 m en total)
@@ -171,7 +175,9 @@ export const ALZADO_POR_MODELO: Record<string, AlzadoModelo> = {
   SUP_ESTANDAR: { pisoCm: 30, refuerzoCm: 0 },
   SUP_ESTANDAR170: { pisoCm: 10, refuerzoCm: 0 },
   SUP_REFORZADO: { pisoCm: 30, refuerzoCm: 4 },
-  SUP_REFORZADO170: { pisoCm: 30, refuerzoCm: 4 },
+  // El Reforzado 170 de Superior NO es el de LEEDER: su pilastra es de 210 y el
+  // panel arranca a 10 del suelo, así que el total queda en 2,14 y no en 2,34.
+  SUP_REFORZADO170: { pisoCm: 10, refuerzoCm: 4 },
   TL_S3: { pisoCm: 30, refuerzoCm: 4 },
 }
 
