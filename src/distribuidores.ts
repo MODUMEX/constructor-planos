@@ -1,4 +1,4 @@
-import type { Usuario } from './auth'
+import { ivaDeRegion, type Usuario } from './auth'
 
 /**
  * Distribuidores, contra la misma tabla `distribuidor` que usa el Constructor
@@ -271,4 +271,22 @@ export async function guardarDistribuidor(usuario: Usuario | null, d: DatosDistr
     },
     mensaje: d.password ? 'Cambios guardados, incluida la contraseña.' : 'Cambios guardados.',
   }
+}
+
+/**
+ * El IVA que le toca a un distribuidor.
+ *
+ * El que tiene escrito en su ficha manda —un 0 a mano SÍ es 0— y en blanco va
+ * el de su región: LATAM factura sin IVA, México con 16 y Costa Rica con 13.
+ *
+ * Es del distribuidor de la COTIZACIÓN, no de quien la escribe: un vendedor
+ * cotiza para varios y cada uno factura con el suyo. Cuando el proyecto
+ * todavía no tiene distribuidor elegido, vale `porDefecto`.
+ */
+export function ivaDeDistribuidor(
+  d: Pick<Distribuidor, 'iva' | 'region'> | undefined | null,
+  porDefecto: number,
+): number {
+  if (!d) return porDefecto
+  return d.iva != null ? Number(d.iva) : ivaDeRegion(d.region)
 }

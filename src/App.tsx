@@ -40,7 +40,7 @@ import EditorAlturas from './components/EditorAlturas'
 import EditorPiezas from './components/EditorPiezas'
 import Distribuidores from './components/Distribuidores'
 import DuplicarArea from './components/DuplicarArea'
-import { listarDistribuidores, type Distribuidor } from './distribuidores'
+import { ivaDeDistribuidor, listarDistribuidores, type Distribuidor } from './distribuidores'
 import { alturasDeFabrica, cargarAlturas, usarAlturas, type TablaAlturas } from './alturas'
 import { cargarPiezas, usarPiezas } from './piezas'
 import {
@@ -1359,8 +1359,19 @@ export default function App() {
     setProyecto({ ...proyecto, extras: (proyecto.extras ?? []).filter((_, k) => k !== i) })
   }
 
-  // el IVA lo trae el distribuidor; si no, el 13 % de Costa Rica
-  const ivaPorcentaje = usuario?.ivaPorcentaje ?? IVA_CR
+  /**
+   * El IVA es del distribuidor de la COTIZACION, no de quien la escribe.
+   *
+   * Un vendedor o un admin cotizan para varios distribuidores y cada uno
+   * factura con el suyo: tomandolo del usuario, una cotizacion para LATAM
+   * salia con el 13 % de Costa Rica de quien la estaba escribiendo.
+   *
+   * En blanco manda el de su region (LATAM factura sin IVA). Si el proyecto
+   * todavia no tiene distribuidor elegido, va el de la cuenta.
+   */
+  const ivaDelDistribuidor = (nombre?: string | null) =>
+    ivaDeDistribuidor(distribuidores.find((x) => x.nombre === nombre), usuario?.ivaPorcentaje ?? IVA_CR)
+  const ivaPorcentaje = ivaDelDistribuidor(proyecto.distribuidor)
 
   /**
    * Los descuentos en cascada. El primero es el de la ficha del distribuidor
@@ -1472,7 +1483,7 @@ export default function App() {
       moneda,
       tipoCambio: TC,
       descuentoPct: usuario?.descuento ?? 0,
-      ivaPct: usuario?.ivaPorcentaje ?? IVA_CR,
+      ivaPct: ivaDelDistribuidor(suyo.distribuidor),
       pais: suyo.paisFabricacion,
       modelo: config?.modelo ?? '',
       tier: tierDeColor(config?.color ?? '', suyo.paisFabricacion, config?.linea),
