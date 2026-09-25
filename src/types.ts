@@ -279,6 +279,18 @@ export interface Descuento {
   origen: 'distribuidor' | 'manual'
   etiqueta: string
   pct: number
+  /**
+   * Quién PONE un descuento extra, que es lo que decide en qué hoja sale:
+   *
+   *   Modumex      → le baja el costo al distribuidor, así que va en SU hoja
+   *                  y también en la del cliente.
+   *   Distribuidor → lo da él de su margen: NO va en su hoja, solo en la del
+   *                  cliente, que es a quien se lo está dando.
+   *
+   * Sin valor se toma como de Modumex, que es como se comportaban los que ya
+   * estaban guardados.
+   */
+  quienLoPone?: 'Modumex' | 'Distribuidor'
 }
 
 /**

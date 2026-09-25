@@ -83,9 +83,26 @@ export function totalesDe(renglones: RenglonBOM[], descuentos: Descuento[], ivaP
   return { neto, pasos, descuento: neto - gravable, gravable, iva, total: gravable + iva }
 }
 
-/** los descuentos que SÍ van en la hoja del cliente: todos menos el del distribuidor */
+/**
+ * Los que van en la hoja del CLIENTE: todos los extras —los ponga Modumex o
+ * el propio distribuidor— menos el de la ficha. Ese último es lo que el
+ * distribuidor compra, no lo que vende.
+ */
 export function descuentosDelCliente(descuentos: Descuento[]): Descuento[] {
   return descuentos.filter((d) => d.origen !== 'distribuidor')
+}
+
+/**
+ * Los que van en la hoja del DISTRIBUIDOR: el de su ficha y los extras que
+ * pone MODUMEX, que son los que de verdad le bajan lo que él paga.
+ *
+ * Un extra que pone ÉL sale de su margen: no le cambia el costo y no tiene
+ * por qué aparecer en su hoja. Solo sale en la del cliente.
+ */
+export function descuentosDelDistribuidor(descuentos: Descuento[]): Descuento[] {
+  return descuentos.filter(
+    (d) => d.origen === 'distribuidor' || (d.quienLoPone ?? 'Modumex') === 'Modumex',
+  )
 }
 
 /** Las familias del cuadro resumen, en el orden en que se leen. */
@@ -251,7 +268,8 @@ export function generarCotizacionPDF(proyecto: Proyecto, d: DatosCotizacion): js
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' })
   // la hoja del cliente no lleva el descuento del distribuidor: eso es lo que
   // el distribuidor COMPRA, no lo que le vende a su cliente
-  const descuentos = d.para === 'cliente' ? descuentosDelCliente(d.descuentos) : d.descuentos
+  const descuentos =
+    d.para === 'cliente' ? descuentosDelCliente(d.descuentos) : descuentosDelDistribuidor(d.descuentos)
   const t = totalesDe(d.renglones, descuentos, d.ivaPct)
 
   // x de cada columna: las tres de plata van alineadas a la derecha

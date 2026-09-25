@@ -5,7 +5,7 @@ import EditorPlano, { formatear } from './components/EditorPlano'
 import { generarCSV, nombreArchivoCSV } from './exportar/csv'
 import { generarPDF, nombreArchivoPDF } from './exportar/pdf'
 import {
-  generarCotizacionPDF, nombreArchivoCotizacion, resumenDePiezas, totalesDe,
+  descuentosDelDistribuidor, generarCotizacionPDF, nombreArchivoCotizacion, resumenDePiezas, totalesDe,
 } from './exportar/cotizacion'
 import { csvABytes, FILTRO_CSV, FILTRO_PDF, guardarArchivo } from './exportar/guardar'
 import { abrirProyecto, armarNumero, numeroTomado, partirNumero, siguienteNumeroPlano } from './proyectos'
@@ -40,7 +40,7 @@ import EditorAlturas from './components/EditorAlturas'
 import EditorPiezas from './components/EditorPiezas'
 import Distribuidores from './components/Distribuidores'
 import DuplicarArea from './components/DuplicarArea'
-import { ivaDeDistribuidor, listarDistribuidores, type Distribuidor } from './distribuidores'
+import { descuentoDeDistribuidor, ivaDeDistribuidor, listarDistribuidores, type Distribuidor } from './distribuidores'
 import { alturasDeFabrica, cargarAlturas, usarAlturas, type TablaAlturas } from './alturas'
 import { cargarPiezas, usarPiezas } from './piezas'
 import {
@@ -1369,6 +1369,8 @@ export default function App() {
    * En blanco manda el de su region (LATAM factura sin IVA). Si el proyecto
    * todavia no tiene distribuidor elegido, va el de la cuenta.
    */
+  const descuentoDelDistribuidor = (nombre?: string | null) =>
+    descuentoDeDistribuidor(distribuidores.find((x) => x.nombre === nombre), usuario?.descuento ?? 0)
   const ivaDelDistribuidor = (nombre?: string | null) =>
     ivaDeDistribuidor(distribuidores.find((x) => x.nombre === nombre), usuario?.ivaPorcentaje ?? IVA_CR)
   const ivaPorcentaje = ivaDelDistribuidor(proyecto.distribuidor)
@@ -1379,15 +1381,18 @@ export default function App() {
    * mano, en orden. Ver `totalesDe`.
    */
   const descuentos = useMemo<Descuento[]>(() => {
-    const dist = usuario?.descuento ?? 0
+    const dist = descuentoDelDistribuidor(proyecto.distribuidor)
     const propios = proyecto.descuentos ?? []
     return dist > 0
       ? [{ origen: 'distribuidor' as const, etiqueta: 'Descuento distribuidor', pct: dist }, ...propios]
       : propios
-  }, [usuario?.descuento, proyecto.descuentos])
+  }, [usuario?.descuento, proyecto.descuentos, proyecto.distribuidor, distribuidores])
 
+  // La pantalla muestra lo que paga el DISTRIBUIDOR, que es su hoja: su
+  // descuento de ficha y los extras que pone Modumex. Los que pone él salen de
+  // su margen y solo bajan el precio del cliente.
   const totales = useMemo(
-    () => totalesDe(renglones, descuentos, ivaPorcentaje),
+    () => totalesDe(renglones, descuentosDelDistribuidor(descuentos), ivaPorcentaje),
     [renglones, descuentos, ivaPorcentaje],
   )
   const neto = totales.neto
@@ -1402,7 +1407,10 @@ export default function App() {
     const propios = proyecto.descuentos ?? []
     setProyecto({
       ...proyecto,
-      descuentos: [...propios, { origen: 'manual', etiqueta: `Descuento ${propios.length + 1}`, pct: 5 }],
+      descuentos: [
+        ...propios,
+        { origen: 'manual', etiqueta: `Descuento ${propios.length + 1}`, pct: 5, quienLoPone: 'Modumex' },
+      ],
     })
   }
 
@@ -1482,7 +1490,7 @@ export default function App() {
       distribuidorId: Number(distribuidores.find((d) => d.nombre === suyo.distribuidor)?.distribuidorId) || null,
       moneda,
       tipoCambio: TC,
-      descuentoPct: usuario?.descuento ?? 0,
+      descuentoPct: descuentoDelDistribuidor(suyo.distribuidor),
       ivaPct: ivaDelDistribuidor(suyo.distribuidor),
       pais: suyo.paisFabricacion,
       modelo: config?.modelo ?? '',
@@ -2776,10 +2784,12 @@ export default function App() {
                     <h4 style={{ margin: '0 0 4px' }}>
                       Descuentos <span className="num">· se aplican en cascada, uno sobre lo que dejó el anterior</span>
                     </h4>
-                    {(usuario.descuento ?? 0) > 0 && (
+                    {descuentoDelDistribuidor(proyecto.distribuidor) > 0 && (
                       <p className="sub" style={{ margin: '0 0 8px' }}>
-                        El de tu ficha de distribuidor ({usuario.descuento}%) va siempre primero y no se edita acá.
-                        Es el único que NO sale en la cotización del cliente.
+                        El de la ficha del distribuidor ({descuentoDelDistribuidor(proyecto.distribuidor)}%) va
+                        siempre primero y no se edita acá. Ese NO sale en la cotización del cliente.
+                        De los extras, los que pone <b>Modumex</b> salen en las dos hojas; los que pone
+                        el <b>Distribuidor</b> solo en la del cliente, porque los da él de su margen.
                       </p>
                     )}
                     {(proyecto.descuentos ?? []).map((d, i) => (
@@ -2798,6 +2808,19 @@ export default function App() {
                             value={d.pct}
                             onChange={(e) => cambiarDescuento(i, { pct: Number(e.target.value) || 0 })}
                           />
+                        </label>
+                        {/* Quién lo pone decide en qué hoja sale: el de Modumex le baja
+                            el costo al distribuidor y va en las dos; el que pone él sale
+                            de su margen y solo va en la del cliente. */}
+                        <label className="campo" style={{ width: 150 }}>
+                          <span>Lo pone</span>
+                          <select
+                            value={d.quienLoPone ?? 'Modumex'}
+                            onChange={(e) => cambiarDescuento(i, { quienLoPone: e.target.value as 'Modumex' | 'Distribuidor' })}
+                          >
+                            <option value="Modumex">Modumex</option>
+                            <option value="Distribuidor">Distribuidor</option>
+                          </select>
                         </label>
                         <button className="btn" style={{ flex: "0 0 auto" }} onClick={() => quitarDescuento(i)}>Quitar</button>
                       </div>

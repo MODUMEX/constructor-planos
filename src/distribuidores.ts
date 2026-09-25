@@ -290,3 +290,21 @@ export function ivaDeDistribuidor(
   if (!d) return porDefecto
   return d.iva != null ? Number(d.iva) : ivaDeRegion(d.region)
 }
+
+/**
+ * El descuento que le toca a un distribuidor.
+ *
+ * Como el IVA, es de la ficha del distribuidor de la COTIZACIÓN y no de quien
+ * la escribe: un vendedor o un admin cotizan para varios, y tomándolo de la
+ * cuenta conectada el descuento del distribuidor no se aplicaba ni aparecía.
+ *
+ * Solo sale en la hoja del DISTRIBUIDOR. Al cliente se le cotiza sin él; a él
+ * solo le llegan los extras que se escriban, en cascada.
+ */
+export function descuentoDeDistribuidor(
+  d: Pick<Distribuidor, 'descuento'> | undefined | null,
+  porDefecto: number,
+): number {
+  if (!d) return porDefecto
+  return Number(d.descuento ?? 0)
+}
