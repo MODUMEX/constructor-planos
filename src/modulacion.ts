@@ -167,6 +167,19 @@ export function modularConCatalogo(
   const normales = cantidad - (conAcc ? 1 : 0) - nMing
   if (normales < 0) return null
 
+  // Hasta que frontera hay pilastra de verdad. Con orinales al final, la
+  // ultima es la que separa la tira de banos del campo; de ahi en adelante
+  // son mamparas de mingitorio, que no salen del catalogo de pilastras.
+  const frontCampo = nMing > 0 ? cantidad - nMing : cantidad
+  const fijable = fijar?.pilastraIndice == null || fijar.pilastraIndice <= frontCampo
+  // Quien llama mira la tira ENTERA para decidir si la pilastra es de punta,
+  // pero el buscador solo ve hasta frontCampo: con orinales al final, o con el
+  // cuarto PMR adelante, la de punta para el no es la misma. Se decide aca, que
+  // es donde se sabe. Sin esto el pedido llegaba como interna, el buscador lo
+  // ignoraba y la pilastra no se movia.
+  const pedidoPil = fijar?.pilInterna ?? fijar?.pilExtremo
+  const dePunta = fijar?.pilastraIndice === 0 || fijar?.pilastraIndice === frontCampo
+
   const m = modularTira({
     claroCm,
     puertas: normales,
@@ -183,21 +196,28 @@ export function modularConCatalogo(
     extremoAbierto,
     puertaFija: fijar?.puerta,
     puertaAccesibleFija: fijar?.puertaAccesible,
-    pilInternaFija: fijar?.pilInterna,
-    pilExtremoFija: fijar?.pilExtremo,
-    pilastraFijaIndice: fijar?.pilastraIndice,
+    pilInternaFija: !fijable ? undefined
+      : fijar?.pilastraIndice == null ? fijar?.pilInterna
+      : dePunta ? undefined : pedidoPil,
+    pilExtremoFija: !fijable ? undefined
+      : fijar?.pilastraIndice == null ? fijar?.pilExtremo
+      : dePunta ? pedidoPil : undefined,
+    pilastraFijaIndice: fijable ? fijar?.pilastraIndice : undefined,
     // La lista del tramo trae una entrada por frontera, incluidas las de
     // mampara entre orinales, que no consumen pilastra: hay que comprimirla a
     // las posiciones que el buscador conoce.
     pilastrasFijas: fijar?.pilastras
       ? (() => {
           const salida: (number | null | undefined)[] = [fijar.pilastras[0]]
-          for (let i = 1; i <= cantidad - 1; i++) {
-            // las fronteras que tocan un orinal no son pilastras del buscador
-            const delCampo = i >= cantidad - nMing
-            if (!delCampo) salida.push(fijar.pilastras[i])
+          // La ULTIMA que conoce es la frontera donde arranca el campo de
+          // orinales -la pilastra lateral de la tira de banos-, NO la punta
+          // de la tira: ahi hay mampara o nada. Pasarle la punta hacia que
+          // elegir a mano la del campo no hiciera nada, y que elegir la de
+          // la punta moviera aquella.
+          for (let i = 1; i < frontCampo; i++) {
+            salida.push(fijar.pilastras[i])
           }
-          salida.push(fijar.pilastras[cantidad])
+          salida.push(fijar.pilastras[frontCampo])
           return salida
         })()
       : undefined,
