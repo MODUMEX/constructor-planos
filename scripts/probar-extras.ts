@@ -26,11 +26,16 @@ for (const c of ['KBDL', 'KU', 'KACE-S3', 'CERRADURA-S1', 'KFP-S3']) {
   )
 }
 
-console.log('\ngrabado láser (no tiene lista de CR: se convierte)')
-for (const c of ['GL03-HPL']) {
+console.log('\ngrabado láser')
+// Los GL0x se cobran por ÁREA grabada y solo están en dólares: en colones se
+// convierten con el tipo de cambio. Los GLP/GLPT/GLMG salen de los COTIZADORES,
+// se cobran por QUÉ PIEZA se graba y sí traen su precio en colones.
+for (const c of ['GL03-HPL', 'GLP', 'GLPT', 'GLMG']) {
   const usd = precioDeExtra(uno(c, 'grabado'), { ...base, moneda: 'USD' })
   const crc = precioDeExtra(uno(c, 'grabado'), { ...base, moneda: 'CRC' })
-  console.log(`  ${c}: USD ${usd.precio} · CRC ${crc.precio.toFixed(2)} (= USD × 512)`)
+  const art = GRABADOS.find((x) => x.codigo === c)
+  const propio = art?.crc != null && Math.abs(crc.precio - art.crc) < 0.01
+  console.log(`  ${c.padEnd(10)} USD ${String(usd.precio).padStart(6)} · CRC ${crc.precio.toFixed(2).padStart(10)}  ${propio ? '(precio de CR del cotizador)' : '(convertido con el tipo de cambio)'}`)
 }
 
 const sinNada = catalogoDe('herraje').filter((a) => a.usd == null && a.crc == null && a.mxn == null)

@@ -1,4 +1,11 @@
 /* GENERADO desde las listas de precios de Costa Rica, LATAM y México — no editar a mano */
+/*
+ * Los tres grabados GLP / GLPT / GLMG NO salen de la lista: salen de los
+ * COTIZADORES de la carpeta COTIZADORES, que es lo que usa el equipo de ventas.
+ * La lista los cobra por ÁREA GRABADA (GL01-HPL en adelante) y los cotizadores
+ * por QUÉ PIEZA se graba. Los colones son los del cotizador de Costa Rica, no
+ * una conversión.
+ */
 
 /**
  * Una pieza suelta con precio POR UNIDAD, no por m².
@@ -1102,6 +1109,27 @@ export const HERRAJES: ArticuloSuelto[] = [
 ]
 
 export const GRABADOS: ArticuloSuelto[] = [
+  {
+    "codigo": "GLP",
+    "descripcion": "GRABADO LÁSER PUERTAS DE ACCESO",
+    "usd": 15,
+    "crc": 7736.84,
+    "mxn": null
+  },
+  {
+    "codigo": "GLPT",
+    "descripcion": "GRABADO LÁSER PUERTA PARTICIÓN",
+    "usd": 17,
+    "crc": 8768.42,
+    "mxn": null
+  },
+  {
+    "codigo": "GLMG",
+    "descripcion": "GRABADO LÁSER PANEL MANGITORIO",
+    "usd": 17,
+    "crc": 8768.42,
+    "mxn": null
+  },
   {
     "codigo": "GL01-HPL",
     "descripcion": "Grabado láser en laminado compacto con área grabada de 100 a 299 cm2",
