@@ -465,21 +465,37 @@ export function reajustarConPuertas(
   })
   if (!r) return null
 
-  // la lista lleva una entrada por frontera: donde va mampara, su grueso
-  const pilastras: number[] = [r.pilastras[0]]
+  // La lista lleva una entrada por frontera: donde va mampara, su grueso.
+  //
+  // Las PUNTAS del campo de orinales no llevan pilastra: llevan la mampara de
+  // cierre, o nada si ese lado topa contra la pared. Poniéndoles la pilastra
+  // que devuelve el buscador —que no sabe del campo— el último orinal se comía
+  // esa pilastra entera y su cota saltaba de 90 a 110 y pico. Lo que había en
+  // esa frontera es lo que vale, así que se conserva.
+  const puntaDeOrinales = (i: number) => cabinas[i]?.tipo === 'orinal'
+  const pilastras: number[] = [
+    puntaDeOrinales(0) ? (pilastrasActuales?.[0] ?? GRUESO_MG_PIEZA) : r.pilastras[0],
+  ]
   let k = 1
   for (let i = 0; i < n - 1; i++) {
     const entreOrinales = cabinas[i].tipo === 'orinal' && cabinas[i + 1].tipo === 'orinal'
     pilastras.push(entreOrinales ? GRUESO_MG_PIEZA : r.pilastras[k++])
   }
-  pilastras.push(r.pilastras[r.pilastras.length - 1])
+  pilastras.push(
+    puntaDeOrinales(n - 1)
+      ? (pilastrasActuales?.[n] ?? GRUESO_MG_PIEZA)
+      : r.pilastras[r.pilastras.length - 1],
+  )
 
   // Con un hueco en la tira, la pilastra que el vendedor clavó a mano se
   // respeta tal cual: lo que cambie de largo se lo come el espacio libre.
   if (libres > 0 && fijas) {
     for (let k = 0; k < pilastras.length; k++) {
       const f = fijas[k]
-      if (f != null && f > 0 && !entreDosOrinales(lugares, k)) pilastras[k] = f
+      // una frontera del campo de orinales no es una pilastra que se pueda
+      // clavar: ahí va mampara, o la de cierre en las puntas
+      const delCampo = entreDosOrinales(lugares, k) || (k === 0 && puntaDeOrinales(0)) || (k === n && puntaDeOrinales(n - 1))
+      if (f != null && f > 0 && !delCampo) pilastras[k] = f
     }
   }
 
