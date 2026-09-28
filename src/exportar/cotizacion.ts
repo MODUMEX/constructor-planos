@@ -60,6 +60,8 @@ export interface Totales {
    * número y se suma después.
    */
   propios: { pct: number; base: number; monta: number }[]
+  /** lo que suman los renglones que NO pasan por la cascada, antes de su descuento */
+  aparte: number
   /** la suma de todos los descuentos, los de la cascada y los propios */
   descuento: number
   gravable: number
@@ -79,7 +81,7 @@ export function totalesDe(renglones: RenglonBOM[], descuentos: Descuento[], ivaP
   // Un renglón con descuento PROPIO —lo normal en herrajes y grabados— se sale
   // de la cascada: ese número reemplaza al general para esa pieza, no se suma
   // encima. El resto sigue igual que siempre.
-  const conPropio = renglones.filter((r) => (r.descuentoPropioPct ?? 0) > 0)
+  const conPropio = renglones.filter((r) => r.descuentoPropioPct != null)
   const porPct = new Map<number, number>()
   for (const r of conPropio) {
     const pct = r.descuentoPropioPct!
@@ -102,7 +104,12 @@ export function totalesDe(renglones: RenglonBOM[], descuentos: Descuento[], ivaP
   }
   const gravable = corriendo + baseConPropio - montaPropia
   const iva = gravable * (ivaPct / 100)
-  return { neto, pasos, propios, descuento: neto - gravable, gravable, iva, total: gravable + iva }
+  return {
+    neto, pasos, propios,
+    aparte: baseConPropio,
+    descuento: neto - gravable,
+    gravable, iva, total: gravable + iva,
+  }
 }
 
 /**
@@ -110,6 +117,11 @@ export function totalesDe(renglones: RenglonBOM[], descuentos: Descuento[], ivaP
  * el propio distribuidor— menos el de la ficha. Ese último es lo que el
  * distribuidor compra, no lo que vende.
  */
+/** lo que se llevan entre todos los descuentos propios */
+export function montaPropiaDe(t: Totales): number {
+  return t.propios.reduce((s, p) => s + p.monta, 0)
+}
+
 export function descuentosDelCliente(descuentos: Descuento[]): Descuento[] {
   return descuentos.filter((d) => d.origen !== 'distribuidor')
 }
@@ -379,6 +391,9 @@ export function generarCotizacionPDF(proyecto: Proyecto, d: DatosCotizacion): js
   }
 
   renglonPlata('Subtotal', plata(t.neto, d.moneda))
+  if (t.aparte > 0) {
+    renglonPlata('Piezas extra con descuento propio', `-${plata(t.aparte, d.moneda)}`)
+  }
   // cada descuento con lo que se lleva y con lo que deja: en cascada, el
   // segundo muerde lo que dejó el primero, así que el desglose importa
   for (const p of t.pasos) {
@@ -386,10 +401,15 @@ export function generarCotizacionPDF(proyecto: Proyecto, d: DatosCotizacion): js
     renglonPlata(`${p.etiqueta} ${p.pct}%`, `-${plata(p.monta, d.moneda)}`)
     renglonPlata('Subtotal', plata(p.subtotal, d.moneda))
   }
-  // los que llevan descuento propio no pasaron por la cascada: se ponen aparte
-  // para que el número del total se pueda seguir a mano
+  // Los que llevan descuento propio no pasan por la cascada. Se restan del neto
+  // antes de ella y se vuelven a sumar después, ya con SU descuento, para que
+  // la cuenta se pueda seguir a mano de arriba abajo.
   for (const p of t.propios) {
-    renglonPlata(`Descuento en piezas extra ${p.pct}%`, `-${plata(p.monta, d.moneda)}`)
+    if (p.pct > 0) renglonPlata(`Descuento en piezas extra ${p.pct}%`, `-${plata(p.monta, d.moneda)}`)
+  }
+  if (t.aparte > 0) {
+    renglonPlata('Piezas extra, ya con su descuento', plata(t.aparte - montaPropiaDe(t), d.moneda))
+    renglonPlata('Subtotal', plata(t.gravable, d.moneda))
   }
   renglonPlata(`IVA ${d.ivaPct}%`, plata(t.iva, d.moneda))
 

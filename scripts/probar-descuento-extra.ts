@@ -52,10 +52,43 @@ console.log('\n— dos herrajes con el mismo porcentaje se agrupan')
   ok(Math.abs(t.iva - t.gravable * 0.13) < 0.01, 'el IVA sale del gravable')
 }
 
-console.log('\n— un descuento propio de 0 o en blanco no cuenta')
+console.log('\n— un 0 es CERO: la pieza no lleva ningún descuento')
 {
   const t = totalesDe([mamparas, { ...herraje, descuentoPropioPct: 0 }], ficha, 0)
-  ok(t.propios.length === 0 && Math.abs(t.gravable - 770) < 0.01, 'se comporta como si no estuviera')
+  ok(Math.abs(t.gravable - 800) < 0.01, 'gravable 700 de mamparas + 100 del herraje sin tocar')
+  ok(t.aparte === 100, 'los 100 del herraje quedan fuera de la cascada')
+}
+
+
+console.log('\n— EL CASO DE MÓNICA: escribir 0 quiere decir CERO, no "el general"')
+{
+  // la cotización real: 7 541 696 de mamparas y 14 grabados GLPT de ₡8 768,42
+  const obra: RenglonBOM = { sku: 'OBRA', descripcion: 'mamparas', tipo: 'Panel', cantidad: 1, precioUnit: 7541696 }
+  const grabado: RenglonBOM = {
+    sku: 'GLPT', descripcion: 'Grabado láser puerta partición', tipo: 'Grabado láser',
+    cantidad: 14, precioUnit: 8768.42, descuentoPropioPct: 0,
+  }
+  const dist: Descuento[] = [{ etiqueta: 'Descuento distribuidor', pct: 25 } as Descuento]
+  const t = totalesDe([obra, grabado], dist, 13)
+  const dinero0 = (n: number) => Math.round(n).toLocaleString('es-CR')
+  console.log(`  Neto                              ${dinero0(t.neto)}`)
+  console.log(`  Piezas extra con descuento propio  -${dinero0(t.aparte)}`)
+  for (const p of t.pasos) console.log(`  ${p.etiqueta} ${p.pct}%        -${dinero0(p.monta)}   →  ${dinero0(p.subtotal)}`)
+  console.log(`  Piezas extra, ya con su descuento   ${dinero0(t.aparte)}`)
+  console.log(`  Subtotal                          ${dinero0(t.gravable)}`)
+  ok(Math.abs(t.neto - 7664454) < 1, 'el neto es 7 664 454')
+  ok(Math.abs(t.pasos[0].monta - 1885424) < 1, 'el 25% muerde solo las mamparas: 1 885 424')
+  ok(Math.abs(t.gravable - 5779030) < 1, 'el subtotal es 5 779 030, como lo esperaba Mónica')
+}
+
+console.log('\n— dejarlo en BLANCO sigue significando "va con el general"')
+{
+  const obra: RenglonBOM = { sku: 'OBRA', descripcion: 'mamparas', tipo: 'Panel', cantidad: 1, precioUnit: 7541696 }
+  const grabado: RenglonBOM = { sku: 'GLPT', descripcion: 'grabado', tipo: 'Grabado láser', cantidad: 14, precioUnit: 8768.42 }
+  const dist: Descuento[] = [{ etiqueta: 'Descuento distribuidor', pct: 25 } as Descuento]
+  const t = totalesDe([obra, grabado], dist, 13)
+  ok(t.aparte === 0, 'nada queda fuera de la cascada')
+  ok(Math.abs(t.gravable - 5748341) < 1, 'el subtotal es 5 748 341: el 25% también le pega al grabado')
 }
 
 console.log(mal === 0 ? '\nTodo cuadra.' : `\n${mal} caso(s) mal.`)

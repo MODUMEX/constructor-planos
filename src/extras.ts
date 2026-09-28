@@ -102,8 +102,11 @@ export function renglonesDeExtras(extras: Extra[], o: OpcionesPrecio): RenglonBO
         tarifaReal: deLista,
         // si la pieza trae su propio descuento, se lo lleva al renglón: la
         // cotización lo saca de la cascada general y le aplica este
-        descuentoPropioPct:
-          x.descuentoPct != null && x.descuentoPct > 0 ? x.descuentoPct : undefined,
+        // Escribir 0 quiere decir CERO por ciento: esta pieza no lleva ningún
+        // descuento. Lo que quiere decir "va con el general" es dejarlo EN
+        // BLANCO. Antes el 0 se trataba como blanco y la pieza terminaba con el
+        // descuento general encima, que es justo lo que se quería evitar.
+        descuentoPropioPct: x.descuentoPct ?? undefined,
       }
     })
 }

@@ -2668,6 +2668,12 @@ export default function App() {
                       </tbody>
                       <tfoot>
                         <tr><td colSpan={5}>Neto</td><td className="der">{money(neto)}</td></tr>
+                        {totales.aparte > 0 && (
+                          <tr>
+                            <td colSpan={5}>Piezas extra con descuento propio</td>
+                            <td className="der">−{money(totales.aparte)}</td>
+                          </tr>
+                        )}
                         {/* la cascada: cada descuento muerde lo que dejó el anterior */}
                         {totales.pasos.map((p, i) => (
                           <Fragment key={`paso-${i}`}>
@@ -2676,12 +2682,24 @@ export default function App() {
                           </Fragment>
                         ))}
                         {/* los que llevan su propio descuento no pasan por la cascada */}
-                        {totales.propios.map((p) => (
+                        {totales.propios.filter((p) => p.pct > 0).map((p) => (
                           <tr key={`propio-${p.pct}`}>
                             <td colSpan={5}>Descuento en piezas extra {p.pct}%</td>
                             <td className="der">−{money(p.monta)}</td>
                           </tr>
                         ))}
+                        {totales.aparte > 0 && (
+                          <>
+                            <tr>
+                              <td colSpan={5}>Piezas extra, ya con su descuento</td>
+                              <td className="der">{money(totales.aparte - totales.propios.reduce((s, p) => s + p.monta, 0))}</td>
+                            </tr>
+                            <tr>
+                              <td colSpan={5} style={{ color: 'var(--text-2)' }}>Subtotal</td>
+                              <td className="der">{money(totales.gravable)}</td>
+                            </tr>
+                          </>
+                        )}
                         <tr><td colSpan={5}>IVA {ivaPorcentaje}%</td><td className="der">{money(iva)}</td></tr>
                         <tr><td colSpan={5}>Total</td><td className="der">{money(total)}</td></tr>
                       </tfoot>
