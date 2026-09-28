@@ -100,6 +100,10 @@ export function renglonesDeExtras(extras: Extra[], o: OpcionesPrecio): RenglonBO
         cantidad: Number(x.cantidad) || 0,
         precioUnit: precio,
         tarifaReal: deLista,
+        // si la pieza trae su propio descuento, se lo lleva al renglón: la
+        // cotización lo saca de la cascada general y le aplica este
+        descuentoPropioPct:
+          x.descuentoPct != null && x.descuentoPct > 0 ? x.descuentoPct : undefined,
       }
     })
 }

@@ -2675,6 +2675,13 @@ export default function App() {
                             <tr><td colSpan={5} style={{ color: 'var(--text-2)' }}>Subtotal</td><td className="der">{money(p.subtotal)}</td></tr>
                           </Fragment>
                         ))}
+                        {/* los que llevan su propio descuento no pasan por la cascada */}
+                        {totales.propios.map((p) => (
+                          <tr key={`propio-${p.pct}`}>
+                            <td colSpan={5}>Descuento en piezas extra {p.pct}%</td>
+                            <td className="der">−{money(p.monta)}</td>
+                          </tr>
+                        ))}
                         <tr><td colSpan={5}>IVA {ivaPorcentaje}%</td><td className="der">{money(iva)}</td></tr>
                         <tr><td colSpan={5}>Total</td><td className="der">{money(total)}</td></tr>
                       </tfoot>
@@ -2762,6 +2769,18 @@ export default function App() {
                               value={x.precioUnit ?? ''}
                               onChange={(e) => cambiarExtra(i, {
                                 precioUnit: e.target.value === '' ? undefined : Number(e.target.value),
+                              })}
+                            />
+                          </label>
+                          <label className="campo" style={{ width: 110 }}>
+                            <span>Descuento %</span>
+                            <input
+                              className="celda-precio num" type="number" min={0} max={100} step="0.5"
+                              placeholder="general"
+                              title="Los herrajes y los grabados casi nunca llevan el mismo descuento que las mamparas. Si lo escribís, manda para esta pieza; en blanco va con el descuento general."
+                              value={x.descuentoPct ?? ''}
+                              onChange={(e) => cambiarExtra(i, {
+                                descuentoPct: e.target.value === '' ? undefined : Number(e.target.value),
                               })}
                             />
                           </label>

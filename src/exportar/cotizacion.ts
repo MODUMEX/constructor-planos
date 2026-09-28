@@ -54,7 +54,13 @@ export interface Totales {
   neto: number
   /** cada descuento, en cascada, con lo que se llevó y lo que dejó */
   pasos: PasoDescuento[]
-  /** la suma de todos los descuentos */
+  /**
+   * Los renglones que llevan descuento PROPIO —herrajes, grabados—, agrupados
+   * por porcentaje. No entran en la cascada: cada uno se descuenta con su
+   * número y se suma después.
+   */
+  propios: { pct: number; base: number; monta: number }[]
+  /** la suma de todos los descuentos, los de la cascada y los propios */
   descuento: number
   gravable: number
   iva: number
@@ -69,8 +75,24 @@ export interface Totales {
  */
 export function totalesDe(renglones: RenglonBOM[], descuentos: Descuento[], ivaPct: number): Totales {
   const neto = renglones.reduce((s, r) => s + r.cantidad * r.precioUnit, 0)
+
+  // Un renglón con descuento PROPIO —lo normal en herrajes y grabados— se sale
+  // de la cascada: ese número reemplaza al general para esa pieza, no se suma
+  // encima. El resto sigue igual que siempre.
+  const conPropio = renglones.filter((r) => (r.descuentoPropioPct ?? 0) > 0)
+  const porPct = new Map<number, number>()
+  for (const r of conPropio) {
+    const pct = r.descuentoPropioPct!
+    porPct.set(pct, (porPct.get(pct) ?? 0) + r.cantidad * r.precioUnit)
+  }
+  const propios = [...porPct.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([pct, base]) => ({ pct, base, monta: base * (pct / 100) }))
+  const baseConPropio = propios.reduce((s, p) => s + p.base, 0)
+  const montaPropia = propios.reduce((s, p) => s + p.monta, 0)
+
   const pasos: PasoDescuento[] = []
-  let corriendo = neto
+  let corriendo = neto - baseConPropio
   for (const d of descuentos) {
     const pct = Number(d.pct) || 0
     if (pct <= 0) continue
@@ -78,9 +100,9 @@ export function totalesDe(renglones: RenglonBOM[], descuentos: Descuento[], ivaP
     corriendo -= monta
     pasos.push({ etiqueta: d.etiqueta, pct, monta, subtotal: corriendo })
   }
-  const gravable = corriendo
+  const gravable = corriendo + baseConPropio - montaPropia
   const iva = gravable * (ivaPct / 100)
-  return { neto, pasos, descuento: neto - gravable, gravable, iva, total: gravable + iva }
+  return { neto, pasos, propios, descuento: neto - gravable, gravable, iva, total: gravable + iva }
 }
 
 /**
@@ -363,6 +385,11 @@ export function generarCotizacionPDF(proyecto: Proyecto, d: DatosCotizacion): js
     // guion normal, no el signo menos largo: ese tampoco está en WinAnsi
     renglonPlata(`${p.etiqueta} ${p.pct}%`, `-${plata(p.monta, d.moneda)}`)
     renglonPlata('Subtotal', plata(p.subtotal, d.moneda))
+  }
+  // los que llevan descuento propio no pasaron por la cascada: se ponen aparte
+  // para que el número del total se pueda seguir a mano
+  for (const p of t.propios) {
+    renglonPlata(`Descuento en piezas extra ${p.pct}%`, `-${plata(p.monta, d.moneda)}`)
   }
   renglonPlata(`IVA ${d.ivaPct}%`, plata(t.iva, d.moneda))
 

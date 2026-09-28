@@ -310,6 +310,14 @@ export interface Extra {
   anchoCm?: number
   altoCm?: number
   precioUnit?: number
+  /**
+   * El descuento de ESTA pieza, en por ciento.
+   *
+   * Los herrajes y los grabados casi nunca llevan el mismo descuento que las
+   * mamparas. Si se escribe, manda para este renglón y reemplaza al general;
+   * si se deja en blanco, va con el general como cualquier otra pieza.
+   */
+  descuentoPct?: number
 }
 
 export interface Proyecto {
@@ -336,4 +344,9 @@ export interface RenglonBOM {
   precioUnit: number
   /** true si el precio salió de la tabla de tarifas por m² */
   tarifaReal?: boolean
+  /**
+   * El descuento propio de este renglón, en por ciento. Si viene, el renglón
+   * NO entra en la cascada general: se descuenta solo con este número.
+   */
+  descuentoPropioPct?: number
 }
