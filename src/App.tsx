@@ -1034,6 +1034,7 @@ export default function App() {
       },
       {
         accesible: llevaAccesible,
+        profundidadCm: config.profundidadCm,
         anchoAccesibleMinCm: anchoAccesibleDe(config),
         // el cuarto PMR no negocia su ancho, tampoco al volver a modular
         cuartoPmrCm: config.tipologia === 'PMR' && llevaAccesible ? anchoAccesibleDe(config) : 0,
@@ -1117,6 +1118,7 @@ export default function App() {
       },
       {
         accesible: llevaAccesible,
+        profundidadCm: config.profundidadCm,
         anchoAccesibleMinCm: anchoAccesibleDe(config),
         // el cuarto PMR no negocia su ancho, tampoco al volver a modular
         cuartoPmrCm: config.tipologia === 'PMR' && llevaAccesible ? anchoAccesibleDe(config) : 0,

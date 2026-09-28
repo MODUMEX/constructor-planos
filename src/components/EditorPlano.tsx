@@ -421,7 +421,7 @@ export default function EditorPlano({
     if (nuevoAncho < minimoDe(vecina)) return
     const copia = [...t.cabinas]
     copia[indice] = { ...vecina, anchoCm: nuevoAncho, puerta: { ...vecina.puerta, anchoCm: puertaSugerida(nuevoAncho) } }
-    copia.splice(indice + 1, 0, nuevaCabina(snap(vecina.anchoCm - nuevoAncho)))
+    copia.splice(indice + 1, 0, nuevaCabina(snap(vecina.anchoCm - nuevoAncho), 'normal', config.profundidadCm))
     onCabinas(tramoId, copia)
   }
 

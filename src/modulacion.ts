@@ -34,14 +34,39 @@ export function puertaSugerida(anchoCm: number, pais: Pais = 'CR'): number {
   return posibles.length ? posibles[posibles.length - 1] : lista[0]
 }
 
-export function nuevaCabina(anchoCm: number, tipo: Cabina['tipo'] = 'normal'): Cabina {
+/**
+ * A partir de qué medida de PANEL la puerta puede abrir hacia adentro.
+ *
+ * Es una regla de fabricación: con un panel más corto, la hoja abierta no cabe
+ * dentro de la cabina. De 135 para arriba sí cabe, y ahí abrir hacia adentro es
+ * lo que se pide casi siempre, porque la puerta no invade el pasillo.
+ */
+export const PANEL_MIN_ADENTRO_CM = 135
+
+/**
+ * Hacia dónde abre la puerta de una cabina recién armada.
+ *
+ * Lo decide el PANEL —el divisor, o sea el fondo de la cabina—, no el ancho de
+ * la cabina. Antes se comparaba el ancho contra 135 y, como una cabina normal
+ * mide 70 u 80, TODAS salían abriendo hacia afuera aunque el fondo fuera de 150.
+ */
+export function aperturaPorDefecto(panelCm: number | undefined): Cabina['puerta']['apertura'] {
+  return (panelCm ?? 0) >= PANEL_MIN_ADENTRO_CM ? 'adentro' : 'afuera'
+}
+
+export function nuevaCabina(
+  anchoCm: number,
+  tipo: Cabina['tipo'] = 'normal',
+  /** el panel de la cabina, que es lo que decide si la puerta puede abrir adentro */
+  panelCm?: number,
+): Cabina {
   return {
     id: nuevoId('cab'),
     anchoCm: snap(anchoCm),
     tipo,
     puerta: {
       anchoCm: puertaSugerida(anchoCm),
-      apertura: anchoCm < 135 ? 'afuera' : 'adentro',
+      apertura: aperturaPorDefecto(panelCm),
       mano: 'der',
       tipo: 'puerta',
     },
@@ -100,6 +125,8 @@ export function modularConCatalogo(
     pais?: Pais
     /** el modelo, para que las piezas especiales que tenga entren en la tira */
     modelo?: string
+    /** el panel de las cabinas: decide hacia dónde abre la puerta por defecto */
+    profundidadCm?: number
   },
 ): { cabinas: Cabina[]; pilastras: number[]; canaletaCm: number; ajuste: Tramo['ajuste']; mensaje: string; avisoAccesible?: string } | null {
   // ------------------------------------------------------------------
@@ -113,7 +140,7 @@ export function modularConCatalogo(
   // ------------------------------------------------------------------
   const cuartoCm = extra?.cuartoPmrCm ?? 0
   if (cuartoCm > 0) {
-    const cuarto = nuevaCabina(cuartoCm, 'accesible')
+    const cuarto = nuevaCabina(cuartoCm, 'accesible', extra?.profundidadCm)
     if (fijar?.puertaAccesible) {
       cuarto.puerta = { ...cuarto.puerta, anchoCm: fijar.puertaAccesible }
     }
@@ -265,7 +292,7 @@ export function modularConCatalogo(
     const cuerpo = esOrinal
       ? (m.anchosOrinal?.[i - (cantidad - nMing)] ?? m.anchoOrinal ?? anchoOrinal)
       : puerta
-    const c = nuevaCabina(izq + cuerpo + der, esAcc ? 'accesible' : esOrinal ? 'orinal' : 'normal')
+    const c = nuevaCabina(izq + cuerpo + der, esAcc ? 'accesible' : esOrinal ? 'orinal' : 'normal', extra?.profundidadCm)
     if (esOrinal) c.puerta = { ...c.puerta, tipo: 'ninguna' }
     else c.puerta.anchoCm = puerta
     cabinas.push(c)
@@ -311,16 +338,22 @@ export function anchoAccesibleDe(config: Config): number {
   return config.anchoAccesibleCm
 }
 
-export function modular(claroCm: number, cantidad: number, anchoAccesibleCm = 0): Cabina[] {
+export function modular(
+  claroCm: number,
+  cantidad: number,
+  anchoAccesibleCm = 0,
+  /** el panel de las cabinas: decide hacia dónde abre la puerta por defecto */
+  profundidadCm?: number,
+): Cabina[] {
   if (cantidad <= 0) return []
   const conAccesible = anchoAccesibleCm > 0
   const resto = conAccesible ? claroCm - anchoAccesibleCm : claroCm
   const normales = conAccesible ? cantidad - 1 : cantidad
   const cabinas: Cabina[] = []
-  if (conAccesible) cabinas.push(nuevaCabina(anchoAccesibleCm, 'accesible'))
+  if (conAccesible) cabinas.push(nuevaCabina(anchoAccesibleCm, 'accesible', profundidadCm))
   if (normales > 0) {
     const base = snap(resto / normales)
-    for (let i = 0; i < normales; i++) cabinas.push(nuevaCabina(base))
+    for (let i = 0; i < normales; i++) cabinas.push(nuevaCabina(base, 'normal', profundidadCm))
     // la última absorbe el redondeo para que el total cierre exacto
     const sobra = snap(claroCm - anchoTotal(cabinas))
     const ultima = cabinas[cabinas.length - 1]
@@ -880,6 +913,7 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
     // puede mover las pilastras. Es la regla del negocio, no una preferencia.
     const conCatalogo = modularConCatalogo(claroTramo, soloOrinales ? cant : total, murosConPilastra, muros < 2, { puerta: config.puertaCm, puertaAccesible: config.puertaAccesibleCm }, {
       modelo: config.modelo,
+      profundidadCm: config.profundidadCm,
       accesible: conAccesible && esPrincipal,
       sinPilastraInicio,
       anchoAccesibleMinCm: anchoAccesibleDe(config),
@@ -898,7 +932,7 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
         ...base,
         cabinas: soloOrinales
           ? orinales(cant)
-          : modular(claroTramo, cant, conAccesible && esPrincipal ? anchoAccesibleDe(config) : 0),
+          : modular(claroTramo, cant, conAccesible && esPrincipal ? anchoAccesibleDe(config) : 0, config.profundidadCm),
       }
     }
     return {
