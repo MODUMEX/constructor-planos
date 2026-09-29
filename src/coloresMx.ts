@@ -18,8 +18,7 @@ export type { ColorMX }
  * LEEDER y Grupo 1 en Superior 2.0, así que el grupo se pregunta siempre con la
  * línea en la mano.
  *
- * Lo que no cae en ningún grupo es especial: la lista dice que los Especiales
- * son "todos los colores de Wilsonart y Lamitech", o sea todo lo demás.
+ * Lo que no cae en ningún grupo es especial: así lo dice la lista de precios.
  *
  * Se compara por expresión regular porque los nombres de la lista de materia
  * prima no coinciden letra por letra con los de la lista de precios: ahí dice
@@ -143,6 +142,9 @@ export function descontinuadosMx(): ColorMX[] {
   return COLORES_MX.filter((c) => c.descontinuado)
 }
 
-export function proveedoresMx(colores: ColorMX[]): string[] {
-  return [...new Set(colores.map((c) => c.proveedor))].sort()
-}
+/**
+ * De quién compramos cada material NO viaja en la aplicación: se sacó de los
+ * datos, no solo de la pantalla. Lo mismo el código de materia prima y la
+ * medida de lámina, que quedaron solo donde hacen falta —el CSV del CIP y la
+ * columna `cp` de la base—, porque son de adentro de Modumex.
+ */

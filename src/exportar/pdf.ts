@@ -1100,9 +1100,10 @@ function cajetin(doc: jsPDF, proyecto: Proyecto, area: Area, hoja: number, hojas
   campo(1, 2, 'TIPOLOGÍA', tipologia(area.config.tipologia).nombre, 66)
 
   campo(2, 0, 'LÍNEA / MODELO', `${nombreLinea(area.config.linea)} · ${modeloParaCsv(area.config)}`, 52)
-  // el código de materia prima solo lo llevan los colores de México
-  const codigo = area.config.colorCodigo ? ` (${area.config.colorCodigo})` : ''
-  campo(2, 1, 'ACABADO / COLOR', `${area.config.acabado} · ${area.config.color}${codigo}`, 52)
+  // El código de materia prima NO va al plano: es de adentro de Modumex y el
+  // plano lo ve el distribuidor. Se sigue guardando y viaja en el CSV del CIP,
+  // que es donde de verdad hace falta.
+  campo(2, 1, 'ACABADO / COLOR', `${area.config.acabado} · ${area.config.color}`, 52)
   // en un área de orinales el fondo que manda es el de la mampara, no el de la cabina
   const soloOrinales = area.tramos.every((t) => t.cabinas.length > 0 && t.cabinas.every((c) => c.tipo === 'orinal'))
   const profCajetin = soloOrinales ? PROF_ORINAL_CM : area.config.profundidadCm

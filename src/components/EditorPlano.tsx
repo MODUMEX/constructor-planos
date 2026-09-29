@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Cabina, Config, Pais, Tramo } from '../types'
 import { anchosPanelFabrica, anchosPilastra, esEspecial, esVariacionPanel, familiaDelFrente, medidasDeFrente, puertasPosibles, tipologia } from '../catalog'
 import { anchoTotal, arrancaElCuartoPmr, esEspacioLibre, minimoDe, nuevaCabina, pilastrasParaAncho, profundidadAccesible, puertaSugerida, snap, cierraConMingitorio, ladosDeCabina, lugaresDe, mamparaEn } from '../modulacion'
@@ -12,18 +12,25 @@ import {
 } from '../geometria'
 import { ALTO_ORINAL_CM, ALTO_REGADERA_CM, ALTO_WC_CM, ORINAL, REGADERA, WC } from '../assets/sanitarios'
 
-/** medio alto de la zona invisible para agarrar una pilastra, en cm de plano */
-const AGARRE_CM = 9
 /**
- * Lo más angosta que puede ser la zona para agarrar una pilastra, en cm de
- * dibujo.
+ * La zona invisible para agarrar una pilastra, EN PÍXELES DE PANTALLA.
  *
- * La zona valía lo mismo que la pieza, así que una pilastra de 10 cm dejaba
- * unos 16 píxeles para acertarle y en la práctica no se podía mover. Se
- * ensancha hacia los dos lados sin tocar el dibujo: la pieza se sigue viendo
- * con su medida de verdad.
+ * Antes se medía en centímetros de plano, y eso es justo lo que no funciona:
+ * en un baño chico sobraba y en uno de doce metros la misma medida quedaba en
+ * ocho píxeles, imposible de acertar. Pedida en píxeles, la zona resulta igual
+ * de cómoda en cualquier plano.
+ *
+ * 30 × 44 es lo que recomienda cualquier guía de interfaz para algo que se
+ * arrastra con el dedo o con el mouse.
  */
-const AGARRE_ANCHO_CM = 24
+const AGARRE_ANCHO_PX = 30
+const AGARRE_ALTO_PX = 44
+/**
+ * Lo más ancha que puede ser la zona, en proporción a lo que hay hasta la
+ * pilastra vecina. Sin esto, en una tira de cabinas angostas las zonas se
+ * pisan entre ellas y se termina agarrando la que no es.
+ */
+const AGARRE_MAX_VECINA = 0.9
 
 /**
  * Lo más delgada que se dibuja una pieza, en píxeles. El grueso de verdad son
@@ -96,6 +103,8 @@ interface Props {
 type MenuEstado =
   | { tipo: 'cabina'; tramoId: string; indice: number; x: number; y: number }
   | { tipo: 'panel'; tramoId: string; indice: number; x: number; y: number }
+  // el índice de una pilastra es el de su FRONTERA: de 0 a la cantidad de cabinas
+  | { tipo: 'pilastra'; tramoId: string; indice: number; x: number; y: number }
   | null
 
 export default function EditorPlano({
@@ -117,6 +126,21 @@ export default function EditorPlano({
   onOrinal,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
+  /**
+   * Cuántos píxeles de pantalla mide el plano. Hace falta para que la zona de
+   * agarre de las pilastras sea siempre del mismo tamaño para la mano, sin
+   * importar si el claro son tres metros o doce.
+   */
+  const [anchoPx, setAnchoPx] = useState(0)
+  /**
+   * Qué pieza tiene el puntero encima.
+   *
+   * Las zonas de agarre son invisibles y más grandes que la pieza, así que sin
+   * esto no hay forma de saber si se le está apuntando a la pilastra correcta
+   * hasta que ya se movió. Iluminarla antes de tocarla es la diferencia entre
+   * apuntar y adivinar.
+   */
+  const [sobre, setSobre] = useState<string | null>(null)
   const [menu, setMenu] = useState<MenuEstado>(null)
   const [arrastrando, setArrastrando] = useState<string | null>(null)
   // lo que se está escribiendo en una cota: se aplica al salir del campo o con
@@ -169,6 +193,19 @@ export default function EditorPlano({
    * por encima del muro de fondo. Con 62 quedaba justo afuera del recorte y el
    * número salía cortado por arriba.
    */
+  // El plano se estira con la ventana, así que hay que volver a medirlo: la
+  // zona de agarre se calcula con esta medida.
+  useEffect(() => {
+    const svg = svgRef.current
+    if (!svg) return
+    const medir = () => setAnchoPx(svg.getBoundingClientRect().width)
+    medir()
+    if (typeof ResizeObserver === 'undefined') return
+    const obs = new ResizeObserver(medir)
+    obs.observe(svg)
+    return () => obs.disconnect()
+  }, [])
+
   const caja = useMemo(
     () => cajaDelPlano(tramos, marcos, prof, 92, profPmr),
     [tramos, marcos, prof, profPmr],
@@ -446,6 +483,17 @@ export default function EditorPlano({
     onCabinas(tramoId, copia)
   }
 
+  /**
+   * Cuántos centímetros de plano mide un píxel de pantalla. Con esto las zonas
+   * de agarre se piden en píxeles y quedan igual de cómodas en cualquier plano.
+   */
+  // Hasta que el observador mide, se supone un plano de mil píxeles: sin esto
+  // las zonas de agarre quedarían en cero en el primer dibujo y por un instante
+  // no se podría agarrar nada.
+  const cmPorPx = caja.w / (anchoPx > 0 ? anchoPx : 1000)
+  /** ancho de la zona para agarrar un PANEL, en cm de plano */
+  const anchoAgarre = Math.max(14, AGARRE_ANCHO_PX * cmPorPx)
+
   const unidadTxt = unidad === 'cm' ? ' cm' : ''
 
   return (
@@ -682,7 +730,8 @@ export default function EditorPlano({
                       const profDiv = profundidadDeDivisor(tramo, i, prof, mamparaEn(tramo, config, i)?.anchoCm)
                       const a = pt(m, u1 - grueso / 2, 0)
                       const b = pt(m, u1 + grueso / 2, profDiv)
-                      const activo = arrastrando === `${tramo.id}:${i}`
+                      const clavePanel = `${tramo.id}:${i}`
+                      const activo = arrastrando === clavePanel || sobre === clavePanel
                       return (
                         <g>
                           {cuarto?.indice !== i && (
@@ -692,15 +741,20 @@ export default function EditorPlano({
                               fill={activo ? '#2e6fd9' : '#22303f'}
                             />
                           )}
-                          {/* zona de agarre, más ancha que la pieza */}
+                          {/* La zona de agarre, más ancha que la pieza. Se pide en
+                              PÍXELES: el panel se dibuja con el espesor del material
+                              —poco más de un centímetro— y en un plano grande eso no
+                              llega ni a dos píxeles. */}
                           <rect
-                            x={horizontal ? Math.min(a.x, b.x) - 6 : Math.min(a.x, b.x)}
-                            y={horizontal ? Math.min(a.y, b.y) : Math.min(a.y, b.y) - 6}
-                            width={horizontal ? 14 : Math.abs(b.x - a.x)}
-                            height={horizontal ? Math.abs(b.y - a.y) : 14}
+                            x={horizontal ? Math.min(a.x, b.x) - anchoAgarre / 2 : Math.min(a.x, b.x)}
+                            y={horizontal ? Math.min(a.y, b.y) : Math.min(a.y, b.y) - anchoAgarre / 2}
+                            width={horizontal ? anchoAgarre : Math.abs(b.x - a.x)}
+                            height={horizontal ? Math.abs(b.y - a.y) : anchoAgarre}
                             fill="transparent"
                             style={{ cursor: horizontal ? 'col-resize' : 'row-resize' }}
                             onPointerDown={(e) => empezarArrastre(e, tramo, i, m)}
+                            onPointerEnter={() => setSobre(clavePanel)}
+                            onPointerLeave={() => setSobre((x) => (x === clavePanel ? null : x))}
                             onContextMenu={(e) => {
                               e.preventDefault(); e.stopPropagation()
                               setMenu({ tipo: 'panel', tramoId: tramo.id, indice: i, x: e.clientX, y: e.clientY })
@@ -867,13 +921,23 @@ export default function EditorPlano({
                       const a = pt(m, centro - ancho / 2, prof - grueso)
                       const b = pt(m, centro + ancho / 2, prof)
                       const extremo = k === 0 || k === cortes.length - 1
-                      const activa = arrastrando === `pil:${tramo.id}:${k}`
+                      const clave = `pil:${tramo.id}:${k}`
+                      const activa = arrastrando === clave || sobre === clave
                       // En planta la pilastra es una tira del grueso del material: en
                       // pantalla quedan 3 o 4 píxeles, imposibles de agarrar. Por eso
                       // encima va una zona de agarre invisible, mucho más alta.
-                      const agarre = Math.max(ancho, AGARRE_ANCHO_CM)
-                      const g0 = pt(m, centro - agarre / 2, prof - AGARRE_CM)
-                      const g1 = pt(m, centro + agarre / 2, prof + AGARRE_CM)
+                      // De píxeles a centímetros de plano, para que la zona mida lo
+                      // mismo en la mano en cualquier escala. Y nunca más de lo que
+                      // hay hasta la vecina, o se pisarían entre ellas.
+                      const hastaVecina = Math.min(
+                        k > 0 ? cortes[k] - cortes[k - 1] : Infinity,
+                        k < cortes.length - 1 ? cortes[k + 1] - cortes[k] : Infinity,
+                      )
+                      const tope = Number.isFinite(hastaVecina) ? hastaVecina * AGARRE_MAX_VECINA : Infinity
+                      const agarre = Math.min(Math.max(ancho, AGARRE_ANCHO_PX * cmPorPx), tope)
+                      const altoAgarre = AGARRE_ALTO_PX * cmPorPx
+                      const g0 = pt(m, centro - agarre / 2, prof - altoAgarre / 2)
+                      const g1 = pt(m, centro + agarre / 2, prof + altoAgarre / 2)
                       const cursor = horizontal ? 'ew-resize' : 'ns-resize'
                       return (
                         <g key={k}>
@@ -888,8 +952,14 @@ export default function EditorPlano({
                             width={Math.max(Math.abs(g1.x - g0.x), 8)} height={Math.max(Math.abs(g1.y - g0.y), 8)}
                             fill="transparent" pointerEvents="auto" style={{ cursor }}
                             onPointerDown={(e) => empezarArrastrePilastra(e, tramo, k, m, ancho, extremo)}
+                            onPointerEnter={() => setSobre(clave)}
+                            onPointerLeave={() => setSobre((x) => (x === clave ? null : x))}
+                            onContextMenu={(e) => {
+                              e.preventDefault(); e.stopPropagation()
+                              setMenu({ tipo: 'pilastra', tramoId: tramo.id, indice: k, x: e.clientX, y: e.clientY })
+                            }}
                           >
-                            <title>{`Pilastra ${ancho} cm — arrastra para cambiar la medida`}</title>
+                            <title>{`Pilastra ${ancho} cm — arrastrala, o clic derecho para elegir la medida`}</title>
                           </rect>
                           {verCotas && (
                             <text
@@ -1314,6 +1384,61 @@ export default function EditorPlano({
             >
               Reforzado para barra de apoyo
             </Item>
+          </Menu>
+        )
+      })()}
+
+      {/* ------------------------------------------------------------------
+          Menú de una PILASTRA.
+
+          Arrastrar está bien para tantear, pero cuando la pilastra mide 10 o
+          17 cm no hay forma de acertarle, y las de las puntas ni siquiera
+          tenían menú: el del panel solo existe entre dos cabinas. Acá se
+          elige la medida de una lista y listo.
+          ------------------------------------------------------------------ */}
+      {menu && menu.tipo === 'pilastra' && (() => {
+        const t = tramoPorId(menu.tramoId)
+        if (!t) return null
+        const k = menu.indice
+        const n = t.cabinas.length
+        const cerrar = () => setMenu(null)
+        const actual = t.pilastras?.[k] ?? config.anchoPilastraCm
+        const extremo = k === 0 || k === n
+        const medidas = medidasDeFrente(config.modelo)
+        // En las puntas entra CUALQUIER pilastra del catálogo: hay planos que
+        // cierran con una ancha de relleno. Adentro, las de siempre.
+        const pilastras = medidas.filter(
+          (m) => m.familia === 'PL' &&
+            (extremo || PILASTRAS_INTERNAS.includes(m.anchoCm) ||
+             esEspecial('PL', m.anchoCm, config.modelo) || m.anchoCm === actual),
+        )
+        const paneles = medidas.filter((m) => m.familia === 'PN')
+        const donde = k === 0 ? 'de arranque' : k === n ? 'de cierre' : `entre ${k} y ${k + 1}`
+        const boton = (m: { anchoCm: number; familia: 'PL' | 'PN' }) => (
+          <button
+            key={m.familia + m.anchoCm}
+            className={actual === m.anchoCm ? 'on' : ''}
+            title={m.familia === 'PN' ? `Panel de relleno de ${m.anchoCm} cm` : `Pilastra de ${m.anchoCm} cm`}
+            onClick={() => { onPilastra(menu.tramoId, k, m.anchoCm); cerrar() }}
+            type="button"
+          >
+            {m.anchoCm}
+          </button>
+        )
+        return (
+          <Menu
+            pos={{ x: menu.x, y: menu.y }}
+            titulo={`Pilastra ${donde}`}
+            detalle={formatear(actual, unidad) + unidadTxt}
+            onCerrar={cerrar}
+          >
+            <Grupo>Medida de la pilastra</Grupo>
+            <div className="anchos">{pilastras.map(boton)}</div>
+            <Grupo>…y de {Math.max(...medidas.filter((m) => m.familia === 'PL').map((m) => m.anchoCm))} para arriba, panel</Grupo>
+            <div className="anchos">{paneles.map(boton)}</div>
+            <div className="nota-menu">
+              La diferencia la absorbe la pilastra de al lado; el resto de la tira no se mueve.
+            </div>
           </Menu>
         )
       })()}

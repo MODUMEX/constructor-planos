@@ -1,8 +1,6 @@
 import { useMemo } from 'react'
 import type { Linea } from '../types'
-import {
-  claveMx, coloresMxPara, descontinuadosMx, espesorDeLinea, proveedoresMx, type ColorMX,
-} from '../coloresMx'
+import { claveMx, coloresMxPara, descontinuadosMx, espesorDeLinea, type ColorMX } from '../coloresMx'
 
 /**
  * Lista de colores de la planta de México: la materia prima real, con su
@@ -33,32 +31,27 @@ export default function ColoresMexico({
         Color · lista de México · {espesorDeLinea(linea)} mm
       </h4>
       <p className="sub" style={{ marginTop: 0, marginBottom: 16 }}>
-        {lista.length} colores de línea con código, los de {espesorDeLinea(linea)} mm, que son los que le
-        corresponden a {linea === 'SUPERIOR' ? 'Superior 2.0' : linea === 'TOUCHLESS' ? 'Touchless S3' : 'LEEDER'}.
+        {lista.length} colores de línea, los que le corresponden a{' '}
+        {linea === 'SUPERIOR' ? 'Superior 2.0' : linea === 'TOUCHLESS' ? 'Touchless S3' : 'LEEDER'}.
       </p>
 
-      {proveedoresMx(lista).map((proveedor) => (
-        <div key={proveedor} style={{ marginBottom: 16 }}>
-          <h5 className="proveedor">{proveedor}</h5>
-          <div className="colores-mx">
-            {lista
-              .filter((c) => c.proveedor === proveedor)
-              .map((c) => (
-                <button
-                  key={claveMx(c)}
-                  className={`color-mx ${color === c.color ? 'sel' : ''}`}
-                  onClick={() => onElegir(c)}
-                  type="button"
-                >
-                  <b>{c.color}</b>
-                  <span className="cod">{c.codigoBase}</span>
-                  <span className="medidas">{c.presentaciones.map((p) => p.medida).join(' · ')}</span>
-                  {c.reservado && <span className="reservado">{c.reservado}</span>}
-                </button>
-              ))}
-          </div>
-        </div>
-      ))}
+      {/* Solo el NOMBRE del color.
+          Quién nos vende el material, con qué código lo compramos y en qué
+          medida de lámina llega son datos de adentro de Modumex: el
+          distribuidor elige un color, no una materia prima. */}
+      <div className="colores-mx">
+        {lista.map((c) => (
+          <button
+            key={claveMx(c)}
+            className={`color-mx ${color === c.color ? 'sel' : ''}`}
+            onClick={() => onElegir(c)}
+            type="button"
+          >
+            <b>{c.color}</b>
+            {c.reservado && <span className="reservado">{c.reservado}</span>}
+          </button>
+        ))}
+      </div>
 
       <div className="aviso-caja" style={{ maxWidth: 720, marginTop: 6 }}>
         <b>Lo que dice la lista original</b>

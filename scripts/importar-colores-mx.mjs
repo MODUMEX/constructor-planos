@@ -133,27 +133,40 @@ const lista = [...porClave.values()].sort(
   (a, b) => a.proveedor.localeCompare(b.proveedor) || a.color.localeCompare(b.color) || (a.espesorMm ?? 99) - (b.espesorMm ?? 99),
 )
 
+// El PROVEEDOR y las PRESENTACIONES se usan acá para ordenar y para sacar el
+// tronco del código, pero NO se escriben: de quién compramos, con qué código y
+// en qué medida de lámina llega son datos de adentro de Modumex, y este archivo
+// viaja entero en la aplicación que usa el distribuidor.
+const publica = lista.map(({ proveedor, presentaciones, ...resto }) => {
+  void proveedor
+  void presentaciones
+  return resto
+})
+
 const ts = `/* GENERADO por scripts/importar-colores-mx.mjs — no editar a mano */
 
-/** un color de la lista de materia prima de la planta de México */
+/**
+ * Un color de la lista de materia prima de la planta de México.
+ *
+ * De quién se compra el material, con qué código y en qué medida de lámina
+ * llega NO están acá a propósito: son datos de adentro de Modumex. Lo único que
+ * sobrevive es el \`codigoBase\`, porque es lo que el CSV le pasa al CIP.
+ */
 export interface ColorMX {
-  proveedor: string
   color: string
   /** como viene en la lista: 3mm, 6mm, 9mm, 12mm o EX2 */
   espesor: string
   /** el mismo espesor en número; null en EX2, que no es un espesor simple */
   espesorMm: number | null
-  /** el tronco del código, sin el sufijo de la medida de lámina */
+  /** el tronco del código de materia prima; solo se usa para el CSV del CIP */
   codigoBase: string
-  /** cada medida de lámina tiene su propio código y su propia nota */
-  presentaciones: { codigo: string; medida: string; nota?: string }[]
   /** ya no se consigue: viene de los comentarios de la hoja */
   descontinuado?: boolean
   /** apartado para un cliente o de uso restringido; el texto dice para quién */
   reservado?: string
 }
 
-export const COLORES_MX: ColorMX[] = ${JSON.stringify(lista, null, 2)}
+export const COLORES_MX: ColorMX[] = ${JSON.stringify(publica, null, 2)}
 `
 writeFileSync(join(RAIZ, 'src', 'datos', 'colores-mx.ts'), ts, 'utf8')
 

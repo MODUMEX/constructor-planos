@@ -30,8 +30,9 @@ import { contarSolicitudes } from './solicitudes'
 import { coloresMxPara, slugRenderMx } from './coloresMx'
 import { fotoDe, fotosHerraje, faltanFotosHerraje, terminacionesDe } from './renders'
 import {
-  anchoAccesibleDe, anchoTotal, bom, claroDeOrinales, crearTramos, esEspacioLibre, frenteAccesible,
-  invertirTramo, modularConCatalogo, nuevoId, pedidoDeModulacion, reajustarConPuertas, recesoDe,
+  anchoAccesibleDe, anchoTotal, bom, claroDeOrinales, compensarPilastra, crearTramos, esEspacioLibre,
+  frenteAccesible, invertirTramo, modularConCatalogo, nuevoId, pedidoDeModulacion, reajustarConPuertas,
+  recesoDe,
 } from './modulacion'
 import { anchoDeOrinal } from './geometria'
 import { cargarTarifas, type ResultadoTarifas } from './tarifas'
@@ -1160,6 +1161,27 @@ export default function App() {
     if (t.cabinas.some(esEspacioLibre)) {
       repartirConLibre(t, t.cabinas, clavadas, elegidas)
       return
+    }
+
+    // Antes de volver a repartir la tira entera se prueba lo que espera
+    // cualquiera al arrastrar: que la diferencia la absorba UNA vecina y el
+    // resto quede donde estaba. Solo si ninguna puede, se vuelve a buscar.
+    if (cambios.length === 1) {
+      const local = compensarPilastra(t, config, indice, anchoCm, elegidas.filter((k) => k !== indice))
+      if (local) {
+        // Va directo, sin pasar por el espejo: `compensarPilastra` trabajó
+        // sobre el tramo TAL COMO SE VE y devuelve las piezas en ese mismo
+        // orden. Son las mismas de antes con dos medidas cambiadas, así que no
+        // hay nada que dar vuelta.
+        setArea({
+          tramos: area.tramos.map((x) =>
+            x.id !== tramoId
+              ? x
+              : { ...x, cabinas: local.cabinas, pilastras: local.pilastras, pilastrasFijas: elegidas },
+          ),
+        })
+        return
+      }
     }
     const r = modularConCatalogo(
       t.claroCm,

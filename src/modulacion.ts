@@ -4,10 +4,10 @@ import {
 } from './catalog'
 import type { Cabina, Config, Moneda, Pais, Tramo, TipologiaId, RenglonBOM } from './types'
 import {
-  alturasDe, ANCHOS_PILASTRA, esSoloOrinales, esVariacionPanel, familiaDelFrente, llevaAccesibleSiempre,
-  mamparaDe, tipologia, tierDeColor, type MedidaMG,
+  alturasDe, ANCHOS_PILASTRA, anchosPilastra, esEspecial, esSoloOrinales, esVariacionPanel, familiaDelFrente,
+  llevaAccesibleSiempre, mamparaDe, tipologia, tierDeColor, type MedidaMG,
 } from './catalog'
-import { ajustarPilastras, GRUESO_MG_PIEZA, medidaCercana, modularTira } from './modulador'
+import { ajustarPilastras, GRUESO_MG_PIEZA, medidaCercana, modularTira, PILASTRAS_INTERNAS } from './modulador'
 import { precioPieza, type TablaTarifas } from './tarifas'
 
 let seq = 0
@@ -690,6 +690,88 @@ export function pedidoDeModulacion(
     return { murosPilastra: muros, cuartoCm: anchoAccesibleDe(config), cuartoComeMuro: true, extremoAbierto }
   }
   return { murosPilastra: muros, cuartoCm: 0, cuartoComeMuro: true, extremoAbierto }
+}
+
+/**
+ * Mover UNA pilastra sin que se mueva toda la tira.
+ *
+ * Arrastrar una pilastra volvía a repartir TODAS: se tocaba una y se
+ * reacomodaban las otras cuatro, así que el plano se desarmaba debajo de la
+ * mano y había que rehacer lo ya ajustado. Acá se prueba primero lo que
+ * cualquiera espera: que la diferencia la absorba UNA vecina y el resto quede
+ * intacto.
+ *
+ * Se busca de adentro hacia afuera —primero la de al lado— y solo sirve una
+ * medida que exista en el catálogo para esa posición. Devuelve null si ninguna
+ * puede absorberla: ahí sí hay que volver a buscar toda la tira.
+ *
+ * Se queda afuera lo que no es una tira de puros baños —orinales o espacios
+ * libres—, porque ahí el ancho de un lugar no sale de las pilastras y el
+ * reparto es otro.
+ */
+export function compensarPilastra(
+  tramo: Tramo,
+  config: Config,
+  indice: number,
+  anchoCm: number,
+  /** las que el vendedor ya clavó: esas no se tocan */
+  fijas: number[] = [],
+): { pilastras: number[]; cabinas: Cabina[] } | null {
+  const actual = tramo.pilastras
+  const n = tramo.cabinas.length
+  if (!actual || actual.length !== n + 1) return null
+  if (tramo.cabinas.some((c) => c.tipo === 'orinal' || esEspacioLibre(c))) return null
+  if (indice < 0 || indice > n) return null
+
+  const delta = Math.round((anchoCm - (actual[indice] ?? 0)) * 10) / 10
+  if (delta === 0) return null
+
+  /** las medidas de catálogo que se pueden poner en esa frontera */
+  const posibles = (k: number): number[] => {
+    const extremo = k === 0 || k === n
+    return anchosPilastra(config.modelo).filter(
+      (a) => extremo || PILASTRAS_INTERNAS.includes(a) || esEspecial('PL', a, config.modelo),
+    )
+  }
+
+  // de adentro hacia afuera: la de al lado primero
+  const orden: number[] = []
+  for (let d = 1; d <= n; d++) {
+    if (indice - d >= 0) orden.push(indice - d)
+    if (indice + d <= n) orden.push(indice + d)
+  }
+
+  for (const j of orden) {
+    if (j === indice || fijas.includes(j)) continue
+    // la frontera de la cabina accesible plantada no lleva pilastra de tira
+    if ((actual[j] ?? 0) <= 0) continue
+    const quiere = Math.round(((actual[j] ?? 0) - delta) * 10) / 10
+    if (quiere <= 0 || !posibles(j).includes(quiere)) continue
+
+    const pilastras = [...actual]
+    pilastras[indice] = anchoCm
+    pilastras[j] = quiere
+    return { pilastras, cabinas: anchosConPilastras(tramo, pilastras) }
+  }
+  return null
+}
+
+/**
+ * El ancho de cada cabina con un juego de pilastras dado. No busca nada: las
+ * medidas son las que se le pasan.
+ *
+ * La cabina accesible PLANTADA no se recalcula: su ancho no sale de las
+ * pilastras de la tira —su frontera vale 0— sino de la medida que se le pidió.
+ */
+function anchosConPilastras(tramo: Tramo, pilastras: number[]): Cabina[] {
+  const lugares = lugaresDe(tramo.cabinas)
+  const arranca = tramo.cabinas[0]?.tipo === 'accesible' && (tramo.pilastras?.[0] ?? 0) === 0
+  const pil = (k: number) => pilastras[k] ?? 0
+  return tramo.cabinas.map((c, i) => {
+    if (c.tipo === 'accesible' && (arranca || i === tramo.cabinas.length - 1)) return c
+    const { izq, der } = ladosDeCabina(lugares, pil, i, arranca)
+    return { ...c, anchoCm: snap(izq + c.puerta.anchoCm + der) }
+  })
 }
 
 /** la profundidad del lugar, que nunca puede ser menor que la de la cabina */

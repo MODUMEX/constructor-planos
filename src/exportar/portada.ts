@@ -77,7 +77,8 @@ function descripcion(area: Area): string[] {
   const a = alturasDe(c.modelo)
   const remate = c.terminacion === 'ZOCLO' ? 'zoclo de acero inoxidable' : 'patas de acero inoxidable'
   const alturas = `Pilastras de ${(a.pilastra / 100).toFixed(2)}m, puertas y paneles laterales de ${(a.puerta / 100).toFixed(2)}m de altura.`
-  const color = `COLOR DE DIVISIONES: ${c.color}${c.colorCodigo ? ` (${c.colorCodigo})` : ''}`
+  // sin el código de materia prima: es de adentro, no del cliente
+  const color = `COLOR DE DIVISIONES: ${c.color}`
   const herrajes = `herrajes, bisagras y cerrojos de ${nombreHerrajeLargo(c.herrajeAcabado)}.`
 
   if (c.linea === 'SUPERIOR') {
@@ -182,7 +183,7 @@ export function portada(
     ['MODELO:', nombreModelo(c.linea, c.modelo)],
     ['REMATE INFERIOR:', c.terminacion === 'ZOCLO' ? 'ZOCLO' : 'PATA'],
     ['ACABADO:', c.acabado],
-    ['COLOR:', `${c.color}${c.colorCodigo ? ` (${c.colorCodigo})` : ''}`],
+    ['COLOR:', c.color],
     ['ALTURA PILASTRA:', `${alturasDe(c.modelo).pilastra} cm`],
     ['KAP:', c.kap ? 'SÍ' : 'NO'],
   ]

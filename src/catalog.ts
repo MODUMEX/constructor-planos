@@ -342,7 +342,7 @@ export function tierDeColor(nombre: string, pais: Pais = 'CR', linea: Linea = 'L
     const grupo = grupoMx(nombre, linea)
     if (grupo === 1) return 'linea'
     if (grupo === 2) return 'grupo2'
-    // Wilsonart y Lamitech, o sea todo lo que no está en los dos grupos
+    // o sea todo lo que no está en ninguno de los dos grupos
     if (esColorMx(nombre)) return 'especial'
   }
   const delCatalogo = buscarColor(nombre)
