@@ -169,9 +169,24 @@ export default function App() {
         }
       : null,
   )
-  // La app va en oscuro. El interruptor se quitó; queda el ?tema=claro de la
-  // dirección por si hace falta una captura en claro.
-  const [tema] = useState<'oscuro' | 'claro'>(params.get('tema') === 'claro' ? 'claro' : 'oscuro')
+  /**
+   * Claro u oscuro.
+   *
+   * Arranca en oscuro, que es como se diseñó, pero se cambia con el botón de
+   * la barra de arriba y queda recordado para la próxima vez. El `?tema=claro`
+   * de la dirección sigue sirviendo y gana sobre lo recordado, que es lo que se
+   * usa para sacar una captura en claro sin tocar la preferencia de nadie.
+   */
+  const [tema, setTema] = useState<'oscuro' | 'claro'>(() => {
+    if (params.get('tema') === 'claro') return 'claro'
+    if (params.get('tema') === 'oscuro') return 'oscuro'
+    try {
+      return localStorage.getItem('cdp-tema') === 'claro' ? 'claro' : 'oscuro'
+    } catch {
+      // en modo privado o con el almacenamiento bloqueado no se recuerda nada
+      return 'oscuro'
+    }
+  })
   const [paso, setPaso] = useState(demo ? pasoDemo : 1)
 
   // Un proyecto nuevo arranca en blanco. Los datos de ejemplo solo se cargan con
@@ -394,6 +409,11 @@ export default function App() {
   useEffect(() => {
     if (tema === 'claro') document.documentElement.setAttribute('data-tema', 'claro')
     else document.documentElement.removeAttribute('data-tema')
+    try {
+      localStorage.setItem('cdp-tema', tema)
+    } catch {
+      /* si no se puede guardar, el tema vale igual para esta sesión */
+    }
   }, [tema])
 
   /**
@@ -1711,6 +1731,14 @@ export default function App() {
           title="Comprobar si hay una versión más nueva publicada"
         >
           {buscandoActualizacion ? 'Buscando…' : 'Actualizar app'}
+        </button>
+        <button
+          className="btn plano chico"
+          onClick={() => setTema((t) => (t === 'claro' ? 'oscuro' : 'claro'))}
+          title={tema === 'claro' ? 'Pasar a tema oscuro' : 'Pasar a tema claro'}
+          aria-label={tema === 'claro' ? 'Pasar a tema oscuro' : 'Pasar a tema claro'}
+        >
+          {tema === 'claro' ? '🌙' : '☀'}
         </button>
         <button className="btn plano chico" onClick={() => setUsuario(null)}>Salir</button>
       </header>
