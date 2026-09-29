@@ -50,6 +50,28 @@ export const PILASTRAS_EXTREMO = ANCHOS_PILASTRA.filter((a) => a <= 24)
 export const PILASTRA_INTERNA_AUTO_MAX = 50
 const INTERNAS_AUTO = PILASTRAS_INTERNAS.filter((a) => a <= PILASTRA_INTERNA_AUTO_MAX)
 
+/**
+ * De acá para arriba debería medir una pilastra CENTRAL.
+ *
+ * Es lo que pide producción: una central de 10 o de 17 no se quiere ver en un
+ * plano. Pero NO se puede exigir siempre — con un claro de 4,20 m no entran 4
+ * cabinas y 2 orinales si cada central mide 24, y el plano dejaría de ser
+ * modulable —, así que va como PREFERENCIA: primero se busca con 24 o más y
+ * solo si no hay ninguna solución se baja, avisándolo.
+ */
+export const INTERNA_PREFERIDA_CM = 24
+const INTERNAS_ANCHAS = INTERNAS_AUTO.filter((a) => a >= INTERNA_PREFERIDA_CM)
+
+/** el aviso que se agrega cuando hubo que bajar de la medida preferida */
+const AVISO_ANGOSTA =
+  `. No hay forma de cerrar este claro con pilastras centrales de ${INTERNA_PREFERIDA_CM} cm`
+  + ' o más: revisá si caben menos cabinas o una puerta más angosta'
+
+/** ¿la tira quedó resuelta, o se pasó / quedó corta? */
+function resuelve(ajuste: TipoAjuste): boolean {
+  return ajuste === 'exacto' || ajuste === 'canaleta'
+}
+
 /** la puerta que se prefiere cuando varias combinaciones empatan */
 const PUERTA_PREFERIDA = 60
 const PENALIZA_PUERTA = 0.05
@@ -194,6 +216,17 @@ function cabe(diferencia: number, extremoAbierto: boolean | undefined, murosPila
 }
 
 export function modularTira(o: OpcionesModulacion): Modulacion | null {
+  // Primero con las centrales que pide producción. Si con esas cierra, esa es
+  // la buena; si no, se vuelve a buscar con todo el catálogo y se avisa.
+  const anchas = modularTiraCon(o, INTERNAS_ANCHAS)
+  if (anchas && resuelve(anchas.ajuste)) return anchas
+  const libre = modularTiraCon(o, INTERNAS_AUTO)
+  if (!libre) return anchas
+  if (!resuelve(libre.ajuste)) return libre
+  return { ...libre, mensaje: libre.mensaje + AVISO_ANGOSTA }
+}
+
+function modularTiraCon(o: OpcionesModulacion, internasPosibles: number[]): Modulacion | null {
   const nEst = o.puertas
   const nAcc = o.accesible ? 1 : 0
   const nMing = o.mingitorios ?? 0
@@ -239,7 +272,7 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
   // buscan libres. Forzar toda la clase era lo que emparejaba la tira entera.
   const unaClavada = o.pilastraFijaIndice !== undefined || (o.pilastrasFijas ?? []).some((v) => !!v)
   const opInternas =
-    internas > 0 ? (o.pilInternaFija && !unaClavada ? [o.pilInternaFija] : INTERNAS_AUTO) : [0]
+    internas > 0 ? (o.pilInternaFija && !unaClavada ? [o.pilInternaFija] : internasPosibles) : [0]
   const opExtremos = o.pilExtremoFija && !unaClavada ? [o.pilExtremoFija] : PILASTRAS_EXTREMO
   // Una tira de PUROS orinales no tiene pilastras: sus dos puntas son el
   // mingitorio de cierre, si de ese lado no hay muro, o nada si da contra la pared.
@@ -323,7 +356,7 @@ export function modularTira(o: OpcionesModulacion): Modulacion | null {
   const uniformeCalza = !unaClavada && cabe(objetivo - mejor.total, o.extremoAbierto, o.murosPilastra)
   const repartidas = uniformeCalza
     ? null
-    : repartirPilastras(objetivo - cuerpos, internas, INTERNAS_AUTO, PILASTRAS_EXTREMO, clavadas)
+    : repartirPilastras(objetivo - cuerpos, internas, internasPosibles, PILASTRAS_EXTREMO, clavadas)
   const pilastras = repartidas ?? (() => {
     // sin reparto posible al menos se respeta la que ella movió
     const base = [mejor.ae1, ...Array(internas).fill(mejor.api), mejor.ae2]
@@ -453,12 +486,21 @@ export interface Pilastreo {
  * más escalones, así que por acá casi siempre hay con qué cuadrar.
  */
 export function ajustarPilastras(o: OpcionesPilastras): Pilastreo | null {
+  const anchas = ajustarPilastrasCon(o, INTERNAS_ANCHAS)
+  if (anchas && resuelve(anchas.ajuste)) return anchas
+  const libre = ajustarPilastrasCon(o, INTERNAS_AUTO)
+  if (!libre) return anchas
+  if (!resuelve(libre.ajuste)) return libre
+  return { ...libre, mensaje: libre.mensaje + AVISO_ANGOSTA }
+}
+
+function ajustarPilastrasCon(o: OpcionesPilastras, internasPosibles: number[]): Pilastreo | null {
   const internas = Math.max(0, o.internas)
   const objetivo = calcularClaroAjustado(o.claroCm, o.murosPilastra, o.conPuerta)
   const cuerpos = o.cuerpos.reduce((s, x) => s + x, 0)
   const dosMuros = o.murosPilastra >= 2
 
-  const opInternas = internas > 0 ? INTERNAS_AUTO : [0]
+  const opInternas = internas > 0 ? internasPosibles : [0]
   type Candidato = { api: number; ae1: number; ae2: number; total: number; score: number }
   let mejor: Candidato | null = null
   // el mejor de los que NO se pasan del claro: entre muros es el único válido
@@ -487,7 +529,7 @@ export function ajustarPilastras(o: OpcionesPilastras): Pilastreo | null {
   // la canaleta: las pilastras no tienen por qué medir todas lo mismo.
   if (!o.huecoLibre && !cabe(objetivo - mejor.total, o.extremoAbierto, o.murosPilastra)) {
     const mezcla = repartirPilastras(
-      objetivo - cuerpos, internas, INTERNAS_AUTO, PILASTRAS_EXTREMO, o.fijas,
+      objetivo - cuerpos, internas, internasPosibles, PILASTRAS_EXTREMO, o.fijas,
     )
     if (mezcla) {
       const total = cuerpos + mezcla.reduce((x, y) => x + y, 0)
