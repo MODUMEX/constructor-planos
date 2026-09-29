@@ -32,3 +32,6 @@ tsconfig.tsbuildinfo
 .dext.mjs
 .aper.mjs
 .p24.mjs
+.*.mjs
+ejemplo-variacion.html
+ejemplo-variacion.pdf

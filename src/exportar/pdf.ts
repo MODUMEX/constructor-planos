@@ -358,7 +358,7 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
         const anchoCm = (altoCm * dibujo.ancho) / dibujo.alto
         const w = anchoCm * e.k
         const h = altoCm * e.k
-        if (cuarto?.indice === i) {
+        if (cuarto?.indice === i && cuarto.entrada === 'costado') {
           // En el cuarto accesible se entra por el COSTADO, así que el inodoro gira:
           // se apoya contra el muro de afuera y mira hacia la puerta del divisor.
           //
@@ -382,7 +382,9 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
         // en el cuarto el rótulo va abajo, para no caer sobre el inodoro girado
         const [cx, cy] = aHoja(
           e,
-          cuarto?.indice === i ? pt(m, (u0 + u1) / 2, cuarto.profCm * 0.9) : pt(m, (u0 + u1) / 2, prof * 0.78),
+          cuarto?.indice === i && cuarto.entrada === 'costado'
+            ? pt(m, (u0 + u1) / 2, cuarto.profCm * 0.9)
+            : pt(m, (u0 + u1) / 2, prof * 0.78),
         )
         texto(doc, cab.tipo === 'accesible' ? 'ACCESIBLE' : esEspacioLibre(cab) ? 'LIBRE' : 'VACÍA', cx, cy, { size: 5.5, align: 'center', color: GRIS })
       }
@@ -431,17 +433,60 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
       // con el área invertida el cuarto queda en la otra punta y el muro se va
       // con él; si no, la tira quedaba sin pared de fondo
       const alFin = cuarto.lado === 'fin'
-      const [wx, wy] = aHoja(e, pt(
-        m,
-        alFin ? -SOBRA_MURO_CM : cuarto.desdeCm - (tramo.muroInicio ? ESPESOR_MURO : 0),
-        cuarto.profCm,
-      ))
-      const [wx2, wy2] = aHoja(e, pt(
-        m,
-        alFin ? cuarto.hastaCm + (tramo.muroFin ? ESPESOR_MURO : 0) : largo + SOBRA_MURO_CM,
-        cuarto.profCm + ESPESOR_MURO,
-      ))
-      muro(doc, Math.min(wx, wx2), Math.min(wy, wy2), Math.abs(wx2 - wx), Math.abs(wy2 - wy))
+      const rotCuarto = horizontal ? 0 : m.ay > 0 ? -90 : 90
+      // El Tipo C cierra contra la pared del lugar. En las "variación panel" el
+      // frente da al pasillo: ahí no va pared, va la puerta.
+      if (cuarto.entrada === 'costado') {
+        const [wx, wy] = aHoja(e, pt(
+          m,
+          alFin ? -SOBRA_MURO_CM : cuarto.desdeCm - (tramo.muroInicio ? ESPESOR_MURO : 0),
+          cuarto.profCm,
+        ))
+        const [wx2, wy2] = aHoja(e, pt(
+          m,
+          alFin ? cuarto.hastaCm + (tramo.muroFin ? ESPESOR_MURO : 0) : largo + SOBRA_MURO_CM,
+          cuarto.profCm + ESPESOR_MURO,
+        ))
+        muro(doc, Math.min(wx, wx2), Math.min(wy, wy2), Math.abs(wx2 - wx), Math.abs(wy2 - wy))
+      }
+      // ------------------------------------------------------------------
+      // El FRENTE de la cabina accesible, en las "variación panel".
+      //
+      // Acá se entra por el frente, no por el costado: pilastra lateral,
+      // frente y puerta. Es la misma geometría que se ve en pantalla.
+      // ------------------------------------------------------------------
+      if (cuarto.entrada === 'frente') {
+        for (const pieza of cuarto.frente) {
+          const largoPieza = pieza.hastaCm - pieza.desdeCm
+          if (pieza.tipo === 'puerta') {
+            // cuelga del borde de la pieza del frente y barre hacia el pasillo,
+            // alejándose del panel
+            const [pxx, pyy] = aHoja(e, pt(m, pieza.desdeCm, cuarto.profCm))
+            const [cxx, cyy] = aHoja(e, pt(m, pieza.hastaCm, cuarto.profCm))
+            const [exx, eyy] = aHoja(e, pt(
+              m, pieza.desdeCm - largoPieza * ABIERTA_45, cuarto.profCm + largoPieza * ABIERTA_45,
+            ))
+            doc.setDrawColor(ARCO[0], ARCO[1], ARCO[2])
+            doc.setLineWidth(0.2)
+            doc.setLineDashPattern([1.2, 1], 0)
+            arco(doc, pxx, pyy, largoPieza * e.k, Math.atan2(cyy - pyy, cxx - pxx), Math.atan2(eyy - pyy, exx - pxx))
+            doc.setLineDashPattern([], 0)
+            doc.setDrawColor(MARCA[0], MARCA[1], MARCA[2])
+            doc.setLineWidth(0.45)
+            doc.line(pxx, pyy, exx, eyy)
+          } else {
+            doc.setFillColor(TINTA, TINTA, TINTA)
+            const [ax, ay] = aHoja(e, pt(m, pieza.desdeCm, cuarto.profCm - grueso / 2))
+            const [bx, by] = aHoja(e, pt(m, pieza.hastaCm, cuarto.profCm + grueso / 2))
+            doc.rect(
+              Math.min(ax, bx), Math.min(ay, by),
+              Math.max(Math.abs(bx - ax), 0.5), Math.max(Math.abs(by - ay), 0.5), 'F',
+            )
+          }
+          const [tx, ty] = aHoja(e, pt(m, (pieza.desdeCm + pieza.hastaCm) / 2, cuarto.profCm + 9))
+          texto(doc, String(largoPieza), tx, ty, { size: 5.5, align: 'center', angle: rotCuarto, color: COTA })
+        }
+      }
 
       // El divisor va en el borde de ADENTRO del cuarto, el que da a la tira.
       // Invertida el area ese borde es el otro: puesto siempre en hastaCm, el
@@ -736,10 +781,13 @@ function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) 
   const acum = acumulado(tramo.cabinas)
   const anchoPil = (j: number) => tramo.pilastras?.[j] ?? area.config.anchoPilastraCm
   /**
-   * El cuarto accesible NO se dibuja acá. Su divisor —con la puerta— corre a lo
-   * hondo, perpendicular a la tira, así que de frente se vería de canto. Va en
-   * `alzadoPmr`, la vista de lado. Sin esto la puerta del cuarto salía DOS
+   * El cuarto del Tipo C NO se dibuja acá. Su divisor —con la puerta— corre a
+   * lo hondo, perpendicular a la tira, así que de frente se vería de canto. Va
+   * en `alzadoPmr`, la vista de lado. Sin esto la puerta del cuarto salía DOS
    * veces: una de frente, donde no está, y otra de lado, donde sí.
+   *
+   * La accesible de una "variación panel" es al revés: se entra por el frente,
+   * así que SÍ va acá y no lleva alzado aparte.
    */
   const cuarto = cuartoPmr(tramo, area.config)
 
@@ -809,6 +857,51 @@ function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) 
     doc.setFillColor(MARCA[0], MARCA[1], MARCA[2])
     doc.circle(lado, aY(hueco + hPuerta / 2), 0.7, 'F')
   })
+
+
+  // ------------------------------------------------------------------
+  // La cabina accesible de una "variación panel" va en ESTE alzado.
+  //
+  // A ella se entra por el FRENTE, así que sus piezas se ven de frente como
+  // las de cualquier cabina: la pilastra lateral, la pieza del frente y la
+  // puerta. El Tipo C es el que necesita un alzado aparte, porque su divisor
+  // corre a lo hondo y de frente se vería de canto.
+  // ------------------------------------------------------------------
+  if (cuarto?.entrada === 'frente') {
+    const conZoclo = area.config.terminacion === 'ZOCLO'
+    for (const pieza of cuarto.frente) {
+      const ancho = pieza.hastaCm - pieza.desdeCm
+      if (ancho <= 0) continue
+      if (pieza.tipo === 'puerta') {
+        doc.setFillColor(248, 249, 251)
+        doc.setDrawColor(MARCA[0], MARCA[1], MARCA[2])
+        doc.setLineWidth(0.35)
+        doc.rect(aX(pieza.desdeCm), aY(hueco + hPuerta), ancho * e.k, hPuerta * e.k, 'FD')
+        doc.setFillColor(MARCA[0], MARCA[1], MARCA[2])
+        // la manija va del lado del gozne opuesto: la hoja abre hacia afuera
+        doc.circle(aX(pieza.hastaCm) - 3, aY(hueco + hPuerta / 2), 0.7, 'F')
+        continue
+      }
+      // pilastra lateral y pieza del frente: de piso a tope, como una pilastra
+      doc.setFillColor(120, 120, 120)
+      doc.setDrawColor(70)
+      doc.setLineWidth(0.25)
+      doc.rect(aX(pieza.desdeCm), aY(hPilastra), ancho * e.k, hPilastra * e.k, 'FD')
+      const anchoBase = conZoclo ? ancho : Math.min(ancho, 6)
+      doc.setFillColor(200, 203, 208)
+      doc.rect(
+        aX(pieza.desdeCm + (ancho - anchoBase) / 2), aY(ALTO_BASE_CM),
+        anchoBase * e.k, ALTO_BASE_CM * e.k, 'FD',
+      )
+      doc.setFillColor(120, 120, 120)
+    }
+    // y sus medidas, en la misma cadena de arriba
+    for (const pieza of cuarto.frente) {
+      const ancho = pieza.hastaCm - pieza.desdeCm
+      if (ancho <= 0) continue
+      cotaAncho(doc, aX(pieza.desdeCm), aX(pieza.hastaCm), aY(hPilastra) - 5, `${ancho}`)
+    }
+  }
 
   /**
    * El mingitorio NO cuelga del tope de la pilastra: arranca a 30 cm del piso,
@@ -1092,7 +1185,10 @@ export function generarPDF(proyecto: Proyecto, fecha = new Date().toLocaleDateSt
     // El cuarto accesible lleva SU PROPIO alzado, a la derecha del otro: su
     // divisor corre a lo hondo y de frente se vería de canto. Eso ensancha la
     // fila de alzados, así que entra en la cuenta de la escala.
-    const cuartoDelAlzado = conAlzado ? cuartoPmr(tramoPrincipal, area.config) : null
+    // Solo el Tipo C: la accesible de una "variación panel" se ve de frente y
+    // va dentro del alzado de la tira, así que no ensancha nada.
+    const delLado = conAlzado ? cuartoPmr(tramoPrincipal, area.config) : null
+    const cuartoDelAlzado = delLado?.entrada === 'costado' ? delLado : null
     const largoAlzadoCm = conAlzado ? anchoTotal(tramoPrincipal.cabinas) : 0
     const anchoAlzadoCm = cuartoDelAlzado
       ? largoAlzadoCm + SEPARA_ALZADOS_CM + cuartoDelAlzado.profCm + SOBRA_MURO_CM * 2

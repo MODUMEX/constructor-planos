@@ -1,7 +1,7 @@
 {
   "name": "constructor-de-planos",
   "private": true,
-  "version": "2.67.0",
+  "version": "2.68.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -36,7 +36,10 @@
     "probar-mamparas": "esbuild scripts/probar-mamparas.ts --bundle --platform=node --format=esm --outfile=.mamp.mjs --log-level=warning && node .mamp.mjs",
     "generar-regadera": "node scripts/generar-regadera.mjs",
     "probar-odoo": "esbuild scripts/probar-odoo.ts --bundle --platform=node --format=esm --outfile=.odoo.mjs --log-level=warning && node .odoo.mjs",
-    "bom-odoo": "esbuild scripts/bom-odoo.ts --bundle --platform=node --format=esm --outfile=.bom.mjs --log-level=warning && node .bom.mjs"
+    "bom-odoo": "esbuild scripts/bom-odoo.ts --bundle --platform=node --format=esm --outfile=.bom.mjs --log-level=warning && node .bom.mjs",
+    "probar-sesion": "node scripts/empaquetar-prueba.mjs scripts/probar-sesion.ts .sesion.mjs && node .sesion.mjs",
+    "probar-variacion": "esbuild scripts/probar-variacion-panel.ts --bundle --platform=node --format=esm --outfile=.var.mjs --log-level=warning --define:import.meta.env={} && node .var.mjs",
+    "ejemplo-variacion": "node scripts/empaquetar-prueba.mjs scripts/ejemplo-variacion.tsx .ejemplo.mjs && node .ejemplo.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",

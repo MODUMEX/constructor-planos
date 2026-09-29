@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import type { Cabina, Config, Pais, Tramo } from '../types'
-import { anchosPanelFabrica, anchosPilastra, esEspecial, familiaDelFrente, medidasDeFrente, puertasPosibles, tipologia } from '../catalog'
-import { anchoTotal, arrancaElCuartoPmr, esEspacioLibre, minimoDe, nuevaCabina, pilastrasParaAncho, puertaSugerida, snap, cierraConMingitorio, ladosDeCabina, lugaresDe, mamparaEn } from '../modulacion'
+import { anchosPanelFabrica, anchosPilastra, esEspecial, esVariacionPanel, familiaDelFrente, medidasDeFrente, puertasPosibles, tipologia } from '../catalog'
+import { anchoTotal, arrancaElCuartoPmr, esEspacioLibre, minimoDe, nuevaCabina, pilastrasParaAncho, profundidadAccesible, puertaSugerida, snap, cierraConMingitorio, ladosDeCabina, lugaresDe, mamparaEn } from '../modulacion'
 import { medidaCercana, PILASTRAS_INTERNAS, PUERTA_ACCESIBLE_MIN } from '../modulador'
 import { Grupo, Item, Menu, Raya } from './Menu'
 import {
@@ -152,8 +152,18 @@ export default function EditorPlano({
   /** grueso con el que se dibujan panel y pilastra: sale del espesor del material */
   const grueso = Math.max(config.espesorMm / 10, 0.3)
 
-  /** el cuarto PMR llega más hondo que las cabinas: hay que encuadrarlo también */
-  const profPmr = config.tipologia === 'PMR' ? profundidadDelLugar(config) : 0
+  /**
+   * La cabina accesible llega más hondo que las demás: hay que encuadrarla.
+   *
+   * En las "variación panel" además hay que dejar lugar para el barrido de su
+   * puerta, que abre hacia el pasillo y se pasa del frente: sin esto la hoja
+   * quedaba cortada por el borde del recorte.
+   */
+  const profPmr = config.tipologia === 'PMR'
+    ? profundidadDelLugar(config)
+    : esVariacionPanel(config.tipologia)
+      ? profundidadAccesible(config) + (config.puertaAccesibleCm ?? 100) * Math.SQRT1_2
+      : 0
   /**
    * El margen tiene que dar para la cota grande del claro, que se escribe 64 cm
    * por encima del muro de fondo. Con 62 quedaba justo afuera del recorte y el
@@ -599,10 +609,11 @@ export default function EditorPlano({
                       const alto = cab.tipo === 'orinal' ? ALTO_ORINAL_CM : cab.tipo === 'regadera' ? ALTO_REGADERA_CM : ALTO_WC_CM
                       const ancho = (alto * dibujo.ancho) / dibujo.alto
                       // el sanitario se apoya contra el muro, centrado en su cabina.
-                      // En el cuarto accesible se entra por el COSTADO, así que el
+                      // En el cuarto del Tipo C se entra por el COSTADO, así que el
                       // inodoro gira: se apoya contra el muro de afuera y mira hacia la
-                      // puerta del divisor.
-                      const enCuarto = cuarto?.indice === i
+                      // puerta del divisor. En las "variación panel" se entra por el
+                      // FRENTE, como en cualquier cabina, y entonces NO gira.
+                      const enCuarto = cuarto?.indice === i && cuarto.entrada === 'costado'
                       const esquina = enCuarto
                         ? pt(m, u0 + 6, cuarto.profCm / 2)
                         : pt(m, (u0 + u1) / 2, 6)
@@ -621,10 +632,11 @@ export default function EditorPlano({
                     })()}
                     {cab.tipo === 'accesible' && (() => {
                       // en el cuarto el símbolo va abajo, para no caer sobre el inodoro girado
-                      const s = cuarto?.indice === i ? pt(m, (u0 + u1) / 2, cuarto.profCm * 0.86) : centro
+                      const enCuartoDeCostado = cuarto?.indice === i && cuarto.entrada === 'costado'
+                      const s = enCuartoDeCostado ? pt(m, (u0 + u1) / 2, cuarto!.profCm * 0.86) : centro
                       return (
                       <text
-                        x={s.x} y={cuarto?.indice === i ? s.y : s.y + prof * 0.26} textAnchor="middle"
+                        x={s.x} y={enCuartoDeCostado ? s.y : s.y + prof * 0.26} textAnchor="middle"
                         fontSize={26} fill="#8b98a8" pointerEvents="none"
                       >♿</text>
                       )
@@ -939,12 +951,75 @@ export default function EditorPlano({
                   // pilastra deja de poder arrastrarse. Solo la pieza que SÍ se
                   // arrastra vuelve a prenderlo.
                   <g pointerEvents="none">
-                    <rect
-                      x={Math.min(pa.x, pb.x)} y={Math.min(pa.y, pb.y)}
-                      width={horizontal ? Math.abs(pb.x - pa.x) : ESPESOR_MURO}
-                      height={horizontal ? ESPESOR_MURO : Math.abs(pb.y - pa.y)}
-                      fill="url(#hatch)" stroke="#5c6a7a" strokeWidth={1.2}
-                    />
+                    {/* El Tipo C cierra contra la pared del lugar. En las
+                        "variación panel" el frente da al pasillo: ahí no va pared,
+                        va la puerta. */}
+                    {cuarto.entrada === 'costado' && (
+                      <rect
+                        x={Math.min(pa.x, pb.x)} y={Math.min(pa.y, pb.y)}
+                        width={horizontal ? Math.abs(pb.x - pa.x) : ESPESOR_MURO}
+                        height={horizontal ? ESPESOR_MURO : Math.abs(pb.y - pa.y)}
+                        fill="url(#hatch)" stroke="#5c6a7a" strokeWidth={1.2}
+                      />
+                    )}
+
+                    {/* ----------------------------------------------------------
+                        El FRENTE de la cabina accesible, en las "variación panel".
+
+                        Acá no se entra por el costado sino por el frente, así que
+                        el frente no es pared: es pilastra lateral + frente +
+                        puerta. La puerta cuelga del borde de la pieza del frente y
+                        abre hacia afuera, como las de la hoja de LEEDER.
+                        ---------------------------------------------------------- */}
+                    {cuarto.entrada === 'frente' && cuarto.frente.map((pieza) => {
+                      const largoPieza = pieza.hastaCm - pieza.desdeCm
+                      const medio = pt(m, (pieza.desdeCm + pieza.hastaCm) / 2, profC)
+
+                      if (pieza.tipo === 'puerta') {
+                        // el gozne va del lado de la pieza del frente, y la hoja
+                        // barre hacia el pasillo alejándose del panel
+                        const pivU = pieza.desdeCm
+                        const pivote = pt(m, pivU, profC)
+                        const cerrada = pt(m, pieza.hastaCm, profC)
+                        const extremo = pt(m, pivU - largoPieza * ABIERTA_45, profC + largoPieza * ABIERTA_45)
+                        return (
+                          <g key="puerta-mr">
+                            <path
+                              d={`M ${cerrada.x} ${cerrada.y} A ${largoPieza} ${largoPieza} 0 0 1 ${extremo.x} ${extremo.y}`}
+                              fill="none" stroke="#8fa3c4" strokeWidth={1.4} strokeDasharray="7 5"
+                            />
+                            <line
+                              x1={pivote.x} y1={pivote.y} x2={extremo.x} y2={extremo.y}
+                              stroke="#2a4c8f" strokeWidth={2.6} strokeLinecap="round"
+                            />
+                            <circle cx={pivote.x} cy={pivote.y} r={2.6} fill="#2a4c8f" />
+                            {verCotas && (
+                              <text x={medio.x} y={medio.y - 10} textAnchor="middle" fontSize={14} fill="#8fa3c4">
+                                {`PT ${formatear(largoPieza, unidad)}`}
+                              </text>
+                            )}
+                          </g>
+                        )
+                      }
+
+                      const a = pt(m, pieza.desdeCm, profC - grueso / 2)
+                      const b = pt(m, pieza.hastaCm, profC + grueso / 2)
+                      return (
+                        <g key={pieza.tipo}>
+                          <rect
+                            x={Math.min(a.x, b.x)} y={Math.min(a.y, b.y)}
+                            width={Math.max(Math.abs(b.x - a.x), MIN_PIEZA_PX)}
+                            height={Math.max(Math.abs(b.y - a.y), MIN_PIEZA_PX)}
+                            fill="#22303f"
+                          />
+                          {verCotas && (
+                            <text x={medio.x} y={medio.y + 20} textAnchor="middle" fontSize={14} fill="#8fa3c4">
+                              {`${pieza.tipo === 'pilastra' ? 'PL' : 'PN'} ${formatear(largoPieza, unidad)}`}
+                            </text>
+                          )}
+                        </g>
+                      )
+                    })}
 
                     {cuarto.divisor.map((pieza) => {
                       const largoPieza = pieza.hastaCm - pieza.desdeCm
@@ -1027,7 +1102,7 @@ export default function EditorPlano({
                           fontSize={14} fill="#8fa2bb"
                           transform={`rotate(${horizontal ? -90 : 0} ${(c0.x + c1.x) / 2} ${(c0.y + c1.y) / 2})`}
                         >
-                          {`Fondo del lugar ${formatear(profC, unidad)}`}
+                          {`${cuarto.entrada === 'frente' ? 'Fondo de la accesible' : 'Fondo del lugar'} ${formatear(profC, unidad)}`}
                         </text>
                       </>
                     )}

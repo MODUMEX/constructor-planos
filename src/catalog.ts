@@ -562,47 +562,83 @@ export const LARGO_SECUNDARIO_CM = 200
 export const TIPOLOGIAS: Tipologia[] = [
   {
     id: 'RECTA_ENTRE_MUROS',
-    nombre: 'Recta entre muros',
-    descripcion: 'Una tira de cabinas que cierra contra pared a los dos lados.',
+    nombre: 'Tipo U · recta entre muros',
+    descripcion:
+      'Una tira de cabinas que cierra contra pared a los dos lados. El CLARO es la pared de fondo, de muro a muro; la PROFUNDIDAD es lo que mide la cabina hacia el pasillo.',
     tramos: [{ orientacion: 'horizontal', muroInicio: true, muroFin: true, nombre: 'Tira' }],
     esquinaCompartida: false,
     principal: 0,
   },
   {
     id: 'RECTA_MURO_IZQ',
-    nombre: 'Recta con muro izquierdo',
-    descripcion: 'Arranca contra pared y termina con panel de cierre.',
+    nombre: 'Tipo L · muro a la izquierda',
+    descripcion:
+      'Arranca contra pared y termina con panel de cierre. El CLARO es la pared de fondo, del muro al final de la tira; la PROFUNDIDAD es lo que mide la cabina hacia el pasillo.',
     tramos: [{ orientacion: 'horizontal', muroInicio: true, muroFin: false, nombre: 'Tira' }],
     esquinaCompartida: false,
     principal: 0,
   },
   {
     id: 'RECTA_MURO_DER',
-    nombre: 'Recta con muro derecho',
-    descripcion: 'Cierra con panel al inicio y contra pared al final.',
+    nombre: 'Tipo L invertido · muro a la derecha',
+    descripcion:
+      'Cierra con panel al inicio y contra pared al final. El CLARO es la pared de fondo, del arranque de la tira al muro; la PROFUNDIDAD es lo que mide la cabina hacia el pasillo.',
     tramos: [{ orientacion: 'horizontal', muroInicio: false, muroFin: true, nombre: 'Tira' }],
     esquinaCompartida: false,
     principal: 0,
   },
   {
     id: 'ISLA',
-    nombre: 'Isla',
-    descripcion: 'Sin muros laterales, cierra con panel a los dos lados.',
+    nombre: 'Tipo E · isla',
+    descripcion:
+      'Sin muros laterales, cierra con panel a los dos lados. El CLARO es todo el largo de la tira, de panel a panel; la PROFUNDIDAD es lo que mide la cabina hacia el pasillo.',
     tramos: [{ orientacion: 'horizontal', muroInicio: false, muroFin: false, nombre: 'Tira' }],
     esquinaCompartida: false,
     principal: 0,
   },
   {
     id: 'PMR',
-    nombre: 'Cuarto accesible + cabinas',
-    descripcion: 'Un cuarto accesible que toma todo el fondo del lugar, con su divisor, más cabinas al lado.',
+    nombre: 'Tipo C · cuarto accesible + cabinas',
+    descripcion:
+      'Un cuarto accesible que toma todo el fondo del lugar, con su divisor, más cabinas al lado. El CLARO es la pared de fondo completa, cuarto incluido; la PROFUNDIDAD es la del cuarto, y sobre ella va su puerta.',
+    tramos: [{ orientacion: 'horizontal', muroInicio: true, muroFin: false, nombre: 'Tira' }],
+    esquinaCompartida: false,
+    principal: 0,
+  },
+  // ---------------- variación panel ----------------
+  // La cabina de movilidad reducida es más HONDA que el resto y su panel
+  // divisor hace de pared: la tira de baños se mete en el receso que queda.
+  // Son las tres de la derecha en la hoja de LEEDER.
+  {
+    id: 'MR_PANEL_E',
+    nombre: 'Tipo E + movilidad reducida · variación panel',
+    descripcion:
+      'Isla con la cabina accesible más honda a un costado. El CLARO es todo el largo de la tira; la PROFUNDIDAD es la de la cabina accesible, y las demás quedan en el receso.',
+    tramos: [{ orientacion: 'horizontal', muroInicio: false, muroFin: false, nombre: 'Tira' }],
+    esquinaCompartida: false,
+    principal: 0,
+  },
+  {
+    id: 'MR_PANEL_L',
+    nombre: 'Tipo L + movilidad reducida · variación panel',
+    descripcion:
+      'Arranca contra pared con la cabina accesible más honda y cierra con panel. El CLARO es la pared de fondo; la PROFUNDIDAD es la de la cabina accesible, y las demás quedan en el receso.',
     tramos: [{ orientacion: 'horizontal', muroInicio: true, muroFin: false, nombre: 'Tira' }],
     esquinaCompartida: false,
     principal: 0,
   },
   {
+    id: 'MR_PANEL_U',
+    nombre: 'Tipo U + movilidad reducida · variación panel',
+    descripcion:
+      'Entre dos paredes, con la cabina accesible más honda contra una de ellas. El CLARO es la pared de fondo, de muro a muro; la PROFUNDIDAD es la de la cabina accesible, y las demás quedan en el receso.',
+    tramos: [{ orientacion: 'horizontal', muroInicio: true, muroFin: true, nombre: 'Tira' }],
+    esquinaCompartida: false,
+    principal: 0,
+  },
+  {
     id: 'ORINALES',
-    nombre: 'Orinales, cierra con mampara',
+    nombre: 'Orinales · cierra con mampara',
     descripcion: 'Tira de orinales contra una pared; el otro extremo lo cierra la mampara del último orinal.',
     tramos: [{ orientacion: 'horizontal', muroInicio: true, muroFin: false, nombre: 'Tira de orinales' }],
     esquinaCompartida: false,
@@ -610,13 +646,40 @@ export const TIPOLOGIAS: Tipologia[] = [
   },
   {
     id: 'ORINALES_ENTRE_MUROS',
-    nombre: 'Orinales entre muros',
+    nombre: 'Orinales · entre muros',
     descripcion: 'Tira de orinales cerrada por pared en los dos extremos.',
     tramos: [{ orientacion: 'horizontal', muroInicio: true, muroFin: true, nombre: 'Tira de orinales' }],
     esquinaCompartida: false,
     principal: 0,
   },
 ]
+
+/**
+ * Las tres tipologías "variación panel", donde la cabina de movilidad reducida
+ * es más honda que las demás y su panel divisor hace de pared.
+ *
+ * Lo que tienen en común, y que ninguna otra tipología tiene:
+ *
+ *   · la cabina accesible tiene su PROPIO fondo, más hondo que el del resto;
+ *     la diferencia es el receso en el que se mete la tira de baños;
+ *   · se entra por el FRENTE, no por el costado como en el Tipo C: el frente
+ *     de esa cabina es pilastra lateral + panel + puerta;
+ *   · lo que la separa de la tira es un PANEL corrido de todo ese fondo, y
+ *     para modular cuenta como una pared más: la tira le apoya encima una
+ *     pilastra lateral, que se come su centímetro de herraje igual que contra
+ *     un muro. Por eso en la U se descuentan 3 cm y no 2.
+ */
+export function esVariacionPanel(id: TipologiaId): boolean {
+  return id === 'MR_PANEL_E' || id === 'MR_PANEL_L' || id === 'MR_PANEL_U'
+}
+
+/**
+ * Las tipologías que llevan cabina de movilidad reducida SIEMPRE, sin
+ * preguntarlo: el cuarto o la cabina accesible ES la tipología.
+ */
+export function llevaAccesibleSiempre(id: TipologiaId): boolean {
+  return id === 'PMR' || esVariacionPanel(id)
+}
 
 /**
  * Las tipologías que son SOLO orinales: no llevan cabinas, la cantidad que da

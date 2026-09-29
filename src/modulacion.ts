@@ -3,7 +3,10 @@ import {
   LARGO_SECUNDARIO_CM,
 } from './catalog'
 import type { Cabina, Config, Moneda, Pais, Tramo, TipologiaId, RenglonBOM } from './types'
-import { alturasDe, ANCHOS_PILASTRA, esSoloOrinales, familiaDelFrente, mamparaDe, tipologia, tierDeColor, type MedidaMG } from './catalog'
+import {
+  alturasDe, ANCHOS_PILASTRA, esSoloOrinales, esVariacionPanel, familiaDelFrente, llevaAccesibleSiempre,
+  mamparaDe, tipologia, tierDeColor, type MedidaMG,
+} from './catalog'
 import { ajustarPilastras, GRUESO_MG_PIEZA, medidaCercana, modularTira } from './modulador'
 import { precioPieza, type TablaTarifas } from './tarifas'
 
@@ -120,6 +123,17 @@ export function modularConCatalogo(
      * solo se modula el resto del claro.
      */
     cuartoPmrCm?: number
+    /**
+     * Si lo que se planta SE COME una pilastra a muro.
+     *
+     * El cuarto del Tipo C arranca pegado al muro sin pilastra, así que de ese
+     * lado no hay centímetro de herraje que descontar y el resto de la tira
+     * recibe uno menos. En las tipologías "variación panel" no es así: la
+     * cabina accesible lleva su propia pilastra lateral contra el muro, y
+     * además su panel hace de pared para la tira. Ahí el descuento entero —el
+     * muro, el panel y el otro muro si lo hay— se lo lleva el resto.
+     */
+    cuartoComeMuro?: boolean
     /** la tira arranca en orinal sin muro de ese lado: también cierra con mingitorio */
     cierreMingitorioInicio?: boolean
     pais?: Pais
@@ -155,7 +169,7 @@ export function modularConCatalogo(
       claroCm - cuartoCm,
       nResto,
       // del lado del cuarto no hay muro sino la pilastra que lo cierra
-      Math.max(0, murosPilastra - 1),
+      extra?.cuartoComeMuro === false ? murosPilastra : Math.max(0, murosPilastra - 1),
       extremoAbierto,
       {
         ...fijar,
@@ -407,9 +421,16 @@ export function reajustarConPuertas(
    * terminaba engordándolo.
    */
   orinalesPedidos?: (number | null | undefined)[],
+  /**
+   * Si lo que se planta se come una pilastra a muro. Ver `modularConCatalogo`:
+   * el cuarto del Tipo C sí, la cabina accesible de las "variación panel" no.
+   */
+  cuartoComeMuro = true,
 ): { cabinas: Cabina[]; pilastras: number[]; canaletaCm: number; ajuste: Tramo['ajuste']; mensaje: string } | null {
   const n = cabinas.length
   if (n === 0) return null
+  /** lo que le queda al resto de la tira después de plantar el cuarto */
+  const murosDelResto = cuartoComeMuro ? Math.max(0, murosPilastra - 1) : murosPilastra
 
   // El cuarto PMR no entra en el reparto: se planta con su medida y se ajusta
   // el resto. Es la misma regla que en modularConCatalogo, y tiene que valer
@@ -419,7 +440,7 @@ export function reajustarConPuertas(
       return { cabinas: [{ ...cabinas[0], anchoCm: cuartoPmrCm }], pilastras: [0, 0], canaletaCm: 0, ajuste: 'exacto', mensaje: 'Solo el cuarto' }
     }
     const resto = reajustarConPuertas(
-      cabinas.slice(1), claroCm - cuartoPmrCm, Math.max(0, murosPilastra - 1), extremoAbierto,
+      cabinas.slice(1), claroCm - cuartoPmrCm, murosDelResto, extremoAbierto,
       0, fijas ? fijas.slice(1) : undefined,
       pilastrasActuales ? pilastrasActuales.slice(1) : undefined,
       orinalesPedidos ? orinalesPedidos.slice(1) : undefined,
@@ -462,7 +483,7 @@ export function reajustarConPuertas(
   // invertir el área: se planta con su medida y se modula lo que va antes.
   if (cuartoPmrCm > 0 && cabinas[n - 1]?.tipo === 'accesible') {
     const resto = reajustarConPuertas(
-      cabinas.slice(0, n - 1), claroCm - cuartoPmrCm, Math.max(0, murosPilastra - 1), extremoAbierto,
+      cabinas.slice(0, n - 1), claroCm - cuartoPmrCm, murosDelResto, extremoAbierto,
       0, fijas ? fijas.slice(0, n) : undefined,
       pilastrasActuales ? pilastrasActuales.slice(0, n) : undefined,
       orinalesPedidos ? orinalesPedidos.slice(0, n - 1) : undefined,
@@ -586,6 +607,91 @@ export function divisorDelCuarto(
   return { puerta, pilastra, panel: Math.round((profundidadLugarCm - puerta - pilastra) * 10) / 10 }
 }
 
+/** la pilastra lateral con la que arranca el frente de la cabina accesible */
+export const PILASTRA_LATERAL_MR_CM = 19
+
+/**
+ * Cómo se reparte el FRENTE de la cabina de movilidad reducida en las
+ * tipologías "variación panel": pilastra lateral, frente y puerta.
+ *
+ * Es el mismo reparto que el divisor del Tipo C, pero sobre el ANCHO en vez de
+ * sobre el fondo, porque acá se entra por el frente. Quién se estira es el
+ * FRENTE: la pilastra lateral y la puerta son medidas que se eligen, y lo que
+ * quede es la pieza del frente —pilastra si entra en el catálogo del modelo, y
+ * panel si se pasa—.
+ *
+ * La hoja de LEEDER lo dibuja como 19 + 85 + 100 sobre 204 de ancho.
+ *
+ * Vive acá y no en el dibujo porque lo necesitan el plano, el despiece y la
+ * cotización, y los tres tienen que dar el mismo número.
+ */
+export function frenteAccesible(
+  cabina: Cabina,
+  config: Config,
+): { pilastra: number; frente: number; puerta: number } {
+  const puerta = Math.max(0, cabina.puerta.anchoCm || config.puertaAccesibleCm || 100)
+  const pedida = config.pilastraLateralMrCm
+  const pilastra = pedida != null && pedida > 0 ? pedida : PILASTRA_LATERAL_MR_CM
+  return {
+    pilastra,
+    puerta,
+    frente: Math.round((cabina.anchoCm - puerta - pilastra) * 10) / 10,
+  }
+}
+
+/**
+ * El FONDO de la cabina de movilidad reducida. Nunca es menor que el de las
+ * cabinas normales: el receso sería negativo.
+ */
+export function profundidadAccesible(config: Config): number {
+  return Math.max(config.profundidadAccesibleCm ?? config.profundidadCm, config.profundidadCm)
+}
+
+/** el RECESO: cuánto más honda es la cabina accesible que las demás */
+export function recesoDe(config: Config): number {
+  return Math.round((profundidadAccesible(config) - config.profundidadCm) * 10) / 10
+}
+
+/**
+ * Los números con los que se le pide una modulación a un tramo: cuántas
+ * pilastras se apoyan en algo fijo, qué se planta sin negociar, y si eso que se
+ * planta se come un muro.
+ *
+ * Vive en un solo lugar porque lo piden cuatro caminos distintos —crear el
+ * área, cambiar una puerta, arrastrar una pilastra, tocar un orinal— y cuando
+ * la cuenta estaba copiada en cada uno se desincronizaban.
+ */
+export function pedidoDeModulacion(
+  tramo: { muroInicio: boolean; muroFin: boolean },
+  config: Config,
+  llevaAccesible: boolean,
+): { murosPilastra: number; cuartoCm: number; cuartoComeMuro: boolean; extremoAbierto: boolean } {
+  const muros = (tramo.muroInicio ? 1 : 0) + (tramo.muroFin ? 1 : 0)
+  // Un extremo ABIERTO —sin muro— perdona que las piezas queden algo cortas:
+  // ahí no hay nada contra lo que tengan que topar. Se mira la pared de verdad,
+  // no el descuento: en una "variación panel" el descuento sube porque el panel
+  // cuenta como pared, pero la punta de la tira sigue estando abierta o no
+  // según haya muro.
+  const extremoAbierto = muros < 2
+  if (esVariacionPanel(config.tipologia)) {
+    // El panel de la cabina accesible cuenta como una pared más: la tira le
+    // apoya encima su pilastra lateral y se come el mismo centímetro de
+    // herraje. Por eso en la U se descuentan 3 y no 2.
+    // la accesible se planta en una punta, así que la que puede quedar abierta
+    // es la otra: la del final de la tira
+    return {
+      murosPilastra: muros + 1,
+      cuartoCm: anchoAccesibleDe(config),
+      cuartoComeMuro: false,
+      extremoAbierto: !tramo.muroFin,
+    }
+  }
+  if (config.tipologia === 'PMR' && llevaAccesible) {
+    return { murosPilastra: muros, cuartoCm: anchoAccesibleDe(config), cuartoComeMuro: true, extremoAbierto }
+  }
+  return { murosPilastra: muros, cuartoCm: 0, cuartoComeMuro: true, extremoAbierto }
+}
+
 /** la profundidad del lugar, que nunca puede ser menor que la de la cabina */
 export function profundidadDelLugar(config: Config): number {
   return Math.max(config.profundidadLugarCm ?? config.profundidadCm, config.profundidadCm)
@@ -692,7 +798,7 @@ export function ladosDeCabina(
 
 /** si la tira arranca con el cuarto PMR, que no comparte su pilastra */
 export function arrancaElCuartoPmr(tramo: Tramo, config: Config): boolean {
-  return config.tipologia === 'PMR' && tramo.cabinas[0]?.tipo === 'accesible'
+  return llevaAccesibleSiempre(config.tipologia) && tramo.cabinas[0]?.tipo === 'accesible'
 }
 
 /**
@@ -705,7 +811,7 @@ export function arrancaElCuartoPmr(tramo: Tramo, config: Config): boolean {
  */
 export function cierraElCuartoPmr(tramo: Tramo, config: Config): boolean {
   const n = tramo.cabinas.length
-  return config.tipologia === 'PMR' && n > 1 && tramo.cabinas[n - 1]?.tipo === 'accesible'
+  return llevaAccesibleSiempre(config.tipologia) && n > 1 && tramo.cabinas[n - 1]?.tipo === 'accesible'
 }
 
 /** en qué punta está el cuarto accesible, o null si el área no lo lleva */
@@ -867,7 +973,7 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
   // así que ahí se sigue deduciendo de la tipología.
   // En el PMR el cuarto accesible ES la tipología: no es una pregunta aparte,
   // va siempre. En las demás lo decide el vendedor.
-  const conAccesible = tipologiaId === 'PMR' || config.llevaAccesible === true
+  const conAccesible = llevaAccesibleSiempre(tipologiaId) || config.llevaAccesible === true
   const soloOrinales = esSoloOrinales(tipologiaId)
   /**
    * Los orinales se suman APARTE de las cabinas y van a un costado, como en el
@@ -901,17 +1007,23 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
       muroInicio: t.muroInicio,
       muroFin: t.muroFin,
     }
-    const muros = murosT
     // El cuarto PMR arranca contra el muro SIN pilastra: ese muro no se come el
     // medio centímetro de herraje, así que tampoco cuenta para el claro ajustado.
-    const sinPilastraInicio = config.tipologia === 'PMR' && conAccesible && esPrincipal
-    const murosConPilastra = Math.max(0, murosT - (sinPilastraInicio ? 1 : 0))
+    // En una "variación panel" es al revés: el panel suma uno.
+    const pedido = pedidoDeModulacion(t, config, conAccesible && esPrincipal)
+    const planta = esPrincipal && pedido.cuartoCm > 0
+    const sinPilastraInicio = planta && pedido.cuartoComeMuro
+    // Cuando lo que se planta NO se come un muro —las "variación panel"— el
+    // descuento entero se lo lleva el resto de la tira, panel incluido.
+    const murosConPilastra = pedido.cuartoComeMuro
+      ? Math.max(0, murosT - (sinPilastraInicio ? 1 : 0))
+      : pedido.murosPilastra
 
     // La cabina accesible ya no tiene camino aparte: es una cabina con puerta
     // ancha, así que sale del mismo buscador que las demás.
     // Si el cliente pidió una medida de puerta, esa manda: el buscador solo
     // puede mover las pilastras. Es la regla del negocio, no una preferencia.
-    const conCatalogo = modularConCatalogo(claroTramo, soloOrinales ? cant : total, murosConPilastra, muros < 2, { puerta: config.puertaCm, puertaAccesible: config.puertaAccesibleCm }, {
+    const conCatalogo = modularConCatalogo(claroTramo, soloOrinales ? cant : total, murosConPilastra, pedido.extremoAbierto, { puerta: config.puertaCm, puertaAccesible: config.puertaAccesibleCm }, {
       modelo: config.modelo,
       profundidadCm: config.profundidadCm,
       accesible: conAccesible && esPrincipal,
@@ -923,8 +1035,10 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
       // si la tira termina en orinal y de ese lado no hay muro, cierra con mingitorio
       cierreMingitorio: !t.muroFin && (soloOrinales ? cant : ming) > 0,
       cierreMingitorioInicio: soloOrinales && !t.muroInicio,
-      // el cuarto PMR se planta y solo se modula el resto
-      cuartoPmrCm: sinPilastraInicio ? anchoAccesibleDe(config) : 0,
+      // el cuarto PMR, o la cabina accesible de una "variación panel", se
+      // planta y solo se modula el resto
+      cuartoPmrCm: planta ? pedido.cuartoCm : 0,
+      cuartoComeMuro: pedido.cuartoComeMuro,
       pais,
     })
     if (!conCatalogo) {

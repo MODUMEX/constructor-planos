@@ -1,5 +1,5 @@
 import type { Area, Cabina, Config, Tramo } from '../types'
-import { alturasDe, esSoloOrinales, familiaDelFrente, mamparaDe, nombreModelo, tipologia } from '../catalog'
+import { alturasDe, esSoloOrinales, esVariacionPanel, familiaDelFrente, llevaAccesibleSiempre, mamparaDe, nombreModelo, tipologia } from '../catalog'
 import { arrancaConMingitorio } from '../modulacion'
 import { cierraConMingitorio, fronteraDeOrinal } from '../modulacion'
 import { cuartoPmr } from '../geometria'
@@ -146,7 +146,9 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
         // El panel del divisor del cuarto PMR tampoco divide dos cabinas: es la
         // pared del cuarto, así que va LATERAL, igual que la pilastra que lo
         // acompaña.
-        const esDelCuarto = config.tipologia === 'PMR' && cab.tipo === 'accesible'
+        // Vale igual para las "variación panel": el panel que separa la cabina
+        // accesible de la tira es su pared, y es más hondo que los demás.
+        const esDelCuarto = llevaAccesibleSiempre(config.tipologia) && cab.tipo === 'accesible'
         // El del cuarto es más largo que los demás: el cuarto es más hondo y su
         // panel se estira hasta cerrar el divisor.
         const delCuarto = esDelCuarto ? cuartoPmr(tramo, config) : null
@@ -202,10 +204,12 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
     // frontera no es del campo.
     // El cuarto PMR arranca contra el muro y lo cierra ese muro, no una
     // pilastra: la que lleva es la del divisor, contra el muro del fondo.
-    const arrancaElCuarto = config.tipologia === 'PMR' && tramo.cabinas[0]?.tipo === 'accesible'
+    // Vale igual para las "variación panel": la accesible se planta y su
+    // frontera 0 no tiene pilastra de tira, sale del frente.
+    const arrancaElCuarto = llevaAccesibleSiempre(config.tipologia) && tramo.cabinas[0]?.tipo === 'accesible'
     // Al invertir el área el cuarto se va a la otra punta: ahí la pilastra que
     // no va es la del FINAL. Sin esto salía una pilastra de 0 cm en el despiece.
-    const cierraElCuarto = config.tipologia === 'PMR' && n > 1 && tramo.cabinas[n - 1]?.tipo === 'accesible'
+    const cierraElCuarto = llevaAccesibleSiempre(config.tipologia) && n > 1 && tramo.cabinas[n - 1]?.tipo === 'accesible'
     if (!omitirPilastraInicial && !fronteraDeOrinal(tramo, 0) && !arrancaElCuarto) {
       piezas.push({
         familia: familiaDe(0),
@@ -226,7 +230,7 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
       // La que sale del cuarto PMR tampoco divide dos cabinas: cierra el cuarto
       // y arranca la tira, así que es LATERAL.
       const salaDelCuarto =
-        config.tipologia === 'PMR' &&
+        llevaAccesibleSiempre(config.tipologia) &&
         (tramo.cabinas[i].tipo === 'accesible' || tramo.cabinas[i + 1].tipo === 'accesible')
       piezas.push({
         familia: familiaDe(i + 1),
@@ -250,6 +254,51 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
   }
 
   return piezas
+}
+
+/**
+ * Las piezas del FRENTE de la cabina accesible en las "variación panel": la
+ * pilastra lateral y la pieza del frente.
+ *
+ * No salen de la tira: la cabina accesible se planta y su frente se reparte
+ * aparte, igual que el divisor del Tipo C se reparte sobre el fondo. La puerta
+ * no va acá —sale de la cabina, como todas—.
+ */
+function piezasDelFrente(area: Area): Pieza[] {
+  if (!esVariacionPanel(area.config.tipologia)) return []
+  const salida: Pieza[] = []
+  for (const tramo of area.tramos) {
+    const cuarto = cuartoPmr(tramo, area.config)
+    if (!cuarto || cuarto.entrada !== 'frente') continue
+    for (const pieza of cuarto.frente) {
+      if (pieza.tipo === 'puerta') continue
+      const ancho = Math.round((pieza.hastaCm - pieza.desdeCm) * 10) / 10
+      if (ancho <= 0) continue
+      const familia = familiaDelFrente(ancho, area.config.modelo)
+      salida.push({
+        familia,
+        anchoCm: ancho,
+        altoCm: altoPilastra(area.config),
+        // la lateral topa contra el muro o contra el panel de cierre; la del
+        // frente cierra la cabina, así que también es lateral
+        subTipo: familia === 'PN' ? 'PNLAT' : pieza.tipo === 'pilastra' && tramo.muroInicio ? 'PLLATMUR' : 'PLLAT',
+        area: area.nombre,
+      })
+    }
+    // Sin muro de ese lado —el Tipo E— la cabina accesible cierra con un panel
+    // suyo, y es más hondo que los de las demás cabinas porque ella lo es.
+    const sinMuro = cuarto.lado === 'inicio' ? !tramo.muroInicio : !tramo.muroFin
+    if (sinMuro) {
+      salida.push({
+        familia: 'PN',
+        anchoCm: cuarto.profCm,
+        altoCm: alturasDe(area.config.modelo).panel,
+        subTipo: 'PNLAT',
+        area: area.nombre,
+      })
+    }
+  }
+  return salida
 }
 
 /**
@@ -280,6 +329,7 @@ export function piezasDeArea(area: Area): Pieza[] {
     piezasDeTramo(t, area.config, area.nombre, tipo.esquinaCompartida && i !== tipo.principal),
   )
   piezas.push(...pilastraDelDivisor(area))
+  piezas.push(...piezasDelFrente(area))
 
   // orinales sueltos de un baño mixto: N orinales llevan N−1 divisores.
   // En un área de solo orinales los divisores ya salieron de las propias cabinas.

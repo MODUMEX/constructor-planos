@@ -152,6 +152,11 @@ export type TipologiaId =
   | 'PMR'
   | 'ORINALES'
   | 'ORINALES_ENTRE_MUROS'
+  // Las tres de la hoja de LEEDER que llevan la cabina de movilidad reducida
+  // MÁS HONDA que el resto, con su panel haciendo de pared para la tira.
+  | 'MR_PANEL_E'
+  | 'MR_PANEL_L'
+  | 'MR_PANEL_U'
 
 export type Terminacion = 'ZOCLO' | 'PATAS'
 
@@ -170,6 +175,24 @@ export interface Config {
   alturaCm: number
   profundidadCm: number
   anchoAccesibleCm: number
+  /**
+   * El FONDO de la cabina de movilidad reducida, en cm.
+   *
+   * Solo lo usan las tipologías "variación panel": ahí la cabina accesible es
+   * más honda que las demás —la hoja de LEEDER las dibuja con 180 contra los
+   * 135 del resto— y esa diferencia es el RECESO en el que se mete la tira de
+   * baños. Si no viene, se usa el fondo de las cabinas normales y no hay
+   * receso.
+   */
+  profundidadAccesibleCm?: number
+  /**
+   * La pilastra LATERAL con la que arranca el frente de la cabina accesible en
+   * las tipologías "variación panel", en cm.
+   *
+   * Es la que se elige —se arrastra en el plano, igual que las de la tira— y la
+   * pieza del FRENTE se lleva lo que quede. La hoja de LEEDER la dibuja de 19.
+   */
+  pilastraLateralMrCm?: number
   /**
    * La medida de puerta que pidió el cliente, en cm. No se captura en un campo
    * aparte: queda pedida cuando se elige una medida en el menú del plano. La

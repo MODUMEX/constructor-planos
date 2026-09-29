@@ -16,12 +16,75 @@ export interface Usuario {
   deLaNube: boolean
   /** token de la sesión, para leer tarifas y demás tablas */
   token?: string
+  /**
+   * Con qué renovar el token sin volver a pedir la contraseña.
+   *
+   * El token de Supabase vive una hora. Antes solo se guardaba ese: con la
+   * aplicación abierta más de una hora TODO lo de la nube empezaba a fallar con
+   * un 401 —guardar, listar, las tarifas— y el aviso no decía por qué.
+   */
+  refresh?: string
+  /** cuándo vence el token, en milisegundos */
+  expiraEl?: number
 }
 
 const URL_SUPABASE = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const LLAVE_SUPABASE = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
 
 export const hayNube = Boolean(URL_SUPABASE && LLAVE_SUPABASE)
+
+/** cuándo vence la sesión que devolvió Supabase, en milisegundos */
+function vencimiento(sesion: { expires_in?: number; expires_at?: number }): number {
+  if (typeof sesion.expires_at === 'number') return sesion.expires_at * 1000
+  return Date.now() + (Number(sesion.expires_in) || 3600) * 1000
+}
+
+/**
+ * Renueva el token con el refresh, sin volver a pedir la contraseña.
+ *
+ * Muta el usuario A PROPÓSITO, además de devolver la copia para el estado de
+ * React: puede haber llamadas en vuelo que ya tienen ese objeto en la mano y
+ * tienen que salir con el token nuevo.
+ */
+export function renovarSesion(u: Usuario | null): Promise<Usuario | null> {
+  if (!hayNube || !u?.deLaNube || !u.refresh) return Promise.resolve(null)
+  // Supabase ROTA el refresh: si dos renovaciones salen a la vez, la segunda
+  // usa uno que ya se gastó y tumba la sesión. Por eso se comparte la que ya
+  // está en vuelo —el reloj y un reintento de guardado pueden coincidir—.
+  if (!enVuelo) {
+    enVuelo = pedirRenovacion(u).finally(() => {
+      enVuelo = null
+    })
+  }
+  return enVuelo
+}
+
+let enVuelo: Promise<Usuario | null> | null = null
+
+async function pedirRenovacion(u: Usuario): Promise<Usuario | null> {
+  try {
+    const r = await fetch(`${URL_SUPABASE}/auth/v1/token?grant_type=refresh_token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: LLAVE_SUPABASE! },
+      body: JSON.stringify({ refresh_token: u.refresh }),
+    })
+    if (!r.ok) return null
+    const sesion = await r.json()
+    if (!sesion?.access_token) return null
+    u.token = sesion.access_token
+    u.refresh = sesion.refresh_token ?? u.refresh
+    u.expiraEl = vencimiento(sesion)
+    return { ...u }
+  } catch {
+    return null
+  }
+}
+
+/** cuánto falta para que venza el token, en milisegundos, o null si no aplica */
+export function faltaParaVencer(u: Usuario | null): number | null {
+  if (!u?.deLaNube || !u.refresh || !u.expiraEl) return null
+  return u.expiraEl - Date.now()
+}
 
 export const IVA_CR = 13
 export const IVA_MX = 16
@@ -148,6 +211,8 @@ async function entrarPorSupabase(email: string, clave: string): Promise<Usuario>
     distribuidorId: perfil.distribuidor_id,
     deLaNube: true,
     token,
+    refresh: sesion.refresh_token,
+    expiraEl: vencimiento(sesion),
   }
 }
 

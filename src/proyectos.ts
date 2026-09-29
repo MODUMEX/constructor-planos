@@ -1,4 +1,4 @@
-import type { Usuario } from './auth'
+import { renovarSesion, type Usuario } from './auth'
 import type { Proyecto } from './types'
 
 /**
@@ -85,6 +85,21 @@ function sesionValida(u: Usuario | null): string | null {
   return null
 }
 
+/**
+ * Hace la llamada y, si el token venció, lo renueva y la repite UNA vez.
+ *
+ * Es la red de la red: la aplicación ya renueva sola antes de que venza, pero
+ * si la computadora estuvo suspendida el token puede llegar vencido igual. Sin
+ * esto, guardar devolvía "Supabase respondió 401" y lo único que quedaba era
+ * cerrar sesión y volver a entrar.
+ */
+async function conSesion(u: Usuario, hacer: (token: string) => Promise<Response>): Promise<Response> {
+  const r = await hacer(u.token!)
+  if (r.status !== 401) return r
+  if (!(await renovarSesion(u))) return r
+  return hacer(u.token!)
+}
+
 function cabeceras(token: string, extra?: Record<string, string>): Record<string, string> {
   return {
     apikey: LLAVE_SUPABASE!,
@@ -95,9 +110,16 @@ function cabeceras(token: string, extra?: Record<string, string>): Record<string
   }
 }
 
+/**
+ * El error tal como lo devuelve Supabase.
+ *
+ * Se muestra ENTERO a propósito: cortado a 200 caracteres se perdía
+ * justo la parte que dice qué pasó —la columna que falta, la regla de RLS
+ * que rebotó— y no quedaba con qué arreglarlo.
+ */
 async function detalle(r: Response): Promise<string> {
-  const t = await r.text().catch(() => '')
-  return `Supabase respondió ${r.status}. ${t.slice(0, 200)}`
+  const t = (await r.text().catch(() => '')).trim()
+  return `Supabase respondió ${r.status}. ${t || r.statusText}`
 }
 
 /**
@@ -111,9 +133,11 @@ export async function listarProyectos(usuario: Usuario | null): Promise<Resultad
 
   const campos = 'proyecto_id,codigo,numero_plano,revision,nombre,cliente,ubicacion,estado,actualizado_el'
   try {
-    const r = await fetch(
-      `${URL_SUPABASE}/rest/v1/proyecto?select=${campos}&app_json->>app=eq.${MARCA_APP}&order=actualizado_el.desc`,
-      { headers: cabeceras(usuario!.token!) },
+    const r = await conSesion(usuario!, (token) =>
+      fetch(
+        `${URL_SUPABASE}/rest/v1/proyecto?select=${campos}&app_json->>app=eq.${MARCA_APP}&order=actualizado_el.desc`,
+        { headers: cabeceras(token) },
+      ),
     )
     if (!r.ok) return { ok: false, mensaje: await detalle(r) }
     const filas = (await r.json()) as FilaLista[]
@@ -145,9 +169,11 @@ export async function siguienteNumero(usuario: Usuario | null): Promise<Resultad
   if (falta) return { ok: false, mensaje: falta }
 
   try {
-    const r = await fetch(`${URL_SUPABASE}/rest/v1/proyecto?select=numero_plano,codigo`, {
-      headers: cabeceras(usuario!.token!),
-    })
+    const r = await conSesion(usuario!, (token) =>
+      fetch(`${URL_SUPABASE}/rest/v1/proyecto?select=numero_plano,codigo`, {
+        headers: cabeceras(token),
+      }),
+    )
     if (!r.ok) return { ok: false, mensaje: await detalle(r) }
     const filas = (await r.json()) as { numero_plano: string | null; codigo: string }[]
     let mayor = 0
@@ -179,6 +205,17 @@ export async function guardarProyecto(
   usuario: Usuario | null,
   proyecto: Proyecto,
   revision: Revision,
+  /**
+   * De qué distribuidor es el proyecto: el de la COTIZACIÓN, el que se elige
+   * en el paso 1, no el del usuario que le da a guardar.
+   *
+   * Es lo mismo que ya hacen el IVA y el descuento. Cuando iba el del usuario,
+   * todo lo que guardaba un administrador o un vendedor quedaba sin dueño
+   * (`distribuidor_id` en NULL): el distribuidor no lo veía, no lo podía
+   * regrabar —el upsert se vuelve UPDATE y la RLS lo rechaza— y encima el
+   * número de plano le quedaba quemado.
+   */
+  distribuidorId?: number | null,
 ): Promise<Resultado<ProyectoEnLista>> {
   if (!URL_SUPABASE || !LLAVE_SUPABASE) return sinNube()
   const falta = sesionValida(usuario)
@@ -197,8 +234,10 @@ export async function guardarProyecto(
     nombre: proyecto.obra || `Plano ${proyecto.numero}`,
     cliente: proyecto.cliente || null,
     ubicacion: proyecto.ubicacion || null,
-    // el dueño del proyecto es el distribuidor; un admin puede guardar sin uno
-    distribuidor_id: u.distribuidorId ? Number(u.distribuidorId) : null,
+    // El dueño es el distribuidor de la cotización. Si no se pudo resolver
+    // —una cotización sin distribuidor elegido— cae en el del usuario, que es
+    // lo que se hacía antes.
+    distribuidor_id: distribuidorId ?? (u.distribuidorId ? Number(u.distribuidorId) : null),
     creado_por: u.id,
     // las columnas de resumen son para poder mirar la tabla sin abrir el JSON
     linea_codigo: codigoLinea(config.linea),
@@ -216,14 +255,16 @@ export async function guardarProyecto(
   }
 
   try {
-    const r = await fetch(`${URL_SUPABASE}/rest/v1/proyecto?on_conflict=codigo`, {
-      method: 'POST',
-      headers: cabeceras(u.token!, {
-        // merge-duplicates es lo que convierte el insert en upsert
-        Prefer: 'resolution=merge-duplicates,return=representation',
+    const r = await conSesion(u, (token) =>
+      fetch(`${URL_SUPABASE}/rest/v1/proyecto?on_conflict=codigo`, {
+        method: 'POST',
+        headers: cabeceras(token, {
+          // merge-duplicates es lo que convierte el insert en upsert
+          Prefer: 'resolution=merge-duplicates,return=representation',
+        }),
+        body: JSON.stringify([fila]),
       }),
-      body: JSON.stringify([fila]),
-    })
+    )
     if (!r.ok) return { ok: false, mensaje: await detalle(r) }
     const filas = (await r.json()) as FilaLista[]
     const f = filas[0]
@@ -254,9 +295,11 @@ export async function abrirProyecto(usuario: Usuario | null, proyectoId: number)
   if (falta) return { ok: false, mensaje: falta }
 
   try {
-    const r = await fetch(
-      `${URL_SUPABASE}/rest/v1/proyecto?select=codigo,app_json&proyecto_id=eq.${proyectoId}`,
-      { headers: cabeceras(usuario!.token!) },
+    const r = await conSesion(usuario!, (token) =>
+      fetch(
+        `${URL_SUPABASE}/rest/v1/proyecto?select=codigo,app_json&proyecto_id=eq.${proyectoId}`,
+        { headers: cabeceras(token) },
+      ),
     )
     if (!r.ok) return { ok: false, mensaje: await detalle(r) }
     const filas = (await r.json()) as { codigo: string; app_json: unknown }[]
@@ -285,10 +328,12 @@ export async function borrarProyecto(usuario: Usuario | null, proyectoId: number
   if (falta) return { ok: false, mensaje: falta }
 
   try {
-    const r = await fetch(`${URL_SUPABASE}/rest/v1/proyecto?proyecto_id=eq.${proyectoId}`, {
-      method: 'DELETE',
-      headers: cabeceras(usuario!.token!, { Prefer: 'return=minimal' }),
-    })
+    const r = await conSesion(usuario!, (token) =>
+      fetch(`${URL_SUPABASE}/rest/v1/proyecto?proyecto_id=eq.${proyectoId}`, {
+        method: 'DELETE',
+        headers: cabeceras(token, { Prefer: 'return=minimal' }),
+      }),
+    )
     if (!r.ok) return { ok: false, mensaje: await detalle(r) }
     return { ok: true, mensaje: 'Revisión borrada.' }
   } catch (e) {
@@ -375,11 +420,13 @@ export async function siguienteNumeroPlano(
   if (falta) return { ok: false, mensaje: falta }
 
   try {
-    const r = await fetch(`${URL_SUPABASE}/rest/v1/rpc/siguiente_numero_plano`, {
-      method: 'POST',
-      headers: cabeceras(usuario!.token!),
-      body: JSON.stringify({ p_prefijo: prefijo }),
-    })
+    const r = await conSesion(usuario!, (token) =>
+      fetch(`${URL_SUPABASE}/rest/v1/rpc/siguiente_numero_plano`, {
+        method: 'POST',
+        headers: cabeceras(token),
+        body: JSON.stringify({ p_prefijo: prefijo }),
+      }),
+    )
     if (r.ok) {
       const n = Number(await r.json())
       if (Number.isFinite(n) && n > 0) return { ok: true, dato: n, mensaje: '' }
@@ -413,11 +460,13 @@ export async function numeroTomado(
   if (falta) return { ok: false, mensaje: falta }
 
   try {
-    const r = await fetch(`${URL_SUPABASE}/rest/v1/rpc/numero_plano_tomado`, {
-      method: 'POST',
-      headers: cabeceras(usuario!.token!),
-      body: JSON.stringify({ p_numero: numero.trim() }),
-    })
+    const r = await conSesion(usuario!, (token) =>
+      fetch(`${URL_SUPABASE}/rest/v1/rpc/numero_plano_tomado`, {
+        method: 'POST',
+        headers: cabeceras(token),
+        body: JSON.stringify({ p_numero: numero.trim() }),
+      }),
+    )
     if (r.ok) {
       const filas = (await r.json()) as { existe: boolean; es_mio: boolean }[]
       const f = Array.isArray(filas) ? filas[0] : (filas as unknown as { existe: boolean; es_mio: boolean })

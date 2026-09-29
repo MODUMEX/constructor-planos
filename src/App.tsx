@@ -12,13 +12,13 @@ import { abrirProyecto, armarNumero, numeroTomado, partirNumero, siguienteNumero
 import {
   autorizar as autorizarEnOdoo, cuadran, guardarCotizacion, lineasParaOdoo, rechazar as rechazarCotizacion,
 } from './odoo/enviar'
-import { esAdmin, IVA_CR, puedeCatalogos, puedeColoresReservados, puedeDistribuidores, puedePiezas, puedeUsuarios, type Usuario } from './auth'
+import { esAdmin, faltaParaVencer, IVA_CR, puedeCatalogos, puedeColoresReservados, puedeDistribuidores, puedePiezas, puedeUsuarios, renovarSesion, type Usuario } from './auth'
 import type { Area, Cabina, Config, Moneda, Pais, Proyecto, TipoCabina, TipologiaId, Tramo } from './types'
 import {
   acabadoEsElColor, acabadosPara, alturasDe, anchosPanel, claroAjustado, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, mgMedidas, MODELOS,
   type PiezaEspecial,
   PAISES, etiquetaTier, nombreHerraje, nombreModelo, tierDeColor, TIPOLOGIAS, tipologia, tipologiaEspejo,
-  ANCHOS_PILASTRA, esEspecial, esSoloOrinales,
+  ANCHOS_PILASTRA, esEspecial, esSoloOrinales, esVariacionPanel,
 } from './catalog'
 import { medidaCercana } from './modulador'
 import VistaRender from './components/VistaRender'
@@ -29,7 +29,10 @@ import Solicitudes from './components/Solicitudes'
 import { contarSolicitudes } from './solicitudes'
 import { coloresMxPara, slugRenderMx } from './coloresMx'
 import { fotoDe, fotosHerraje, faltanFotosHerraje, terminacionesDe } from './renders'
-import { anchoAccesibleDe, anchoTotal, bom, claroDeOrinales, crearTramos, esEspacioLibre, invertirTramo, modularConCatalogo, nuevoId, reajustarConPuertas } from './modulacion'
+import {
+  anchoAccesibleDe, anchoTotal, bom, claroDeOrinales, crearTramos, esEspacioLibre, frenteAccesible,
+  invertirTramo, modularConCatalogo, nuevoId, pedidoDeModulacion, reajustarConPuertas, recesoDe,
+} from './modulacion'
 import { anchoDeOrinal } from './geometria'
 import { cargarTarifas, type ResultadoTarifas } from './tarifas'
 import { buscarActualizacion, type FaseActualizacion } from './actualizar'
@@ -299,6 +302,51 @@ export default function App() {
     }
   }, [usuario?.token])
 
+  /**
+   * Mantiene viva la sesión de Supabase.
+   *
+   * El token dura una hora. La aplicación se queda abierta todo el día —y la
+   * computadora se suspende—, así que se renueva sola unos minutos antes de
+   * vencer y también al volver a la ventana. Sin esto, pasada la hora fallaba
+   * TODO lo de la nube con un 401: guardar, listar proyectos, las tarifas; y
+   * como "+ Proyecto nuevo" guarda antes de limpiar, ese botón también moría.
+   */
+  useEffect(() => {
+    if (!usuario?.deLaNube || !usuario.refresh) return
+    let vigente = true
+    let reloj: ReturnType<typeof setTimeout> | undefined
+
+    /** renueva si falta poco, y deja programada la próxima */
+    async function mantener() {
+      if (!vigente) return
+      const falta = faltaParaVencer(usuario)
+      if (falta == null) return
+      // cinco minutos de margen: alcanza para que una llamada larga no se caiga
+      const margen = 5 * 60 * 1000
+      if (falta <= margen) {
+        const nuevo = await renovarSesion(usuario)
+        if (!vigente) return
+        if (nuevo) setUsuario(nuevo)
+        else return // el refresh ya no sirve: se va a pedir entrar de nuevo
+      }
+      const siguiente = Math.max(30_000, (faltaParaVencer(usuario) ?? margen) - margen)
+      reloj = setTimeout(() => void mantener(), siguiente)
+    }
+
+    void mantener()
+    const alVolver = () => {
+      if (document.visibilityState === 'visible') void mantener()
+    }
+    document.addEventListener('visibilitychange', alVolver)
+    window.addEventListener('focus', alVolver)
+    return () => {
+      vigente = false
+      if (reloj) clearTimeout(reloj)
+      document.removeEventListener('visibilitychange', alVolver)
+      window.removeEventListener('focus', alVolver)
+    }
+  }, [usuario])
+
   // Un distribuidor no elige: sus planos salen a su nombre, así que se pone solo
   useEffect(() => {
     if (usuario?.rol !== 'Distribuidor' || !usuario.distribuidorNombre) return
@@ -431,6 +479,14 @@ export default function App() {
   const llevaAccesible = config.tipologia === 'PMR' || config.llevaAccesible === true
   /** el área es un CUARTO accesible, no una cabina accesible en la tira */
   const esPmrCuarto = config.tipologia === 'PMR'
+  /** las tres de la hoja de LEEDER con la accesible más honda y su panel de pared */
+  const esVariacion = esVariacionPanel(config.tipologia)
+  /** cómo queda repartido el frente de la accesible, para mostrarlo al pedir medidas */
+  const frenteMr = frenteAccesible(
+    area.tramos[0]?.cabinas.find((c) => c.tipo === 'accesible')
+      ?? { puerta: { anchoCm: config.puertaAccesibleCm ?? 100 }, anchoCm: config.anchoAccesibleCm } as Cabina,
+    config,
+  )
   /**
    * Cuántos orinales tiene el área. En las tipologías con cabinas los orinales
    * van aparte y los cuenta `config.orinales`; en las de solo orinales, la
@@ -491,7 +547,7 @@ export default function App() {
    * 141 cm, 30 · 40 · 50 no llega y hay que verlo antes, no después.
    */
   function sumaPilastras(t: Area['tramos'][number]): number {
-    const muros = (t.muroInicio ? 1 : 0) + (t.muroFin ? 1 : 0)
+    const muros = pedidoDeModulacion(t, config, llevaAccesible).murosPilastra
     const conPuerta = t.cabinas.filter((c) => c.tipo !== 'orinal').length
     const cuerpos = t.cabinas.reduce(
       (s, c) => s + (c.tipo === 'orinal' ? c.anchoCm : c.puerta.anchoCm), 0,
@@ -595,7 +651,12 @@ export default function App() {
     const ocupadas = (lista.dato ?? []).filter((p) => p.numeroPlano === numero).map((p) => p.revision)
     const huella = huellaDe(proyecto)
     const elegida = revisionAGuardar(revisionGuardada?.revision ?? null, ocupadas, hayCambiosSinGuardar)
-    const g = await guardarProyecto(usuario, proyecto, elegida.revision)
+    // El proyecto queda a nombre del distribuidor de la cotización, no del
+    // usuario que guarda: es el mismo criterio del IVA y del descuento.
+    const dueno = distribuidores.find(
+      (d) => d.nombre.trim().toLowerCase() === proyecto.distribuidor.trim().toLowerCase(),
+    )
+    const g = await guardarProyecto(usuario, proyecto, elegida.revision, dueno?.distribuidorId ?? null)
     if (!g.ok) return fallar(g.mensaje)
     setGuardandoProyecto(false)
     setRevisionGuardada({ revision: elegida.revision, huella, numero })
@@ -823,11 +884,10 @@ export default function App() {
     const cabinas = t.cabinas.map((c, i) =>
       i === indice ? { ...c, puerta: { ...c.puerta, anchoCm: anchoPuertaCm } } : c,
     )
-    const muros = (t.muroInicio ? 1 : 0) + (t.muroFin ? 1 : 0)
+    const p = pedidoDeModulacion(t, config, llevaAccesible)
     const r = reajustarConPuertas(
-      cabinas, t.claroCm, muros, muros < 2,
-      config.tipologia === 'PMR' && llevaAccesible ? anchoAccesibleDe(config) : 0,
-      undefined, t.pilastras, orinalesPedidosDe(t),
+      cabinas, t.claroCm, p.murosPilastra, p.extremoAbierto,
+      p.cuartoCm, undefined, t.pilastras, orinalesPedidosDe(t), p.cuartoComeMuro,
     )
     setArea({
       tramos: area.tramos.map((x) =>
@@ -888,7 +948,7 @@ export default function App() {
     /** las posiciones que quedan clavadas para la próxima vez */
     clavadas?: number[],
   ) {
-    const muros = (t.muroInicio ? 1 : 0) + (t.muroFin ? 1 : 0)
+    const p = pedidoDeModulacion(t, config, llevaAccesible)
     // Con un ESPACIO LIBRE en la tira, el hueco absorbe lo que haga falta, así
     // que NO hay por qué recalcular las demás pilastras: se dejan las que ya
     // tiene y solo se aplica lo que se tocó. Antes se volvían a buscar todas y
@@ -898,9 +958,8 @@ export default function App() {
       cambios?.[k] ?? t.pilastras?.[k] ?? null,
     )
     const r = reajustarConPuertas(
-      cabinas, t.claroCm, muros, muros < 2,
-      config.tipologia === 'PMR' && llevaAccesible ? anchoAccesibleDe(config) : 0,
-      fijas, t.pilastras, orinalesPedidosDe(t),
+      cabinas, t.claroCm, p.murosPilastra, p.extremoAbierto,
+      p.cuartoCm, fijas, t.pilastras, orinalesPedidosDe(t), p.cuartoComeMuro,
     )
     if (!r) return false
     setArea({
@@ -930,18 +989,17 @@ export default function App() {
     const cabinas = t.cabinas.map((c, i) =>
       i === indice ? { ...c, puerta: { ...c.puerta, tipo }, libreCm: tipo === 'ninguna' ? c.libreCm : undefined } : c,
     )
-    const muros = (t.muroInicio ? 1 : 0) + (t.muroFin ? 1 : 0)
+    const p = pedidoDeModulacion(t, config, llevaAccesible)
     // Sacar o poner la puerta no es motivo para mover el resto: si queda un
     // espacio libre, es el hueco el que absorbe la diferencia. Por eso se
     // conservan las pilastras que la tira ya tenía.
     const hayHueco = cabinas.some(esEspacioLibre)
     const r = reajustarConPuertas(
-      cabinas, t.claroCm, muros, muros < 2,
-      config.tipologia === 'PMR' && llevaAccesible ? anchoAccesibleDe(config) : 0,
+      cabinas, t.claroCm, p.murosPilastra, p.extremoAbierto, p.cuartoCm,
       hayHueco
         ? Array.from({ length: cabinas.length + 1 }, (_, k) => t.pilastras?.[k] ?? null)
         : undefined,
-      t.pilastras, orinalesPedidosDe(t),
+      t.pilastras, orinalesPedidosDe(t), p.cuartoComeMuro,
     )
     setArea({
       tramos: area.tramos.map((x) =>
@@ -1017,12 +1075,12 @@ export default function App() {
       return
     }
 
-    const muros = (t.muroInicio ? 1 : 0) + (t.muroFin ? 1 : 0)
+    const p = pedidoDeModulacion(t, config, llevaAccesible)
     const r = modularConCatalogo(
       t.claroCm,
       t.cabinas.length,
-      muros,
-      muros < 2,
+      p.murosPilastra,
+      p.extremoAbierto,
       {
         // las pilastras que ella ya eligió y las puertas no se tocan
         pilastras: Array.from({ length: t.cabinas.length + 1 }, (_, i) =>
@@ -1036,8 +1094,10 @@ export default function App() {
         accesible: llevaAccesible,
         profundidadCm: config.profundidadCm,
         anchoAccesibleMinCm: anchoAccesibleDe(config),
-        // el cuarto PMR no negocia su ancho, tampoco al volver a modular
-        cuartoPmrCm: config.tipologia === 'PMR' && llevaAccesible ? anchoAccesibleDe(config) : 0,
+        // el cuarto PMR, o la cabina accesible de una "variación panel", no
+        // negocian su ancho tampoco al volver a modular
+        cuartoPmrCm: pedidoDeModulacion(t, config, llevaAccesible).cuartoCm,
+        cuartoComeMuro: pedidoDeModulacion(t, config, llevaAccesible).cuartoComeMuro,
         mingitorios: cuantos,
         anchoOrinalCm: config.anchoOrinalCm,
         anchosOrinalCm: anchos,
@@ -1084,7 +1144,7 @@ export default function App() {
     const anchoCm = ultimo.anchoCm
     const nuevo = new Map(cambios.map((c) => [c.indice, c.anchoCm]))
     const extremo = indice === 0 || indice === t.cabinas.length
-    const muros = (t.muroInicio ? 1 : 0) + (t.muroFin ? 1 : 0)
+    const muros = pedidoDeModulacion(t, config, llevaAccesible).murosPilastra
 
     // Las medidas las decide el cliente, así que lo que ya eligió se queda:
     // estas pilastras se suman a la lista y solo se reacomodan las que no tocó.
@@ -1120,8 +1180,10 @@ export default function App() {
         accesible: llevaAccesible,
         profundidadCm: config.profundidadCm,
         anchoAccesibleMinCm: anchoAccesibleDe(config),
-        // el cuarto PMR no negocia su ancho, tampoco al volver a modular
-        cuartoPmrCm: config.tipologia === 'PMR' && llevaAccesible ? anchoAccesibleDe(config) : 0,
+        // el cuarto PMR, o la cabina accesible de una "variación panel", no
+        // negocian su ancho tampoco al volver a modular
+        cuartoPmrCm: pedidoDeModulacion(t, config, llevaAccesible).cuartoCm,
+        cuartoComeMuro: pedidoDeModulacion(t, config, llevaAccesible).cuartoComeMuro,
         // los orinales de la tira: sin esto el buscador los trata como baños con puerta
         mingitorios: t.cabinas.filter((c) => c.tipo === 'orinal').length,
         anchoOrinalCm: config.anchoOrinalCm,
@@ -2382,7 +2444,51 @@ export default function App() {
                       En un área de solo orinales tampoco: no hay cabinas que hacer
                       accesibles.
                     */}
-                    {!esPmrCuarto && !esSoloOrinales(config.tipologia) && (
+                    {/* ----------------------------------------------------------
+                        Variación panel: la cabina accesible tiene su PROPIO fondo.
+
+                        La diferencia con el de las demás es el RECESO, que es donde
+                        se mete la tira de baños. Se pide el fondo y el receso se
+                        muestra calculado, que es como lo dan en obra.
+                        ---------------------------------------------------------- */}
+                    {esVariacion && (
+                      <>
+                        <div className="campo">
+                          <label>Ancho de la accesible (cm)</label>
+                          <CampoNumero
+                            value={config.anchoAccesibleCm}
+                            onChange={(n) => setConfig({ anchoAccesibleCm: n })}
+                            min={150} max={400}
+                          />
+                          <span className="ayuda">Se planta: no se mueve al modular</span>
+                        </div>
+                        <div className="campo">
+                          <label>Fondo de la accesible (cm)</label>
+                          <CampoNumero
+                            value={config.profundidadAccesibleCm ?? config.profundidadCm}
+                            onChange={(n) => setConfig({ profundidadAccesibleCm: n })}
+                            min={config.profundidadCm} max={400}
+                          />
+                          <span className="ayuda">
+                            {recesoDe(config) > 0
+                              ? `Receso de ${recesoDe(config)} cm: es lo que la tira de baños queda metida hacia adentro`
+                              : 'Igual que las demás: no hay receso'}
+                          </span>
+                        </div>
+                        <div className="campo">
+                          <label>Frente de la accesible</label>
+                          <div className="reparto">
+                            pilastra {frenteMr.pilastra} + frente {frenteMr.frente} + puerta {frenteMr.puerta}
+                            {' = '}{frenteMr.pilastra + frenteMr.frente + frenteMr.puerta} cm
+                          </div>
+                          <span className="ayuda">
+                            Se entra por el frente. La pilastra lateral y la puerta se eligen; la pieza del frente
+                            se lleva lo que quede.
+                          </span>
+                        </div>
+                      </>
+                    )}
+                    {!esPmrCuarto && !esVariacion && !esSoloOrinales(config.tipologia) && (
                       <>
                         <div className="campo">
                           <label>¿Lleva cabina accesible?</label>

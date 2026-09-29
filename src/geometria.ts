@@ -1,6 +1,10 @@
 import type { Cabina, Config, Tramo } from './types'
 import { anchosPanelFabrica, GRUESO_PILASTRA } from './catalog'
-import { anchoTotal, divisorDelCuarto, ladoDePilastra, ladosDeCabina, lugaresDe, profundidadDelLugar } from './modulacion'
+import {
+  anchoTotal, divisorDelCuarto, frenteAccesible, ladoDePilastra, ladosDeCabina, lugaresDe,
+  profundidadAccesible, profundidadDelLugar,
+} from './modulacion'
+import { esVariacionPanel } from './catalog'
 // se mudó a modulación —que es de quien depende este archivo— pero se sigue
 // pudiendo importar desde acá, que es donde la busca el resto de la app
 export { profundidadDelLugar }
@@ -180,7 +184,25 @@ export interface PiezaDivisorPmr {
   hastaCm: number
 }
 
+/** una pieza del FRENTE de la cabina accesible, medida sobre el ancho */
+export interface PiezaFrenteMr {
+  tipo: 'pilastra' | 'frente' | 'puerta'
+  desdeCm: number
+  hastaCm: number
+}
+
 export interface CuartoPmr {
+  /**
+   * Por dónde se entra a la cabina accesible.
+   *
+   *   'costado' → Tipo C: la puerta va en el DIVISOR, a lo hondo, y el frente
+   *               del cuarto es la pared del lugar. Por eso el inodoro gira.
+   *   'frente'  → las tres "variación panel": la puerta va en el FRENTE, y lo
+   *               que separa de la tira es un panel corrido sin vano.
+   */
+  entrada: 'costado' | 'frente'
+  /** las piezas del frente, solo cuando se entra por ahí */
+  frente: PiezaFrenteMr[]
   /** la cabina que es el cuarto; la modulación la pone siempre primera */
   indice: number
   /** lo que ocupa sobre el claro. Sale de la modulación, no del dato pedido */
@@ -247,12 +269,50 @@ export function centroPilastra(
  * verdad se va a fabricar.
  */
 export function cuartoPmr(tramo: Tramo, config: Config): CuartoPmr | null {
-  if (config.tipologia !== 'PMR') return null
+  const variacion = esVariacionPanel(config.tipologia)
+  if (config.tipologia !== 'PMR' && !variacion) return null
   const i = tramo.cabinas.findIndex((c) => c.tipo === 'accesible')
   if (i < 0) return null
 
   const cab = tramo.cabinas[i]
   const desde = acumulado(tramo.cabinas)[i]
+
+  // ------------------------------------------------------------------
+  // Variación panel: se entra por el FRENTE.
+  //
+  // La cabina accesible es más honda que las demás y lo que la separa de la
+  // tira es un PANEL corrido de todo ese fondo, sin vano. La puerta va en el
+  // frente, que se reparte en pilastra lateral + frente + puerta.
+  // ------------------------------------------------------------------
+  if (variacion) {
+    const profA = profundidadAccesible(config)
+    const f = frenteAccesible(cab, config)
+    const frente: PiezaFrenteMr[] = []
+    let u = desde
+    for (const [tipo, largo] of [['pilastra', f.pilastra], ['frente', f.frente], ['puerta', f.puerta]] as const) {
+      if (largo <= 0) continue
+      frente.push({ tipo, desdeCm: u, hastaCm: u + largo })
+      u += largo
+    }
+    return {
+      entrada: 'frente',
+      frente,
+      indice: i,
+      desdeCm: desde,
+      hastaCm: desde + cab.anchoCm,
+      anchoCm: cab.anchoCm,
+      profCm: profA,
+      profCabinasCm: config.profundidadCm,
+      lado: i === 0 ? 'inicio' : 'fin',
+      cierre: config.cierrePmr ?? 'muros',
+      // el divisor es un panel corrido de todo el fondo: no lleva puerta
+      divisor: [{ tipo: 'panel', desdeCm: 0, hastaCm: profA }],
+      pilastraCm: f.pilastra,
+      panelCm: profA,
+      aviso: avisoDelFrente(f.frente, cab.anchoCm, f.puerta, f.pilastra, config.modelo),
+    }
+  }
+
   const prof = profundidadDelLugar(config)
 
   // Cómo se reparte el fondo entre las tres piezas lo decide modulación, que
@@ -270,6 +330,8 @@ export function cuartoPmr(tramo: Tramo, config: Config): CuartoPmr | null {
   }
 
   return {
+    entrada: 'costado',
+    frente: [],
     indice: i,
     desdeCm: desde,
     hastaCm: desde + cab.anchoCm,
@@ -285,6 +347,29 @@ export function cuartoPmr(tramo: Tramo, config: Config): CuartoPmr | null {
     panelCm: panel,
     aviso: avisoDelDivisor(prof, panel, puerta, pilastra, config.modelo),
   }
+}
+
+/**
+ * Qué avisar de la pieza del FRENTE de la cabina accesible.
+ *
+ * Es la que se estira: si la puerta y la pilastra lateral ya se comieron el
+ * ancho, no queda frente que fabricar; y si queda tan ancha que no sale de una
+ * hoja, tampoco.
+ */
+function avisoDelFrente(
+  frente: number, ancho: number, puerta: number, pilastra: number, modelo?: string,
+): string | null {
+  if (frente <= 0) {
+    return `La puerta de ${puerta} y la pilastra lateral de ${pilastra} ya suman los ${ancho} cm de la`
+      + ` cabina accesible: no queda frente. Agrandá la cabina o achicá la puerta.`
+  }
+  const deFicha = anchosPanelFabrica(modelo ?? '')
+  const mayor = Math.max(...deFicha)
+  if (frente > mayor) {
+    return `El frente de la cabina accesible tendría que medir ${frente} cm y la hoja más grande de`
+      + ` este modelo es de ${mayor}. Agrandá la pilastra lateral o achicá la cabina.`
+  }
+  return null
 }
 
 /** Qué decirle al vendedor cuando el divisor no cierra contra el fondo. */
