@@ -287,9 +287,22 @@ export function cuartoPmr(tramo: Tramo, config: Config): CuartoPmr | null {
   if (variacion) {
     const profA = profundidadAccesible(config)
     const f = frenteAccesible(cab, config)
+    const alFin = i !== 0
+    /**
+     * El orden de las piezas del frente.
+     *
+     * La PUERTA va siempre pegada al panel que separa de la tira, y la pilastra
+     * lateral en la otra punta, contra el muro o contra el panel de cierre. Al
+     * invertir el área la cabina se va al otro extremo y ese panel le queda del
+     * lado contrario, así que las tres piezas se dan vuelta con ella. Sin esto,
+     * el área invertida dibujaba la puerta contra el muro.
+     */
+    const orden = alFin
+      ? ([['puerta', f.puerta], ['frente', f.frente], ['pilastra', f.pilastra]] as const)
+      : ([['pilastra', f.pilastra], ['frente', f.frente], ['puerta', f.puerta]] as const)
     const frente: PiezaFrenteMr[] = []
     let u = desde
-    for (const [tipo, largo] of [['pilastra', f.pilastra], ['frente', f.frente], ['puerta', f.puerta]] as const) {
+    for (const [tipo, largo] of orden) {
       if (largo <= 0) continue
       frente.push({ tipo, desdeCm: u, hastaCm: u + largo })
       u += largo

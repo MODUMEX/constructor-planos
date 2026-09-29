@@ -148,7 +148,14 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
         // acompaña.
         // Vale igual para las "variación panel": el panel que separa la cabina
         // accesible de la tira es su pared, y es más hondo que los demás.
-        const esDelCuarto = llevaAccesibleSiempre(config.tipologia) && cab.tipo === 'accesible'
+        //
+        // Cada cabina emite el divisor que tiene A SU DERECHA, así que el de la
+        // accesible lo emite ella cuando arranca la tira y la cabina ANTERIOR
+        // cuando la cierra —el área invertida—. Mirando solo la propia, al
+        // invertir el panel hondo se perdía y salía uno normal en su lugar.
+        const esDelCuarto =
+          llevaAccesibleSiempre(config.tipologia) &&
+          (cab.tipo === 'accesible' || tramo.cabinas[i + 1]?.tipo === 'accesible')
         // El del cuarto es más largo que los demás: el cuarto es más hondo y su
         // panel se estira hasta cerrar el divisor.
         const delCuarto = esDelCuarto ? cuartoPmr(tramo, config) : null
@@ -177,8 +184,14 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
     })
   }
 
-  // pilastra de cierre al inicio cuando el tramo no arranca contra pared
-  if (n > 0 && !tramo.muroInicio) {
+  // Panel de cierre al inicio cuando el tramo no arranca contra pared.
+  //
+  // Si quien arranca es la cabina accesible de una "variación panel", el suyo
+  // NO mide esto: es más honda, y ese panel lo pone `piezasDelFrente` con su
+  // propia medida. Sin esta salvedad salían los dos.
+  const arrancaLaAccesible =
+    llevaAccesibleSiempre(config.tipologia) && tramo.cabinas[0]?.tipo === 'accesible'
+  if (n > 0 && !tramo.muroInicio && !arrancaLaAccesible) {
     piezas.push({ familia: 'PN', anchoCm: config.profundidadCm, altoCm: altoPanel, subTipo: 'PNLAT', area })
   }
 
@@ -279,15 +292,25 @@ function piezasDelFrente(area: Area): Pieza[] {
         familia,
         anchoCm: ancho,
         altoCm: altoPilastra(area.config),
-        // la lateral topa contra el muro o contra el panel de cierre; la del
-        // frente cierra la cabina, así que también es lateral
-        subTipo: familia === 'PN' ? 'PNLAT' : pieza.tipo === 'pilastra' && tramo.muroInicio ? 'PLLATMUR' : 'PLLAT',
+        // La lateral topa contra el muro o contra el panel de cierre; la del
+        // frente cierra la cabina, así que también es lateral. El muro que le
+        // toca es el de SU punta: al invertir el área la cabina se va al otro
+        // extremo y el muro que tiene al lado es el otro.
+        subTipo: familia === 'PN'
+          ? 'PNLAT'
+          : pieza.tipo === 'pilastra' && (cuarto.lado === 'inicio' ? tramo.muroInicio : tramo.muroFin)
+            ? 'PLLATMUR'
+            : 'PLLAT',
         area: area.nombre,
       })
     }
     // Sin muro de ese lado —el Tipo E— la cabina accesible cierra con un panel
     // suyo, y es más hondo que los de las demás cabinas porque ella lo es.
-    const sinMuro = cuarto.lado === 'inicio' ? !tramo.muroInicio : !tramo.muroFin
+    //
+    // Solo hace falta cuando la accesible ARRANCA la tira: ese panel le queda a
+    // la izquierda y el recorrido de cabinas, que emite el de la derecha, no lo
+    // puede sacar. Cuando cierra la tira —área invertida— ella misma lo emite.
+    const sinMuro = cuarto.lado === 'inicio' && !tramo.muroInicio
     if (sinMuro) {
       salida.push({
         familia: 'PN',

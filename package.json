@@ -1,7 +1,7 @@
 {
   "name": "constructor-de-planos",
   "private": true,
-  "version": "2.68.0",
+  "version": "2.68.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -39,7 +39,8 @@
     "bom-odoo": "esbuild scripts/bom-odoo.ts --bundle --platform=node --format=esm --outfile=.bom.mjs --log-level=warning && node .bom.mjs",
     "probar-sesion": "node scripts/empaquetar-prueba.mjs scripts/probar-sesion.ts .sesion.mjs && node .sesion.mjs",
     "probar-variacion": "esbuild scripts/probar-variacion-panel.ts --bundle --platform=node --format=esm --outfile=.var.mjs --log-level=warning --define:import.meta.env={} && node .var.mjs",
-    "ejemplo-variacion": "node scripts/empaquetar-prueba.mjs scripts/ejemplo-variacion.tsx .ejemplo.mjs && node .ejemplo.mjs"
+    "ejemplo-variacion": "node scripts/empaquetar-prueba.mjs scripts/ejemplo-variacion.tsx .ejemplo.mjs && node .ejemplo.mjs",
+    "probar-invertir-variacion": "esbuild scripts/probar-invertir-variacion.ts --bundle --platform=node --format=esm --outfile=.invvar.mjs --log-level=warning --define:import.meta.env={} && node .invvar.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",

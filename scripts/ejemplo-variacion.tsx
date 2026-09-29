@@ -13,7 +13,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import EditorPlano from '../src/components/EditorPlano'
 import { generarPDF } from '../src/exportar/pdf'
-import { crearTramos, recesoDe } from '../src/modulacion'
+import { crearTramos, invertirTramo, recesoDe } from '../src/modulacion'
 import type { Area, Config, Proyecto, TipologiaId } from '../src/types'
 
 const CLARO = 500
@@ -46,9 +46,16 @@ function config(tipologia: TipologiaId): Config {
   } as Config
 }
 
-function area(nombre: string, tipologia: TipologiaId): Area {
+function area(nombre: string, tipologia: TipologiaId, espejo = false): Area {
   const cfg = config(tipologia)
-  return { id: 'a-' + tipologia, nombre, piso: '1', config: cfg, tramos: crearTramos(tipologia, CLARO, CABINAS, cfg) }
+  const tramos = crearTramos(tipologia, CLARO, CABINAS, cfg)
+  return {
+    id: 'a-' + tipologia + (espejo ? '-esp' : ''),
+    nombre,
+    piso: '1',
+    config: cfg,
+    tramos: espejo ? tramos.map((t) => ({ ...invertirTramo(t), espejo: true })) : tramos,
+  }
 }
 
 const LAS_TRES: [TipologiaId, string][] = [
@@ -65,7 +72,10 @@ const proyecto: Proyecto = {
   ubicacion: 'San José, Costa Rica',
   distribuidor: 'Modumex',
   creadoPor: 'ejemplo',
-  areas: LAS_TRES.map(([id, nombre]) => area(nombre, id)),
+  areas: [
+    ...LAS_TRES.map(([id, nombre]) => area(nombre, id)),
+    area('Tipo U · variación panel · INVERTIDA', 'MR_PANEL_U', true),
+  ],
 }
 
 // ---------------------------------------------------------------- el plano

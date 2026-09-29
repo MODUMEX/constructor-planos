@@ -459,12 +459,16 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
         for (const pieza of cuarto.frente) {
           const largoPieza = pieza.hastaCm - pieza.desdeCm
           if (pieza.tipo === 'puerta') {
-            // cuelga del borde de la pieza del frente y barre hacia el pasillo,
-            // alejándose del panel
-            const [pxx, pyy] = aHoja(e, pt(m, pieza.desdeCm, cuarto.profCm))
-            const [cxx, cyy] = aHoja(e, pt(m, pieza.hastaCm, cuarto.profCm))
+            // Cuelga del borde de la pieza del frente y barre hacia el pasillo,
+            // alejándose del panel. Invertida el área, el panel le queda del
+            // otro lado y la hoja se da vuelta con ella.
+            const haciaIzq = cuarto.lado === 'inicio'
+            const pivU = haciaIzq ? pieza.desdeCm : pieza.hastaCm
+            const [pxx, pyy] = aHoja(e, pt(m, pivU, cuarto.profCm))
+            const [cxx, cyy] = aHoja(e, pt(m, haciaIzq ? pieza.hastaCm : pieza.desdeCm, cuarto.profCm))
             const [exx, eyy] = aHoja(e, pt(
-              m, pieza.desdeCm - largoPieza * ABIERTA_45, cuarto.profCm + largoPieza * ABIERTA_45,
+              m, pivU + (haciaIzq ? -1 : 1) * largoPieza * ABIERTA_45,
+              cuarto.profCm + largoPieza * ABIERTA_45,
             ))
             doc.setDrawColor(ARCO[0], ARCO[1], ARCO[2])
             doc.setLineWidth(0.2)
@@ -878,8 +882,10 @@ function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) 
         doc.setLineWidth(0.35)
         doc.rect(aX(pieza.desdeCm), aY(hueco + hPuerta), ancho * e.k, hPuerta * e.k, 'FD')
         doc.setFillColor(MARCA[0], MARCA[1], MARCA[2])
-        // la manija va del lado del gozne opuesto: la hoja abre hacia afuera
-        doc.circle(aX(pieza.hastaCm) - 3, aY(hueco + hPuerta / 2), 0.7, 'F')
+        // la manija va en la punta opuesta al gozne, que cambia de lado al
+        // invertir el área
+        const xManija = cuarto.lado === 'inicio' ? aX(pieza.hastaCm) - 3 : aX(pieza.desdeCm) + 3
+        doc.circle(xManija, aY(hueco + hPuerta / 2), 0.7, 'F')
         continue
       }
       // pilastra lateral y pieza del frente: de piso a tope, como una pilastra

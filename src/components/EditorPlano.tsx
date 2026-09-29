@@ -976,16 +976,23 @@ export default function EditorPlano({
                       const medio = pt(m, (pieza.desdeCm + pieza.hastaCm) / 2, profC)
 
                       if (pieza.tipo === 'puerta') {
-                        // el gozne va del lado de la pieza del frente, y la hoja
-                        // barre hacia el pasillo alejándose del panel
-                        const pivU = pieza.desdeCm
+                        // El gozne va del lado de la pieza del frente y la hoja
+                        // barre hacia el pasillo, alejándose del panel. Al invertir
+                        // el área el panel le queda del otro lado, así que la hoja
+                        // también se da vuelta.
+                        const haciaIzq = cuarto.lado === 'inicio'
+                        const pivU = haciaIzq ? pieza.desdeCm : pieza.hastaCm
                         const pivote = pt(m, pivU, profC)
-                        const cerrada = pt(m, pieza.hastaCm, profC)
-                        const extremo = pt(m, pivU - largoPieza * ABIERTA_45, profC + largoPieza * ABIERTA_45)
+                        const cerrada = pt(m, haciaIzq ? pieza.hastaCm : pieza.desdeCm, profC)
+                        const extremo = pt(
+                          m,
+                          pivU + (haciaIzq ? -1 : 1) * largoPieza * ABIERTA_45,
+                          profC + largoPieza * ABIERTA_45,
+                        )
                         return (
                           <g key="puerta-mr">
                             <path
-                              d={`M ${cerrada.x} ${cerrada.y} A ${largoPieza} ${largoPieza} 0 0 1 ${extremo.x} ${extremo.y}`}
+                              d={`M ${cerrada.x} ${cerrada.y} A ${largoPieza} ${largoPieza} 0 0 ${haciaIzq ? 1 : 0} ${extremo.x} ${extremo.y}`}
                               fill="none" stroke="#8fa3c4" strokeWidth={1.4} strokeDasharray="7 5"
                             />
                             <line
