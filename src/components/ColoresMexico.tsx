@@ -1,6 +1,8 @@
 import { useMemo } from 'react'
 import type { Linea } from '../types'
-import { claveMx, coloresMxPara, descontinuadosMx, espesorDeLinea, type ColorMX } from '../coloresMx'
+import {
+  coloresMxAgrupados, descontinuadosMx, espesorDeLinea, type ColorMxAgrupado,
+} from '../coloresMx'
 
 /**
  * Lista de colores de la planta de México: la materia prima real, con su
@@ -20,9 +22,9 @@ export default function ColoresMexico({
   color: string
   /** si se muestran los apartados para un cliente: solo adentro de Modumex */
   verReservados: boolean
-  onElegir: (c: ColorMX) => void
+  onElegir: (c: ColorMxAgrupado) => void
 }) {
-  const lista = useMemo(() => coloresMxPara(linea, verReservados), [linea, verReservados])
+  const lista = useMemo(() => coloresMxAgrupados(linea, verReservados), [linea, verReservados])
   const descontinuados = descontinuadosMx().filter((c) => c.espesorMm === espesorDeLinea(linea))
 
   return (
@@ -42,12 +44,12 @@ export default function ColoresMexico({
       <div className="colores-mx">
         {lista.map((c) => (
           <button
-            key={claveMx(c)}
-            className={`color-mx ${color === c.color ? 'sel' : ''}`}
+            key={c.nombre}
+            className={`color-mx ${color === c.nombre ? 'sel' : ''}`}
             onClick={() => onElegir(c)}
             type="button"
           >
-            <b>{c.color}</b>
+            <b>{c.nombre}</b>
             {c.reservado && <span className="reservado">{c.reservado}</span>}
           </button>
         ))}

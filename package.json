@@ -1,7 +1,7 @@
 {
   "name": "constructor-de-planos",
   "private": true,
-  "version": "2.69.0",
+  "version": "2.69.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -41,7 +41,8 @@
     "probar-variacion": "esbuild scripts/probar-variacion-panel.ts --bundle --platform=node --format=esm --outfile=.var.mjs --log-level=warning --define:import.meta.env={} && node .var.mjs",
     "ejemplo-variacion": "node scripts/empaquetar-prueba.mjs scripts/ejemplo-variacion.tsx .ejemplo.mjs && node .ejemplo.mjs",
     "probar-invertir-variacion": "esbuild scripts/probar-invertir-variacion.ts --bundle --platform=node --format=esm --outfile=.invvar.mjs --log-level=warning --define:import.meta.env={} && node .invvar.mjs",
-    "probar-arrastre": "esbuild scripts/probar-arrastre.ts --bundle --platform=node --format=esm --outfile=.arr.mjs --log-level=warning --define:import.meta.env={} && node .arr.mjs"
+    "probar-arrastre": "esbuild scripts/probar-arrastre.ts --bundle --platform=node --format=esm --outfile=.arr.mjs --log-level=warning --define:import.meta.env={} && node .arr.mjs",
+    "probar-colores-mx": "esbuild scripts/probar-colores-mx.ts --bundle --platform=node --format=esm --outfile=.cmx.mjs --log-level=warning --define:import.meta.env={} && node .cmx.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",

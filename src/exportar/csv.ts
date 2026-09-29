@@ -8,8 +8,12 @@ import { agrupar, modeloParaCsv, nombreLinea, nombreSistema, piezasDeArea } from
  *
  * `Herraje`, `Pais` y `CodigoColor` son las columnas nuevas y van al final. El
  * CIP resuelve las columnas con header.indexOf(nombre) y solo exige SKU,
- * Cantidad y SubTipo, así que las ignora sin romperse; quedan puestas para
- * cuando el CIP tenga los códigos del juego negro y la materia prima de México.
+ * Cantidad y SubTipo, así que las ignora sin romperse.
+ *
+ * `CodigoColor` viaja VACÍO cuando ese color tiene varias láminas —Alumina son
+ * tres— porque la app no elige ninguna: el distribuidor pide un COLOR y es el
+ * CIP el que despliega las láminas de ese color para escoger cuál se da de
+ * baja. Lo que manda es la columna `Color`.
  */
 export const CABECERA_CSV =
   'Codigo,Obra,Distribuidor,SKU,Cantidad,SubTipo,Orientacion,Area,Modelo,Sistema,Color,KAP,Linea,Acabado,Herraje,Pais,CodigoColor'

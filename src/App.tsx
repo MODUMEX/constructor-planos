@@ -27,7 +27,7 @@ import CampoNumero from './components/CampoNumero'
 import Usuarios from './components/Usuarios'
 import Solicitudes from './components/Solicitudes'
 import { contarSolicitudes } from './solicitudes'
-import { coloresMxPara, slugRenderMx } from './coloresMx'
+import { coloresMxAgrupados, slugRenderMx } from './coloresMx'
 import { fotoDe, fotosHerraje, faltanFotosHerraje, terminacionesDe } from './renders'
 import {
   anchoAccesibleDe, anchoTotal, bom, claroDeOrinales, compensarPilastra, crearTramos, esEspacioLibre,
@@ -742,11 +742,11 @@ export default function App() {
           a = { ...a, config: { ...a.config, linea: 'LEEDER', espesorMm: espesorPorLinea('LEEDER') } }
         }
         if (paisFabricacion === 'MX') {
-          const disponibles = coloresMxPara(a.config.linea, puedeColoresReservados(usuario))
-          const sigue = disponibles.find((c) => c.color === a.config.color)
+          const disponibles = coloresMxAgrupados(a.config.linea, puedeColoresReservados(usuario))
+          const sigue = disponibles.find((c) => c.nombre === a.config.color)
           const elegido = sigue ?? disponibles[0]
           if (!elegido) return a
-          return { ...a, config: { ...a.config, color: elegido.color, colorCodigo: elegido.codigoBase } }
+          return { ...a, config: { ...a.config, color: elegido.nombre, colorCodigo: elegido.codigoBase } }
         }
         const delCatalogo = coloresPara(a.config.linea, a.config.acabado)
         const sigue = delCatalogo.find((c) => c.nombre === a.config.color)
@@ -817,8 +817,8 @@ export default function App() {
       return { color: coloresPara(linea, acabado)[0].nombre, colorCodigo: undefined }
     }
     if (proyecto.paisFabricacion === 'MX') {
-      const primero = coloresMxPara(linea, puedeColoresReservados(usuario))[0]
-      if (primero) return { color: primero.color, colorCodigo: primero.codigoBase }
+      const primero = coloresMxAgrupados(linea, puedeColoresReservados(usuario))[0]
+      if (primero) return { color: primero.nombre, colorCodigo: primero.codigoBase }
     }
     return { color: coloresPara(linea, acabado)[0].nombre, colorCodigo: undefined }
   }
@@ -2244,7 +2244,7 @@ export default function App() {
                       color={config.color}
                       verReservados={puedeColoresReservados(usuario)}
                       onElegir={(c) =>
-                        setConfig({ color: c.color, colorCodigo: c.codigoBase })
+                        setConfig({ color: c.nombre, colorCodigo: c.codigoBase })
                       }
                     />
                   ) : (
