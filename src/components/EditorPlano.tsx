@@ -11,6 +11,7 @@ import {
   type Marco,
 } from '../geometria'
 import { ALTO_ORINAL_CM, ALTO_REGADERA_CM, ALTO_WC_CM, ORINAL, REGADERA, WC } from '../assets/sanitarios'
+import { descargasDe, escalaDeTramo, hayCentros } from '../descargas'
 
 /**
  * La zona invisible para agarrar una pilastra, EN PÍXELES DE PANTALLA.
@@ -206,9 +207,12 @@ export default function EditorPlano({
     return () => obs.disconnect()
   }, [])
 
+  // La cadena de los centros de carga va por FUERA de la del claro, así que
+  // cuando está el margen tiene que dar para las dos.
+  const conDescargas = config.usaCentrosCarga === true && tramos.some(hayCentros)
   const caja = useMemo(
-    () => cajaDelPlano(tramos, marcos, prof, 92, profPmr),
-    [tramos, marcos, prof, profPmr],
+    () => cajaDelPlano(tramos, marcos, prof, conDescargas ? 122 : 92, profPmr),
+    [tramos, marcos, prof, profPmr, conDescargas],
   )
 
   function empezarArrastre(e: React.PointerEvent, tramo: Tramo, indice: number, m: Marco) {
@@ -537,6 +541,17 @@ export default function EditorPlano({
           const muroA = pt(m, -SOBRA_MURO_CM, -ESPESOR_MURO)
           const muroB = pt(m, largo + SOBRA_MURO_CM, 0)
 
+          // Los centros de carga: dónde cae de verdad cada inodoro. Con ellos el
+          // sanitario se dibuja EN la descarga y no en el centro de su cabina,
+          // que es lo que deja ver si va a quedar montado sobre una pieza.
+          // Con el área modulada por centros de carga el inodoro se dibuja EN su
+          // descarga —que es donde va a quedar— y el plano lleva el eje de cada una
+          // más la cadena de cotas que las ubica contra los muros. Sin la opción no
+          // se pregunta ni se dibuja nada de esto.
+          const descargas = config.usaCentrosCarga === true ? descargasDe(tramo, config) : []
+          const ejeDeCabina = new Map(descargas.map((d) => [d.indice, d.uCm]))
+          const anotarDescargas = descargas
+
           return (
             <g key={tramo.id}>
               {/* muro de fondo */}
@@ -662,9 +677,11 @@ export default function EditorPlano({
                       // puerta del divisor. En las "variación panel" se entra por el
                       // FRENTE, como en cualquier cabina, y entonces NO gira.
                       const enCuarto = cuarto?.indice === i && cuarto.entrada === 'costado'
+                      // en la descarga si se sabe dónde está; si no, centrado
+                      const uSan = ejeDeCabina.get(i) ?? (u0 + u1) / 2
                       const esquina = enCuarto
                         ? pt(m, u0 + 6, cuarto.profCm / 2)
-                        : pt(m, (u0 + u1) / 2, 6)
+                        : pt(m, uSan, 6)
                       const giro = (Math.atan2(m.py, m.px) * 180) / Math.PI - 90 + (enCuarto ? -90 : 0)
                       return (
                         <image
@@ -974,6 +991,61 @@ export default function EditorPlano({
                               {formatear(ancho, unidad)}
                             </text>
                           )}
+                        </g>
+                      )
+                    })}
+                  </g>
+                )
+              })()}
+
+              {/* ------------------------------------------------------------
+                  Centros de carga: el eje de cada descarga y la cadena de cotas
+                  que la ubica contra los muros, como viene en el plano del
+                  arquitecto. Es lo que deja comparar la plomería con la tira.
+                  ------------------------------------------------------------ */}
+              {anotarDescargas.length > 0 && (() => {
+                const esc = escalaDeTramo(tramo)
+                const paradas = [0, ...anotarDescargas.map((d) => d.uCm), largo]
+                const nivel = -ESPESOR_MURO - 74
+                return (
+                  <g pointerEvents="none">
+                    {anotarDescargas.map((d) => {
+                      const a = pt(m, d.uCm, -ESPESOR_MURO)
+                      const b = pt(m, d.uCm, prof + 10)
+                      return (
+                        <line
+                          key={`eje-${d.indice}`}
+                          x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                          stroke={d.aviso ? '#c2452d' : '#8fa3c4'}
+                          strokeWidth={1.2}
+                          strokeDasharray="14 5 3 5"
+                        />
+                      )
+                    })}
+                    {paradas.slice(0, -1).map((u, k) => {
+                      const v = paradas[k + 1]
+                      if (v - u < 1) return null
+                      const a = pt(m, u, nivel)
+                      const b = pt(m, v, nivel)
+                      const c = pt(m, (u + v) / 2, nivel - 8)
+                      const rot = horizontal ? 0 : m.ay > 0 ? 90 : -90
+                      return (
+                        <g key={`cad-${k}`}>
+                          <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#6b7c94" strokeWidth={1} />
+                          <line
+                            x1={a.x} y1={a.y - 4} x2={a.x} y2={a.y + 4} stroke="#6b7c94" strokeWidth={1}
+                            transform={horizontal ? undefined : `rotate(90 ${a.x} ${a.y})`}
+                          />
+                          <line
+                            x1={b.x} y1={b.y - 4} x2={b.x} y2={b.y + 4} stroke="#6b7c94" strokeWidth={1}
+                            transform={horizontal ? undefined : `rotate(90 ${b.x} ${b.y})`}
+                          />
+                          <text
+                            x={c.x} y={c.y} textAnchor="middle" fontSize={13} fill="#6b7c94"
+                            transform={rot ? `rotate(${rot} ${c.x} ${c.y})` : undefined}
+                          >
+                            {formatear(Math.round(((v - u) / esc) * 10) / 10, unidad)}
+                          </text>
                         </g>
                       )
                     })}

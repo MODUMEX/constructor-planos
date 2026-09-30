@@ -35,6 +35,7 @@ import {
   piezasQuePidenCostilla, PILASTRA_LATERAL_MR_CM, reajustarConPuertas, recesoDe,
 } from './modulacion'
 import { anchoDeOrinal } from './geometria'
+import { avisosDeDescargas, centrosDe, corridaDeCentros, tramoDesdeCentros } from './descargas'
 import { cargarTarifas, type ResultadoTarifas } from './tarifas'
 import { buscarActualizacion, type FaseActualizacion } from './actualizar'
 import { versionActual, VERSION_COMPILADA } from './version'
@@ -207,6 +208,9 @@ export default function App() {
   const [unidad, setUnidad] = useState<'cm' | 'in'>('cm')
   const [verInodoros, setVerInodoros] = useState(true)
   const [verCotas, setVerCotas] = useState(true)
+  // lo que se está escribiendo en un centro de carga, para que el campo deje
+  // borrar y volver a escribir sin que el número salte solo
+  const [centroEnCurso, setCentroEnCurso] = useState<{ clave: string; texto: string } | null>(null)
   const [seleccion, setSeleccion] = useState<string | null>(null)
   /** qué área está a un clic de borrarse; se pregunta antes de sacarla */
   const [borrarArea, setBorrarArea] = useState<number | null>(null)
@@ -584,6 +588,9 @@ export default function App() {
    * para que el vendedor lo cargue en la cotización si corresponde.
    */
   const piezasSinSoporte = area.tramos.flatMap((t) => piezasQuePidenCostilla(t, config))
+  const avisosDeCentros = config.usaCentrosCarga === true
+    ? area.tramos.flatMap((t) => avisosDeDescargas(t, config))
+    : []
 
   /**
    * ¿Cambió algo desde el último guardado? Un proyecto que nunca se guardó
@@ -1148,6 +1155,63 @@ export default function App() {
       tramos: area.tramos.map((x) =>
         x.id === tramoId
           ? conEspejo(x, { cabinas: r.cabinas, pilastras: r.pilastras, canaletaCm: r.canaletaCm, ajuste: r.ajuste, mensaje: r.mensaje, avisoAccesible: r.avisoAccesible })
+          : x,
+      ),
+    })
+  }
+
+  /**
+   * Escribir el centro de carga de una cabina.
+   *
+   * Se guarda en el tramo, no en la configuración: es una medida del PISO de
+   * esta área y cada tramo tiene el suyo. En blanco vuelve a no saberse dónde
+   * está la descarga y el inodoro se dibuja centrado, como siempre.
+   */
+  function onCentro(tramoId: string, indice: number, texto: string) {
+    const t = area.tramos.find((x) => x.id === tramoId)
+    if (!t) return
+    const limpio = texto.trim().replace(',', '.')
+    const n = Number(limpio)
+    const valor = limpio === '' || !Number.isFinite(n) || n <= 0 ? null : n
+    const centros = t.cabinas.map((_, i) => (i === indice ? valor : (t.centrosCm?.[i] ?? null)))
+    setArea({
+      tramos: area.tramos.map((x) => (x.id === tramoId ? { ...x, centrosCm: centros } : x)),
+    })
+  }
+
+  /**
+   * Acomodar las piezas alrededor de las descargas.
+   *
+   * Va DIRECTO al tramo, sin pasar por el espejo: la modulación por centros
+   * trabaja frontera por frontera sobre la tira tal como se ve, así que no hay
+   * forma canónica que armar. Las pilastras que eligió quedan clavadas para que
+   * un reparto posterior no las vuelva a emparejar.
+   */
+  function modularDesdeCentros(tramoId: string) {
+    const t = area.tramos.find((x) => x.id === tramoId)
+    if (!t) return
+    const r = tramoDesdeCentros(t, config, proyecto.paisFabricacion)
+    if (!r) return
+    if (r.ajuste === 'falta') {
+      setBloqueo(
+        `Con esas descargas las piezas no caben en el claro de ${t.claroCm} cm. ${r.mensaje}. El plano quedó como estaba.`,
+      )
+      return
+    }
+    setBloqueo(null)
+    const fijas = Array.from(new Set([...(t.pilastrasFijas ?? []), ...r.fijas]))
+    setArea({
+      tramos: area.tramos.map((x) =>
+        x.id === tramoId
+          ? {
+              ...x,
+              cabinas: r.cabinas,
+              pilastras: r.pilastras,
+              pilastrasFijas: fijas,
+              canaletaCm: r.ajuste === 'canaleta' ? Math.max(0, r.diferencia) : 0,
+              ajuste: r.ajuste,
+              mensaje: r.mensaje,
+            }
           : x,
       ),
     })
@@ -1945,6 +2009,14 @@ export default function App() {
                   <input type="checkbox" checked={verInodoros} onChange={(e) => setVerInodoros(e.target.checked)} />
                   Sanitarios
                 </label>
+                <label className="toggle" title="La plomería ya está en el piso: las descargas mandan y las piezas se acomodan alrededor">
+                  <input
+                    type="checkbox"
+                    checked={config.usaCentrosCarga === true}
+                    onChange={(e) => setConfig({ usaCentrosCarga: e.target.checked })}
+                  />
+                  Modular con centro de descarga
+                </label>
                 <div className="div" />
                 <button className="btn chico" onClick={() => setVerDuplicar(true)}>Repetir en otras áreas</button>
                 <div className="div" />
@@ -1995,6 +2067,20 @@ export default function App() {
                   {avisosAccesible.map((t) => (
                     <span key={t.id}>{t.avisoAccesible}</span>
                   ))}
+                </div>
+              )}
+
+              {avisosDeCentros.length > 0 && (
+                <div className="aviso-caja" style={{ margin: '0 0 12px' }}>
+                  <b>Revisá los centros de carga</b>
+                  {avisosDeCentros.map((a, i) => (
+                    <span key={i}>{a}</span>
+                  ))}
+                  <span>
+                    El inodoro se instala en la descarga, así que si queda montado sobre un panel o
+                    una pilastra hay que correr la pieza. Con <b>Modular desde los centros</b> la app
+                    acomoda las piezas sola.
+                  </span>
                 </div>
               )}
 
@@ -2085,6 +2171,59 @@ export default function App() {
                       ))}
                     </div>
                   ))}
+
+                  {config.usaCentrosCarga === true && area.tramos.map((t) => {
+                    const corrida = corridaDeCentros(t, config)
+                    const problema = 'problema' in corrida ? corrida.problema : null
+                    const valores = centrosDe(t)
+                    return (
+                      <div className="bloque" key={`centros-${t.id}`}>
+                        <h4>Centros de carga · {t.nombre}</h4>
+                        <p className="vacio">
+                          A cuántos centímetros del arranque del área está el eje de cada descarga,
+                          como viene en el plano. Las descargas NO se mueven: el inodoro se dibuja
+                          ahí y son las piezas las que se acomodan, con el panel divisor justo en el
+                          medio de cada par.
+                        </p>
+                        {t.cabinas.map((c, i) => {
+                          if (c.tipo === 'orinal' || esEspacioLibre(c)) return null
+                          const clave = `${t.id}:${i}`
+                          return (
+                            <div className="fila" key={c.id}>
+                              <span>Cabina {i + 1}{c.tipo === 'accesible' ? ' · accesible' : ''}</span>
+                              <input
+                                className="editable"
+                                inputMode="decimal"
+                                placeholder="—"
+                                style={{ maxWidth: 88 }}
+                                value={
+                                  centroEnCurso?.clave === clave
+                                    ? centroEnCurso.texto
+                                    : valores[i] != null
+                                      ? String(valores[i])
+                                      : ''
+                                }
+                                onChange={(e) => {
+                                  setCentroEnCurso({ clave, texto: e.target.value })
+                                  onCentro(t.id, i, e.target.value)
+                                }}
+                                onBlur={() => setCentroEnCurso(null)}
+                              />
+                            </div>
+                          )
+                        })}
+                        <button
+                          className="btn chico"
+                          style={{ marginTop: 8 }}
+                          disabled={problema != null}
+                          onClick={() => modularDesdeCentros(t.id)}
+                        >
+                          Modular desde los centros
+                        </button>
+                        {problema && <p className="vacio">{problema}</p>}
+                      </div>
+                    )
+                  })}
 
                   <div className="bloque">
                     <h4>Cómo se edita</h4>

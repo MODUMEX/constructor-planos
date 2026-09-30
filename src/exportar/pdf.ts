@@ -14,6 +14,7 @@ import type { CuartoPmr } from '../geometria'
 import { agrupar, modeloParaCsv, nombreLinea, nombreSistema, piezasDeArea } from './piezas'
 import { ALTO_ORINAL_CM, ALTO_REGADERA_CM, ALTO_WC_CM, ORINAL, REGADERA, WC } from '../assets/sanitarios'
 import { marcaDeAgua, ponerLogo, portada } from './portada'
+import { descargasDe, escalaDeTramo, hayCentros } from '../descargas'
 
 /**
  * Plano en PDF: una portada que el cliente firma y después una hoja por área,
@@ -327,6 +328,11 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
       })
     }
 
+    // Los centros de carga del área, si los tiene: el inodoro se dibuja EN la
+    // descarga y no en el centro de su cabina.
+    const descargas = area.config.usaCentrosCarga === true ? descargasDe(tramo, area.config) : []
+    const ejeDeCabina = new Map(descargas.map((d) => [d.indice, d.uCm]))
+
     tramo.cabinas.forEach((cab, i) => {
       const u0 = acum[i]
       const u1 = u0 + cab.anchoCm
@@ -369,7 +375,7 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
           const [wx, wy] = aHoja(e, pt(m, u0 + 6, cuarto.profCm / 2))
           doc.addImage(dibujo.src, 'PNG', wx + h, wy + w / 2 - h, w, h, undefined, 'FAST', 90)
         } else {
-          const [ax, ay] = aHoja(e, pt(m, (u0 + u1) / 2, 6))
+          const [ax, ay] = aHoja(e, pt(m, ejeDeCabina.get(i) ?? (u0 + u1) / 2, 6))
           // el giro se hace a mano sobre el punto donde va apoyado al muro
           const giro = Math.atan2(m.py, m.px) - Math.PI / 2
           const dx = -w / 2
@@ -567,6 +573,40 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
       rot,
       vTexto: -ESPESOR_MURO - 30,
     })
+
+    // ------------------------------------------------------------------
+    // Centros de carga: el eje de cada descarga y la cadena que la ubica contra
+    // los muros, que es como viene la plomería en el plano del arquitecto. Con
+    // eso el instalador compara lo que hay en el piso con lo que se fabricó.
+    // ------------------------------------------------------------------
+    if (descargas.length > 0) {
+      const esc = escalaDeTramo(tramo)
+      doc.setLineWidth(0.18)
+      doc.setLineDashPattern([3, 1.2, 0.6, 1.2], 0)
+      for (const d of descargas) {
+        if (d.aviso) doc.setDrawColor(190, 60, 40)
+        else doc.setDrawColor(120, 140, 180)
+        const [ax, ay] = aHoja(e, pt(m, d.uCm, -ESPESOR_MURO))
+        const [bx, by] = aHoja(e, pt(m, d.uCm, prof + 8))
+        doc.line(ax, ay, bx, by)
+      }
+      doc.setLineDashPattern([], 0)
+
+      const paradas = [0, ...descargas.map((d) => d.uCm), largo]
+      for (let k = 0; k < paradas.length - 1; k++) {
+        const u = paradas[k]
+        const v = paradas[k + 1]
+        if (v - u < 1) continue
+        cotaEntre(doc, e, m, u, v, -ESPESOR_MURO - 50, -ESPESOR_MURO - 30,
+          String(Math.round(((v - u) / esc) * 10) / 10), {
+            size: 6,
+            rot,
+            vTexto: -ESPESOR_MURO - 52,
+          })
+      }
+      const [rx, ry] = aHoja(e, pt(m, largo / 2, -ESPESOR_MURO - 61))
+      texto(doc, 'CENTROS DE CARGA', rx, ry, { size: 5.4, align: 'center', color: GRIS, angle: rot })
+    }
 
     // Cotas por PIEZA, al frente: pilastra y puerta en horizontal, panel girado
     // a lo largo de la pieza. Son las medidas que se fabrican, no el reparto.
@@ -1180,7 +1220,9 @@ export function generarPDF(proyecto: Proyecto, fecha = new Date().toLocaleDateSt
     const marcos = marcosDe(area.tramos)
     // el cuarto PMR llega más hondo que las cabinas: hay que encuadrarlo también
     const profPmr = area.config.tipologia === 'PMR' ? profundidadDelLugar(area.config) : 0
-    const caja = cajaDelPlano(area.tramos, marcos, prof, 46, profPmr)
+    // con los centros de carga la hoja lleva una cadena de cotas más por fuera
+    const conDescargas = area.config.usaCentrosCarga === true && area.tramos.some(hayCentros)
+    const caja = cajaDelPlano(area.tramos, marcos, prof, conDescargas ? 74 : 46, profPmr)
 
     const zonaW = HOJA.w - M * 2 - PANEL_W - 6
     const zonaH = HOJA.h - M * 2 - CAJETIN_H - 6

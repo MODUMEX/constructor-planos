@@ -124,6 +124,16 @@ export interface Tramo {
    * tolerar que falte y caer en el ancho único de la configuración.
    */
   pilastras?: number[]
+  /**
+   * Los CENTROS DE CARGA del área: una entrada por cabina, en cm desde el
+   * arranque del tramo hasta el eje de la descarga, tal como vienen en el plano
+   * del arquitecto. En blanco donde no se sabe.
+   *
+   * Cuando están, el inodoro se dibuja AHÍ y no en el centro de la cabina, y la
+   * tira se puede modular alrededor de ellos: la frontera entre dos cabinas se
+   * va al punto medio de sus dos descargas.
+   */
+  centrosCm?: (number | null)[]
   /** relleno contra la pared cuando las piezas quedan cortas por 5 cm o menos */
   canaletaCm?: number
   /**
@@ -282,6 +292,16 @@ export interface Config {
   // casi nunca miden lo mismo. Antes vivían en un estado suelto del paso 6, así
   // que al cambiar de área seguían los números de la anterior.
 
+  /**
+   * El área se modula CON LOS CENTROS DE CARGA: la plomería ya está en el piso
+   * y es ella la que manda.
+   *
+   * Es una opción del área, no una vista: mientras esté apagada el plano no
+   * pregunta ni dibuja descargas y todo se reparte como siempre. Encendida, los
+   * centros son un dato FIJO del lugar —no se mueven nunca— y lo que se acomoda
+   * alrededor son las piezas.
+   */
+  usaCentrosCarga?: boolean
   /** el claro que dio el vendedor para esta área, en cm */
   claroPedidoCm?: number
   /** cuántas cabinas pidió para esta área */
