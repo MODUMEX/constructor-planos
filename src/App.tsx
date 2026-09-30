@@ -2550,11 +2550,12 @@ export default function App() {
                           <label>Frente de la accesible</label>
                           <div className="reparto">
                             pilastra {frenteMr.pilastra} + frente {frenteMr.frente} + puerta {frenteMr.puerta}
-                            {' = '}{frenteMr.pilastra + frenteMr.frente + frenteMr.puerta} cm
+                            {' + cierre '}{frenteMr.cierre}
+                            {' = '}{frenteMr.pilastra + frenteMr.frente + frenteMr.puerta + frenteMr.cierre} cm
                           </div>
                           <span className="ayuda">
-                            Se entra por el frente. La pilastra lateral y la puerta se eligen; la pieza del frente
-                            se lleva lo que quede.
+                            Se entra por el frente. La puerta va entre dos pilastras —una puerta nunca cierra
+                            contra un panel—, y la pieza del frente se lleva lo que quede.
                           </span>
                         </div>
                       </>
