@@ -628,14 +628,19 @@ export const PILASTRA_LATERAL_MR_CM = 19
 export function frenteAccesible(
   cabina: Cabina,
   config: Config,
-): { pilastra: number; frente: number; puerta: number } {
+): { pilastra: number; frente: number; puerta: number; cierre: number } {
   const puerta = Math.max(0, cabina.puerta.anchoCm || config.puertaAccesibleCm || 100)
   const pedida = config.pilastraLateralMrCm
   const pilastra = pedida != null && pedida > 0 ? pedida : PILASTRA_LATERAL_MR_CM
+  // Una puerta NUNCA cierra contra un panel: cierra contra una pilastra. Así
+  // que del lado del panel divisor va otra lateral, la de cierre, y la puerta
+  // queda entre las dos. Sin ella, la hoja topaba contra el canto del panel.
+  const cierre = pilastra
   return {
     pilastra,
     puerta,
-    frente: Math.round((cabina.anchoCm - puerta - pilastra) * 10) / 10,
+    cierre,
+    frente: Math.round((cabina.anchoCm - puerta - pilastra - cierre) * 10) / 10,
   }
 }
 

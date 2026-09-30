@@ -64,11 +64,15 @@ for (const id of ['MR_PANEL_U', 'MR_PANEL_L', 'MR_PANEL_E'] as const) {
   // el frente: la puerta va SIEMPRE pegada al panel que separa de la tira
   const ordenA = a.frente.map((p) => p.tipo).join('·')
   const ordenB = b.frente.map((p) => p.tipo).join('·')
-  revisar('derecha: pilastra, frente y puerta', ordenA === 'pilastra·frente·puerta', ordenA)
-  revisar('invertida: se dan vuelta', ordenB === 'puerta·frente·pilastra', ordenB)
+  revisar('derecha: pilastra, frente, puerta y cierre', ordenA === 'pilastra·frente·puerta·cierre', ordenA)
+  revisar('invertida: se dan vuelta', ordenB === 'cierre·puerta·frente·pilastra', ordenB)
+  // La de CIERRE es la que va contra el panel divisor: es contra ella que
+  // cierra la puerta, porque una puerta nunca cierra contra un panel.
   revisar(
-    'la puerta queda pegada al panel',
-    a.frente[a.frente.length - 1].hastaCm === a.hastaCm && b.frente[0].desdeCm === b.desdeCm,
+    'la de cierre queda pegada al panel',
+    a.frente[a.frente.length - 1].tipo === 'cierre' &&
+      a.frente[a.frente.length - 1].hastaCm === a.hastaCm &&
+      b.frente[0].tipo === 'cierre' && b.frente[0].desdeCm === b.desdeCm,
   )
   revisar(
     'y la pilastra lateral, contra el muro o el cierre',

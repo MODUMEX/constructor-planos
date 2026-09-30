@@ -1100,7 +1100,7 @@ export default function EditorPlano({
                           />
                           {verCotas && (
                             <text x={medio.x} y={medio.y + 20} textAnchor="middle" fontSize={14} fill="#8fa3c4">
-                              {`${pieza.tipo === 'pilastra' ? 'PL' : 'PN'} ${formatear(largoPieza, unidad)}`}
+                              {`${pieza.tipo === 'frente' ? 'PN' : 'PL'} ${formatear(largoPieza, unidad)}`}
                             </text>
                           )}
                         </g>

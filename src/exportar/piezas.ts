@@ -287,15 +287,17 @@ function piezasDelFrente(area: Area): Pieza[] {
       if (pieza.tipo === 'puerta') continue
       const ancho = Math.round((pieza.hastaCm - pieza.desdeCm) * 10) / 10
       if (ancho <= 0) continue
-      const familia = familiaDelFrente(ancho, area.config.modelo)
+      // La pieza del FRENTE puede ser tan ancha que ya no exista pilastra: ahí
+      // es panel. Las dos laterales son siempre pilastra.
+      const familia = pieza.tipo === 'frente' ? familiaDelFrente(ancho, area.config.modelo) : 'PL'
       salida.push({
         familia,
         anchoCm: ancho,
         altoCm: altoPilastra(area.config),
-        // La lateral topa contra el muro o contra el panel de cierre; la del
-        // frente cierra la cabina, así que también es lateral. El muro que le
-        // toca es el de SU punta: al invertir el área la cabina se va al otro
-        // extremo y el muro que tiene al lado es el otro.
+        // La lateral topa contra el muro o contra el panel de cierre; la de
+        // CIERRE va contra el panel divisor y es contra la que cierra la
+        // puerta. El muro que le toca a la lateral es el de SU punta: al
+        // invertir el área la cabina se va al otro extremo.
         subTipo: familia === 'PN'
           ? 'PNLAT'
           : pieza.tipo === 'pilastra' && (cuarto.lado === 'inicio' ? tramo.muroInicio : tramo.muroFin)

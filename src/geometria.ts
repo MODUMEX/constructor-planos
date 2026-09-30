@@ -186,7 +186,12 @@ export interface PiezaDivisorPmr {
 
 /** una pieza del FRENTE de la cabina accesible, medida sobre el ancho */
 export interface PiezaFrenteMr {
-  tipo: 'pilastra' | 'frente' | 'puerta'
+  /**
+   * 'pilastra' es la lateral, la que topa contra el muro o contra el panel de
+   * cierre; 'cierre' es la otra lateral, la del lado del panel divisor, que es
+   * contra la que CIERRA la puerta. Una puerta nunca cierra contra un panel.
+   */
+  tipo: 'pilastra' | 'frente' | 'puerta' | 'cierre'
   desdeCm: number
   hastaCm: number
 }
@@ -298,8 +303,8 @@ export function cuartoPmr(tramo: Tramo, config: Config): CuartoPmr | null {
      * el área invertida dibujaba la puerta contra el muro.
      */
     const orden = alFin
-      ? ([['puerta', f.puerta], ['frente', f.frente], ['pilastra', f.pilastra]] as const)
-      : ([['pilastra', f.pilastra], ['frente', f.frente], ['puerta', f.puerta]] as const)
+      ? ([['cierre', f.cierre], ['puerta', f.puerta], ['frente', f.frente], ['pilastra', f.pilastra]] as const)
+      : ([['pilastra', f.pilastra], ['frente', f.frente], ['puerta', f.puerta], ['cierre', f.cierre]] as const)
     const frente: PiezaFrenteMr[] = []
     let u = desde
     for (const [tipo, largo] of orden) {

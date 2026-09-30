@@ -83,7 +83,7 @@ console.log('\n2 · el fondo de la accesible y el receso')
   revisar('nunca queda más corta que las demás', profundidadAccesible(corto) === 135)
 }
 
-console.log('\n3 · el frente: pilastra lateral + frente + puerta')
+console.log('\n3 · el frente: pilastra lateral + frente + puerta + pilastra de cierre')
 {
   const c = cfg('MR_PANEL_U', { puertaAccesibleCm: 100 })
   const tramos = crearTramos('MR_PANEL_U', 500, 3, c)
@@ -93,8 +93,11 @@ console.log('\n3 · el frente: pilastra lateral + frente + puerta')
   const f = frenteAccesible(acc, c)
   revisar('la pilastra lateral es de 19', f.pilastra === 19, `${f.pilastra}`)
   revisar('la puerta es de 100', f.puerta === 100, `${f.puerta}`)
-  revisar('el frente se lleva lo que queda: 85', f.frente === 85, `${f.frente}`)
-  revisar('las tres suman el ancho', f.pilastra + f.frente + f.puerta === acc!.anchoCm)
+  revisar('la pilastra de cierre también es de 19', f.cierre === 19, `${f.cierre}`)
+  revisar('el frente se lleva lo que queda: 66', f.frente === 66, `${f.frente}`)
+  revisar('las cuatro suman el ancho', f.pilastra + f.frente + f.puerta + f.cierre === acc!.anchoCm)
+  // Una puerta NUNCA cierra contra un panel: de los dos lados tiene pilastra.
+  revisar('la puerta tiene pilastra de los dos lados', f.pilastra > 0 && f.cierre > 0)
 }
 
 console.log('\n4 · la tira del receso cierra el claro con el descuento nuevo')
