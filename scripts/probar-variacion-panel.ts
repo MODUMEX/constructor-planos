@@ -100,6 +100,26 @@ console.log('\n3 · el frente: pilastra lateral + frente + puerta + pilastra de 
   revisar('la puerta tiene pilastra de los dos lados', f.pilastra > 0 && f.cierre > 0)
 }
 
+console.log('\n3b · la lateral y la de cierre pueden medir distinto')
+{
+  const c = cfg('MR_PANEL_U', {
+    puertaAccesibleCm: 100, pilastraLateralMrCm: 24, pilastraCierreMrCm: 10,
+  })
+  const t = crearTramos('MR_PANEL_U', 500, 4, c, 'CR')[0]
+  const acc = t.cabinas[0]
+  const f = frenteAccesible(acc, c)
+  revisar('la lateral toma su medida', f.pilastra === 24, String(f.pilastra))
+  revisar('la de cierre toma la suya', f.cierre === 10, String(f.cierre))
+  revisar('el frente absorbe la diferencia', f.pilastra + f.frente + f.puerta + f.cierre === acc.anchoCm,
+    `${f.pilastra} + ${f.frente} + ${f.puerta} + ${f.cierre}`)
+
+  // y si no se elige la de cierre, sale igual que la lateral
+  const soloLateral = cfg('MR_PANEL_U', { puertaAccesibleCm: 100, pilastraLateralMrCm: 30 })
+  const t2 = crearTramos('MR_PANEL_U', 500, 4, soloLateral, 'CR')[0]
+  const f2 = frenteAccesible(t2.cabinas[0], soloLateral)
+  revisar('sin elegirla, la de cierre copia a la lateral', f2.cierre === 30 && f2.pilastra === 30, String(f2.cierre))
+}
+
 console.log('\n4 · la tira del receso cierra el claro con el descuento nuevo')
 {
   for (const id of ['MR_PANEL_E', 'MR_PANEL_L', 'MR_PANEL_U'] as const) {

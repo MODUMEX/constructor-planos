@@ -635,7 +635,11 @@ export function frenteAccesible(
   // Una puerta NUNCA cierra contra un panel: cierra contra una pilastra. Así
   // que del lado del panel divisor va otra lateral, la de cierre, y la puerta
   // queda entre las dos. Sin ella, la hoja topaba contra el canto del panel.
-  const cierre = pilastra
+  //
+  // No tienen por qué medir lo mismo: la de cierre se elige aparte y, si no se
+  // eligió, sale igual que la lateral.
+  const pedidaCierre = config.pilastraCierreMrCm
+  const cierre = pedidaCierre != null && pedidaCierre > 0 ? pedidaCierre : pilastra
   return {
     pilastra,
     puerta,

@@ -194,6 +194,14 @@ export interface Config {
    */
   pilastraLateralMrCm?: number
   /**
+   * La pilastra de CIERRE del frente de la accesible, en cm: la del lado del
+   * panel divisor, contra la que cierra la puerta.
+   *
+   * No tiene por qué medir lo mismo que la lateral. Si no viene, se usa la
+   * medida de la lateral, que es como salían antes de poder elegirlas aparte.
+   */
+  pilastraCierreMrCm?: number
+  /**
    * La medida de puerta que pidió el cliente, en cm. No se captura en un campo
    * aparte: queda pedida cuando se elige una medida en el menú del plano. La
    * modulación gira en torno a ella: si está puesta, las puertas NO se tocan y
