@@ -98,6 +98,11 @@ interface Props {
    * lo que quede
    */
   onPilastraPmr: (anchoCm: number) => void
+  /**
+   * Cambiar una de las dos pilastras del frente de la cabina accesible. Con
+   * `null` vuelven a salir de la modulación.
+   */
+  onLateralMr: (cual: 'lateral' | 'cierre', anchoCm: number | null) => void
 
 }
 
@@ -106,6 +111,8 @@ type MenuEstado =
   | { tipo: 'panel'; tramoId: string; indice: number; x: number; y: number }
   // el índice de una pilastra es el de su FRONTERA: de 0 a la cantidad de cabinas
   | { tipo: 'pilastra'; tramoId: string; indice: number; x: number; y: number }
+  // las dos pilastras del frente de la cabina accesible, que no son de la tira
+  | { tipo: 'lateralMr'; cual: 'lateral' | 'cierre'; x: number; y: number }
   | null
 
 export default function EditorPlano({
@@ -124,6 +131,7 @@ export default function EditorPlano({
   onTipoPuerta,
   onAnchoLibre,
   onPilastraPmr,
+  onLateralMr,
   onOrinal,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
@@ -1162,17 +1170,62 @@ export default function EditorPlano({
 
                       const a = pt(m, pieza.desdeCm, profC - grueso / 2)
                       const b = pt(m, pieza.hastaCm, profC + grueso / 2)
+                      // Las dos pilastras del frente las elige la modulación, pero si
+                      // no calzan se cambian acá mismo con clic derecho.
+                      const cual = pieza.tipo === 'pilastra' ? 'lateral' : pieza.tipo === 'cierre' ? 'cierre' : null
+                      // En planta estas piezas son una tira del grueso del material:
+                      // en pantalla quedan tres o cuatro píxeles y no hay forma de
+                      // pegarles. Encima va una zona invisible mucho más alta, igual
+                      // que la de las pilastras de la tira.
+                      const altoAgarreMr = AGARRE_ALTO_PX * cmPorPx
+                      const anchoAgarreMr = Math.max(largoPieza, AGARRE_ANCHO_PX * cmPorPx)
+                      const centroPieza = (pieza.desdeCm + pieza.hastaCm) / 2
+                      const ga = pt(m, centroPieza - anchoAgarreMr / 2, profC - altoAgarreMr / 2)
+                      const gb = pt(m, centroPieza + anchoAgarreMr / 2, profC + altoAgarreMr / 2)
                       return (
                         <g key={pieza.tipo}>
                           <rect
                             x={Math.min(a.x, b.x)} y={Math.min(a.y, b.y)}
                             width={Math.max(Math.abs(b.x - a.x), MIN_PIEZA_PX)}
                             height={Math.max(Math.abs(b.y - a.y), MIN_PIEZA_PX)}
-                            fill="#22303f"
+                            fill={sobre === 'mr:' + pieza.tipo ? '#2e6fd9' : '#22303f'}
+                            pointerEvents="none"
                           />
+                          {cual && (
+                            <rect
+                              x={Math.min(ga.x, gb.x)} y={Math.min(ga.y, gb.y)}
+                              width={Math.max(Math.abs(gb.x - ga.x), 8)}
+                              height={Math.max(Math.abs(gb.y - ga.y), 8)}
+                              fill="transparent" pointerEvents="auto"
+                              style={{ cursor: 'context-menu' }}
+                              onPointerEnter={() => setSobre('mr:' + pieza.tipo)}
+                              onPointerLeave={() => setSobre((x) => (x === 'mr:' + pieza.tipo ? null : x))}
+                              onContextMenu={(ev) => {
+                                ev.preventDefault(); ev.stopPropagation()
+                                setMenu({ tipo: 'lateralMr', cual, x: ev.clientX, y: ev.clientY })
+                              }}
+                              onClick={(ev) => {
+                                ev.preventDefault(); ev.stopPropagation()
+                                setMenu({ tipo: 'lateralMr', cual, x: ev.clientX, y: ev.clientY })
+                              }}
+                            >
+                              <title>
+                                {(cual === 'lateral' ? 'Pilastra lateral' : 'Pilastra de cierre') +
+                                  ' de ' + largoPieza + ' cm — tocala para elegir la medida'}
+                              </title>
+                            </rect>
+                          )}
                           {verCotas && (
-                            <text x={medio.x} y={medio.y + 20} textAnchor="middle" fontSize={14} fill="#8fa3c4">
-                              {`${pieza.tipo === 'frente' ? 'PN' : 'PL'} ${formatear(largoPieza, unidad)}`}
+                            // El frente es PL mientras entre en el catálogo de pilastras y PN de
+                            // ahí para arriba: rotularlo siempre PN mentía en las accesibles
+                            // angostas. Y las tres piezas van escalonadas, porque cuando son
+                            // chicas los rótulos se montaban uno sobre otro.
+                            <text
+                              x={medio.x}
+                              y={medio.y + (pieza.tipo === 'frente' ? 38 : 20)}
+                              textAnchor="middle" fontSize={14} fill="#8fa3c4"
+                            >
+                              {`${pieza.tipo === 'frente' ? familiaDelFrente(largoPieza, config.modelo) : 'PL'} ${formatear(largoPieza, unidad)}`}
                             </text>
                           )}
                         </g>
@@ -1477,6 +1530,49 @@ export default function EditorPlano({
           tenían menú: el del panel solo existe entre dos cabinas. Acá se
           elige la medida de una lista y listo.
           ------------------------------------------------------------------ */}
+      {menu && menu.tipo === 'lateralMr' && (() => {
+        const cerrar = () => setMenu(null)
+        const pedida = menu.cual === 'lateral' ? config.pilastraLateralMrCm : config.pilastraCierreMrCm
+        // la cabina accesible vive en el tramo principal, pero se busca por su
+        // frente para no depender de cuál sea
+        const cuarto = tramos.map((t) => cuartoPmr(t, config)).find((c) => c?.entrada === 'frente')
+        const pieza = cuarto?.frente.find((p) => p.tipo === (menu.cual === 'lateral' ? 'pilastra' : 'cierre'))
+        const actual = pieza ? Math.round((pieza.hastaCm - pieza.desdeCm) * 10) / 10 : (pedida ?? 0)
+        const medidas = anchosPilastra(config.modelo).filter((a) => a <= 60)
+        return (
+          <Menu
+            pos={{ x: menu.x, y: menu.y }}
+            titulo={menu.cual === 'lateral' ? 'Pilastra lateral del frente' : 'Pilastra de cierre del frente'}
+            detalle={formatear(actual, unidad) + unidadTxt + (pedida ? '' : ' · la eligió la modulación')}
+            onCerrar={cerrar}
+          >
+            <Grupo>Medida de la pilastra</Grupo>
+            <div className="anchos">
+              {medidas.map((a) => (
+                <button
+                  key={a}
+                  className={pedida === a ? 'on' : ''}
+                  onClick={() => { onLateralMr(menu.cual, a); cerrar() }}
+                  type="button"
+                >
+                  {a}
+                </button>
+              ))}
+            </div>
+            {pedida != null && (
+              <div className="anchos">
+                <button onClick={() => { onLateralMr(menu.cual, null); cerrar() }} type="button">
+                  ↺ Que la elija la modulación
+                </button>
+              </div>
+            )}
+            <div className="nota-menu">
+              La diferencia se la lleva la pieza del FRENTE: la puerta y el ancho de la cabina no se mueven.
+            </div>
+          </Menu>
+        )
+      })()}
+
       {menu && menu.tipo === 'pilastra' && (() => {
         const t = tramoPorId(menu.tramoId)
         if (!t) return null

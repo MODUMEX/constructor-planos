@@ -494,7 +494,9 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
               Math.max(Math.abs(bx - ax), 0.5), Math.max(Math.abs(by - ay), 0.5), 'F',
             )
           }
-          const [tx, ty] = aHoja(e, pt(m, (pieza.desdeCm + pieza.hastaCm) / 2, cuarto.profCm + 9))
+          // la del FRENTE va un escalón más abajo: con una accesible angosta las tres
+          // medidas se montaban una sobre otra
+          const [tx, ty] = aHoja(e, pt(m, (pieza.desdeCm + pieza.hastaCm) / 2, cuarto.profCm + (pieza.tipo === 'frente' ? 17 : 9)))
           texto(doc, String(largoPieza), tx, ty, { size: 5.5, align: 'center', angle: rotCuarto, color: COTA })
         }
       }

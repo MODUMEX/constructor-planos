@@ -18,7 +18,7 @@ import {
   acabadoEsElColor, acabadosPara, alturasDe, anchosPanel, claroAjustado, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, mgMedidas, MODELOS,
   type PiezaEspecial,
   PAISES, etiquetaTier, nombreHerraje, nombreModelo, tierDeColor, TIPOLOGIAS, tipologia, tipologiaEspejo,
-  ANCHOS_PILASTRA, anchosPilastra, esEspecial, esSoloOrinales, esVariacionPanel,
+  ANCHOS_PILASTRA, esEspecial, esSoloOrinales, esVariacionPanel,
 } from './catalog'
 import { medidaCercana } from './modulador'
 import VistaRender from './components/VistaRender'
@@ -32,7 +32,7 @@ import { fotoDe, fotosHerraje, faltanFotosHerraje, terminacionesDe } from './ren
 import {
   anchoAccesibleDe, anchoTotal, bom, claroDeOrinales, compensarPilastra, crearTramos, esEspacioLibre,
   frenteAccesible, invertirTramo, modularConCatalogo, nuevoId, pedidoDeModulacion,
-  piezasQuePidenCostilla, PILASTRA_LATERAL_MR_CM, reajustarConPuertas, recesoDe,
+  piezasQuePidenCostilla, reajustarConPuertas, recesoDe,
 } from './modulacion'
 import { anchoDeOrinal } from './geometria'
 import { avisosDeDescargas, centrosDe, corridaDeCentros, tramoDesdeCentros } from './descargas'
@@ -2116,6 +2116,11 @@ export default function App() {
                     onTipoPuerta={onTipoPuerta}
                     onAnchoLibre={onAnchoLibre}
                     onPilastraPmr={(anchoCm) => setConfig({ pilastraPmrCm: anchoCm })}
+                    onLateralMr={(cual, anchoCm) =>
+                      setConfig(cual === 'lateral'
+                        ? { pilastraLateralMrCm: anchoCm ?? undefined }
+                        : { pilastraCierreMrCm: anchoCm ?? undefined })
+                    }
                   />
                 </div>
 
@@ -2686,30 +2691,6 @@ export default function App() {
                           </span>
                         </div>
                         <div className="campo">
-                          <label>Pilastra lateral (cm)</label>
-                          <select
-                            value={config.pilastraLateralMrCm ?? PILASTRA_LATERAL_MR_CM}
-                            onChange={(e) => setConfig({ pilastraLateralMrCm: Number(e.target.value) })}
-                          >
-                            {anchosPilastra(config.modelo).map((a) => (
-                              <option key={a} value={a}>{a}</option>
-                            ))}
-                          </select>
-                          <span className="ayuda">La que topa contra el muro o contra el panel de cierre</span>
-                        </div>
-                        <div className="campo">
-                          <label>Pilastra de cierre (cm)</label>
-                          <select
-                            value={config.pilastraCierreMrCm ?? config.pilastraLateralMrCm ?? PILASTRA_LATERAL_MR_CM}
-                            onChange={(e) => setConfig({ pilastraCierreMrCm: Number(e.target.value) })}
-                          >
-                            {anchosPilastra(config.modelo).map((a) => (
-                              <option key={a} value={a}>{a}</option>
-                            ))}
-                          </select>
-                          <span className="ayuda">Contra esta cierra la puerta; no tiene que medir lo mismo que la otra</span>
-                        </div>
-                        <div className="campo">
                           <label>Frente de la accesible</label>
                           <div className="reparto">
                             pilastra {frenteMr.pilastra} + frente {frenteMr.frente} + puerta {frenteMr.puerta}
@@ -2718,7 +2699,8 @@ export default function App() {
                           </div>
                           <span className="ayuda">
                             Se entra por el frente. La puerta va entre dos pilastras —una puerta nunca cierra
-                            contra un panel—, y la pieza del frente se lleva lo que quede.
+                            contra un panel—, y la pieza del frente se lleva lo que quede. Las dos pilastras las
+                            elige la modulación; si no calzan se cambian con clic derecho sobre el plano.
                           </span>
                         </div>
                       </>

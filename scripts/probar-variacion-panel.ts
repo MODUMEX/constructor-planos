@@ -12,7 +12,8 @@
  */
 import { claroAjustado } from '../src/catalog'
 import {
-  anchoAccesibleDe, crearTramos, frenteAccesible, pedidoDeModulacion, profundidadAccesible, recesoDe,
+  anchoAccesibleDe, crearTramos, frenteAccesible, lateralesDelFrente, pedidoDeModulacion,
+  profundidadAccesible, recesoDe,
 } from '../src/modulacion'
 import type { Config, TipologiaId } from '../src/types'
 
@@ -118,6 +119,25 @@ console.log('\n3b · la lateral y la de cierre pueden medir distinto')
   const t2 = crearTramos('MR_PANEL_U', 500, 4, soloLateral, 'CR')[0]
   const f2 = frenteAccesible(t2.cabinas[0], soloLateral)
   revisar('sin elegirla, la de cierre copia a la lateral', f2.cierre === 30 && f2.pilastra === 30, String(f2.cierre))
+}
+
+console.log('\n3c · las dos pilastras las elige la modulación, no se preguntan')
+{
+  // con el ancho de la hoja sobran centímetros y salen las 19 de LEEDER
+  revisar('con 204 y puerta 100 salen de 19', lateralesDelFrente(204, 100) === 19, String(lateralesDelFrente(204, 100)))
+  // el caso del plano de FEDEX: accesible de 164 con puerta de 90
+  revisar('con 164 y puerta 90 también', lateralesDelFrente(164, 90) === 19, String(lateralesDelFrente(164, 90)))
+  // y cuando no da para las 19 se achican solas, en vez de dejar el frente en nada
+  revisar('con 140 y puerta 100 bajan a 15', lateralesDelFrente(140, 100) === 15, String(lateralesDelFrente(140, 100)))
+  revisar('y el frente nunca queda negativo', 120 - 100 - 2 * lateralesDelFrente(120, 100) >= 0, String(120 - 100 - 2 * lateralesDelFrente(120, 100)))
+
+  // sin nada pedido, el frente toma la automática
+  const c = cfg('MR_PANEL_U', { puertaAccesibleCm: 90, anchoAccesibleCm: 164 })
+  const t = crearTramos('MR_PANEL_U', 449, 4, c)[0]
+  const f = frenteAccesible(t.cabinas[0], c)
+  revisar('sin pedir nada, las dos salen de 19', f.pilastra === 19 && f.cierre === 19, f.pilastra + ' y ' + f.cierre)
+  revisar('y el frente se lleva el resto', f.pilastra + f.frente + f.puerta + f.cierre === 164,
+    [f.pilastra, f.frente, f.puerta, f.cierre].join(' + '))
 }
 
 console.log('\n4 · la tira del receso cierra el claro con el descuento nuevo')
