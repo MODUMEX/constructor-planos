@@ -32,7 +32,7 @@ import { fotoDe, fotosHerraje, faltanFotosHerraje, terminacionesDe } from './ren
 import {
   anchoAccesibleDe, anchoTotal, bom, claroDeOrinales, compensarPilastra, crearTramos, esEspacioLibre,
   frenteAccesible, invertirTramo, modularConCatalogo, nuevoId, pedidoDeModulacion,
-  piezasQuePidenCostilla, reajustarConPuertas, recesoDe,
+  piezasQuePidenCostilla, profundidadAccesible, reajustarConPuertas, recesoDe,
 } from './modulacion'
 import { anchoDeOrinal } from './geometria'
 import { avisosDeDescargas, centrosDe, corridaDeCentros, tramoDesdeCentros } from './descargas'
@@ -556,6 +556,20 @@ export default function App() {
   })()
   // los paneles grandes no existen en todos los modelos
   const panelesDelModelo = anchosPanel(config.modelo)
+  /**
+   * Los fondos que puede tomar la cabina de movilidad reducida.
+   *
+   * Son paneles del catálogo del modelo, pero solo los que pasan del fondo de
+   * las demás cabinas: ahí está el RECESO. Con 135 de cabina la lista arranca
+   * en 140; con 150, en la siguiente que exista. Los que no llegan no son una
+   * opción: harían el receso negativo.
+   */
+  const fondosDeLaAccesible = (() => {
+    const mas = panelesDelModelo.filter((a) => a > config.profundidadCm)
+    const guardado = config.profundidadAccesibleCm
+    if (guardado != null && guardado > config.profundidadCm && !mas.includes(guardado)) mas.push(guardado)
+    return mas.sort((a, b) => a - b)
+  })()
   // las mamparas de orinal también cambian por línea
   const mgDeLaLinea = mgMedidas(config.linea, config.modelo)
 
@@ -2679,11 +2693,22 @@ export default function App() {
                         </div>
                         <div className="campo">
                           <label>Fondo de la accesible (cm)</label>
-                          <CampoNumero
-                            value={config.profundidadAccesibleCm ?? config.profundidadCm}
-                            onChange={(n) => setConfig({ profundidadAccesibleCm: n })}
-                            min={config.profundidadCm} max={400}
-                          />
+                          <select
+                            value={recesoDe(config) > 0 ? profundidadAccesible(config) : config.profundidadCm}
+                            onChange={(e) => {
+                              const n = Number(e.target.value)
+                              setConfig({ profundidadAccesibleCm: n > config.profundidadCm ? n : undefined })
+                            }}
+                          >
+                            <option value={config.profundidadCm}>
+                              {config.profundidadCm} · igual que las demás
+                            </option>
+                            {fondosDeLaAccesible.map((a) => (
+                              <option key={a} value={a}>
+                                {a}{esEspecial('PN', a, config.modelo) ? ' · especial' : ''}
+                              </option>
+                            ))}
+                          </select>
                           <span className="ayuda">
                             {recesoDe(config) > 0
                               ? `Receso de ${recesoDe(config)} cm: es lo que la tira de baños queda metida hacia adentro`
