@@ -533,6 +533,19 @@ export function medidaQueCabe(opciones: number[], max: number): number | null {
   return posibles.length ? posibles[posibles.length - 1] : null
 }
 
+/**
+ * De qué medida para arriba una pieza de FRENTE pide soporte.
+ *
+ * Un panel o una pilastra de más de un metro no trabaja solo: se le agrega una
+ * COSTILLA de canto, o se cambia por un refuerzo o por un sándwich. Cuál de las
+ * tres se usa, y de cuánto, lo decide el cliente en la cotización: la app no lo
+ * pone solo, solo avisa que hace falta.
+ *
+ * Se mira la pieza del FRENTE —lo que cierra la cabina hacia el pasillo— y no
+ * el panel divisor de una cabina normal, que va agarrado de sus dos pilastras.
+ */
+export const PIEZA_PIDE_COSTILLA_CM = 100
+
 /** una puerta necesita este margen contra el ancho de la cabina */
 export const MARGEN_PUERTA_CM = 8
 

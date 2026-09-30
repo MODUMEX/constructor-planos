@@ -325,7 +325,7 @@ export interface Descuento {
  * manda sobre el precio calculado.
  */
 export interface Extra {
-  tipo: 'puerta' | 'panel' | 'pilastra' | 'mingitorio' | 'herraje' | 'grabado'
+  tipo: 'puerta' | 'panel' | 'pilastra' | 'mingitorio' | 'costilla' | 'herraje' | 'grabado'
   /** código del herraje o del grabado */
   codigo?: string
   descripcion?: string

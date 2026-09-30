@@ -459,15 +459,16 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
         for (const pieza of cuarto.frente) {
           const largoPieza = pieza.hastaCm - pieza.desdeCm
           if (pieza.tipo === 'puerta') {
-            // Cuelga del borde de la pieza del frente y barre hacia el pasillo,
-            // alejándose del panel. Invertida el área, el panel le queda del
-            // otro lado y la hoja se da vuelta con ella.
+            // Cuelga del borde de la pieza del frente. Invertida el área, el
+            // panel le queda del otro lado y la hoja se da vuelta con ella.
+            // Abre a 45 grados desde su propio vano, igual que las de cabina.
             const haciaIzq = cuarto.lado === 'inicio'
             const pivU = haciaIzq ? pieza.desdeCm : pieza.hastaCm
+            const dir = haciaIzq ? 1 : -1
             const [pxx, pyy] = aHoja(e, pt(m, pivU, cuarto.profCm))
-            const [cxx, cyy] = aHoja(e, pt(m, haciaIzq ? pieza.hastaCm : pieza.desdeCm, cuarto.profCm))
+            const [cxx, cyy] = aHoja(e, pt(m, pivU + dir * largoPieza, cuarto.profCm))
             const [exx, eyy] = aHoja(e, pt(
-              m, pivU + (haciaIzq ? -1 : 1) * largoPieza * ABIERTA_45,
+              m, pivU + dir * largoPieza * ABIERTA_45,
               cuarto.profCm + largoPieza * ABIERTA_45,
             ))
             doc.setDrawColor(ARCO[0], ARCO[1], ARCO[2])

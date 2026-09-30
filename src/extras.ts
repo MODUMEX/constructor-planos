@@ -28,6 +28,11 @@ export const FAMILIAS_EXTRA = [
   { tipo: 'panel', etiqueta: 'Panel', familia: 'PN', porM2: true },
   { tipo: 'pilastra', etiqueta: 'Pilastra', familia: 'PL', porM2: true },
   { tipo: 'mingitorio', etiqueta: 'Mampara de mingitorio', familia: 'MG', porM2: true },
+  // La COSTILLA es una pieza de soporte: se le pone de canto a un panel o a una
+  // pilastra grande para que no trabaje sola. Es del mismo material y se cobra
+  // igual que una pilastra, por m² y con su propia medida, que la elige el
+  // cliente: la hoja de LEEDER dibuja una de 19 y hay planos con una de 10.
+  { tipo: 'costilla', etiqueta: 'Costilla de soporte', familia: 'PL', porM2: true },
   { tipo: 'herraje', etiqueta: 'Herraje', familia: null, porM2: false },
   { tipo: 'grabado', etiqueta: 'Grabado láser', familia: null, porM2: false },
 ] as const

@@ -31,8 +31,8 @@ import { coloresMxAgrupados, slugRenderMx } from './coloresMx'
 import { fotoDe, fotosHerraje, faltanFotosHerraje, terminacionesDe } from './renders'
 import {
   anchoAccesibleDe, anchoTotal, bom, claroDeOrinales, compensarPilastra, crearTramos, esEspacioLibre,
-  frenteAccesible, invertirTramo, modularConCatalogo, nuevoId, pedidoDeModulacion, reajustarConPuertas,
-  recesoDe,
+  frenteAccesible, invertirTramo, modularConCatalogo, nuevoId, pedidoDeModulacion,
+  piezasQuePidenCostilla, reajustarConPuertas, recesoDe,
 } from './modulacion'
 import { anchoDeOrinal } from './geometria'
 import { cargarTarifas, type ResultadoTarifas } from './tarifas'
@@ -576,6 +576,14 @@ export default function App() {
     return claroAjustado(t.claroCm, muros, conPuerta) - cuerpos
   }
   const avisosAccesible = area.tramos.filter((t) => t.avisoAccesible)
+  /**
+   * Las piezas de frente que pasan del metro y piden soporte.
+   *
+   * La app NO lo agrega sola: qué soporte se usa —costilla, refuerzo o
+   * sándwich— y de qué medida lo decide el cliente, así que esto es un aviso
+   * para que el vendedor lo cargue en la cotización si corresponde.
+   */
+  const piezasSinSoporte = area.tramos.flatMap((t) => piezasQuePidenCostilla(t, config))
 
   /**
    * ¿Cambió algo desde el último guardado? Un proyecto que nunca se guardó
@@ -1987,6 +1995,19 @@ export default function App() {
                   {avisosAccesible.map((t) => (
                     <span key={t.id}>{t.avisoAccesible}</span>
                   ))}
+                </div>
+              )}
+
+              {piezasSinSoporte.length > 0 && (
+                <div className="aviso-caja" style={{ margin: '0 0 12px' }}>
+                  <b>Hay piezas que piden soporte</b>
+                  <span>
+                    {piezasSinSoporte.join(' · ')}. De un metro para arriba una pieza de frente no
+                    trabaja sola. Cuál soporte lleva lo decide el cliente, así que no se agrega solo:
+                    la <b>costilla</b> se carga en <b>Cotización → Piezas extra</b> con la medida que
+                    pida; el <b>refuerzo</b> ya va en los herrajes; y el <b>sándwich</b> se solicita
+                    aparte.
+                  </span>
                 </div>
               )}
 

@@ -1,6 +1,6 @@
 import {
   GRUESO_PILASTRA, MIN_ACCESIBLE_CM, MIN_CABINA_CM, SNAP_CM, anchosPuerta, MARGEN_PUERTA_CM,
-  LARGO_SECUNDARIO_CM,
+  LARGO_SECUNDARIO_CM, PIEZA_PIDE_COSTILLA_CM,
 } from './catalog'
 import type { Cabina, Config, Moneda, Pais, Tramo, TipologiaId, RenglonBOM } from './types'
 import {
@@ -772,6 +772,40 @@ function anchosConPilastras(tramo: Tramo, pilastras: number[]): Cabina[] {
     const { izq, der } = ladosDeCabina(lugares, pil, i, arranca)
     return { ...c, anchoCm: snap(izq + c.puerta.anchoCm + der) }
   })
+}
+
+/**
+ * Las piezas de FRENTE de un tramo que pasan de la medida en la que hay que
+ * darles soporte.
+ *
+ * Devuelve una descripción por pieza para poder avisarlo mientras se modula.
+ * No cambia nada del plano: qué soporte se usa —costilla, refuerzo o sándwich—
+ * y de qué medida lo decide el cliente en la cotización.
+ */
+export function piezasQuePidenCostilla(tramo: Tramo, config: Config): string[] {
+  const avisos: string[] = []
+  const n = tramo.cabinas.length
+
+  // las pilastras y paneles de frente de la tira
+  ;(tramo.pilastras ?? []).forEach((ancho, k) => {
+    if (!ancho || ancho <= PIEZA_PIDE_COSTILLA_CM) return
+    const familia = familiaDelFrente(ancho, config.modelo)
+    const donde = k === 0 ? 'de arranque' : k === n ? 'de cierre' : `entre la ${k} y la ${k + 1}`
+    avisos.push(`${familia === 'PN' ? 'El panel' : 'La pilastra'} ${donde}, de ${ancho} cm`)
+  })
+
+  // y la pieza del frente de la cabina accesible, en las "variación panel"
+  if (esVariacionPanel(config.tipologia)) {
+    const acc = tramo.cabinas.find((c) => c.tipo === 'accesible')
+    if (acc) {
+      const f = frenteAccesible(acc, config)
+      if (f.frente > PIEZA_PIDE_COSTILLA_CM) {
+        const familia = familiaDelFrente(f.frente, config.modelo)
+        avisos.push(`${familia === 'PN' ? 'El panel' : 'La pilastra'} del frente de la accesible, de ${f.frente} cm`)
+      }
+    }
+  }
+  return avisos
 }
 
 /** la profundidad del lugar, que nunca puede ser menor que la de la cabina */

@@ -913,6 +913,10 @@ export default function EditorPlano({
                     {cortes.map((_u2, k) => {
                       // en las fronteras de mingitorio no hay pilastra que dibujar
                       if (esMingitorio(tramo, k)) return null
+                      // La frontera de la cabina accesible PLANTADA vale 0: ahí no
+                      // va pilastra de tira. Sin esto se dibujaba una del espesor
+                      // del material y salía acotada como "0.3".
+                      if ((tramo.pilastras?.[k] ?? -1) === 0) return null
                       // La pilastra se dibuja con SU ancho (el de la pieza, 10–85 cm según
                       // catálogo), no con el espesor del material: son cosas distintas y
                       // dibujarla de 1.27 cm la volvía invisible en planta.
@@ -1046,23 +1050,28 @@ export default function EditorPlano({
                       const medio = pt(m, (pieza.desdeCm + pieza.hastaCm) / 2, profC)
 
                       if (pieza.tipo === 'puerta') {
-                        // El gozne va del lado de la pieza del frente y la hoja
-                        // barre hacia el pasillo, alejándose del panel. Al invertir
+                        // El gozne va del lado de la pieza del frente. Al invertir
                         // el área el panel le queda del otro lado, así que la hoja
                         // también se da vuelta.
+                        //
+                        // Abre a 45 grados DESDE SU PROPIO VANO, igual que las de
+                        // las cabinas: antes se dibujaba el barrido desde el lado
+                        // opuesto y quedaba abierta 135, mucho más de lo que abre.
                         const haciaIzq = cuarto.lado === 'inicio'
                         const pivU = haciaIzq ? pieza.desdeCm : pieza.hastaCm
+                        /** del gozne hacia el otro extremo del vano: ahí está cerrada */
+                        const dir = haciaIzq ? 1 : -1
                         const pivote = pt(m, pivU, profC)
-                        const cerrada = pt(m, haciaIzq ? pieza.hastaCm : pieza.desdeCm, profC)
+                        const cerrada = pt(m, pivU + dir * largoPieza, profC)
                         const extremo = pt(
                           m,
-                          pivU + (haciaIzq ? -1 : 1) * largoPieza * ABIERTA_45,
+                          pivU + dir * largoPieza * ABIERTA_45,
                           profC + largoPieza * ABIERTA_45,
                         )
                         return (
                           <g key="puerta-mr">
                             <path
-                              d={`M ${cerrada.x} ${cerrada.y} A ${largoPieza} ${largoPieza} 0 0 ${haciaIzq ? 1 : 0} ${extremo.x} ${extremo.y}`}
+                              d={`M ${cerrada.x} ${cerrada.y} A ${largoPieza} ${largoPieza} 0 0 ${dir < 0 ? 1 : 0} ${extremo.x} ${extremo.y}`}
                               fill="none" stroke="#8fa3c4" strokeWidth={1.4} strokeDasharray="7 5"
                             />
                             <line
