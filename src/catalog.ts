@@ -284,6 +284,17 @@ export function etiquetaColor(c: Color): string {
  * Esmaltada Antigrafiti y Acero Inoxidable no llevan color: el acabado ES el
  * color. No hay lista que elegir, y el color del área es el nombre del acabado.
  */
+/**
+ * Cómo se llama en pantalla la cabina de movilidad reducida.
+ *
+ * El dato interno sigue siendo `tipo: 'accesible'` —cambiarlo rompería los
+ * proyectos guardados—, pero al vendedor y al cliente se les habla del
+ * CUBÍCULO DE MOVILIDAD LIMITADA, que es como lo nombra Modumex. El símbolo va
+ * al lado para reconocerlo de un vistazo entre las demás cabinas.
+ */
+export const CUBICULO_MR = 'Cubículo de movilidad limitada'
+export const ICONO_MR = '♿'
+
 export function acabadoEsElColor(acabado: Acabado): boolean {
   return acabado === 'Esmaltada Antigrafiti'
     || acabado === 'Acero Inoxidable'
@@ -624,9 +635,9 @@ export const TIPOLOGIAS: Tipologia[] = [
   },
   {
     id: 'PMR',
-    nombre: 'Tipo C · cuarto accesible + cabinas',
+    nombre: 'Tipo C · cuarto de movilidad limitada + cabinas',
     descripcion:
-      'Un cuarto accesible que toma todo el fondo del lugar, con su divisor, más cabinas al lado. El CLARO es la pared de fondo completa, cuarto incluido; la PROFUNDIDAD es la del cuarto, y sobre ella va su puerta.',
+      'Un cuarto de movilidad limitada que toma todo el fondo del lugar, con su divisor, más cabinas al lado. El CLARO es la pared de fondo completa, cuarto incluido; la PROFUNDIDAD es la del cuarto, y sobre ella va su puerta.',
     tramos: [{ orientacion: 'horizontal', muroInicio: true, muroFin: false, nombre: 'Tira' }],
     esquinaCompartida: false,
     principal: 0,
@@ -639,7 +650,7 @@ export const TIPOLOGIAS: Tipologia[] = [
     id: 'MR_PANEL_E',
     nombre: 'Tipo E + movilidad reducida · variación panel',
     descripcion:
-      'Isla con la cabina accesible más honda a un costado. El CLARO es todo el largo de la tira; la PROFUNDIDAD es la de la cabina accesible, y las demás quedan en el receso.',
+      'Isla con el cubículo de movilidad limitada más hondo a un costado. El CLARO es todo el largo de la tira; la PROFUNDIDAD es la del cubículo de movilidad limitada, y las demás quedan en el receso.',
     tramos: [{ orientacion: 'horizontal', muroInicio: false, muroFin: false, nombre: 'Tira' }],
     esquinaCompartida: false,
     principal: 0,
@@ -648,7 +659,7 @@ export const TIPOLOGIAS: Tipologia[] = [
     id: 'MR_PANEL_L',
     nombre: 'Tipo L + movilidad reducida · variación panel',
     descripcion:
-      'Arranca contra pared con la cabina accesible más honda y cierra con panel. El CLARO es la pared de fondo; la PROFUNDIDAD es la de la cabina accesible, y las demás quedan en el receso.',
+      'Arranca contra pared con el cubículo de movilidad limitada más hondo y cierra con panel. El CLARO es la pared de fondo; la PROFUNDIDAD es la del cubículo de movilidad limitada, y las demás quedan en el receso.',
     tramos: [{ orientacion: 'horizontal', muroInicio: true, muroFin: false, nombre: 'Tira' }],
     esquinaCompartida: false,
     principal: 0,
@@ -657,7 +668,7 @@ export const TIPOLOGIAS: Tipologia[] = [
     id: 'MR_PANEL_U',
     nombre: 'Tipo U + movilidad reducida · variación panel',
     descripcion:
-      'Entre dos paredes, con la cabina accesible más honda contra una de ellas. El CLARO es la pared de fondo, de muro a muro; la PROFUNDIDAD es la de la cabina accesible, y las demás quedan en el receso.',
+      'Entre dos paredes, con el cubículo de movilidad limitada más hondo contra una de ellas. El CLARO es la pared de fondo, de muro a muro; la PROFUNDIDAD es la del cubículo de movilidad limitada, y las demás quedan en el receso.',
     tramos: [{ orientacion: 'horizontal', muroInicio: true, muroFin: true, nombre: 'Tira' }],
     esquinaCompartida: false,
     principal: 0,

@@ -323,7 +323,7 @@ export function modularConCatalogo(
   const anchoAcc = conAcc && cabinas[0] ? cabinas[0].anchoCm : 0
   const avisoAccesible =
     conAcc && anchoAcc < minAcc - 0.5
-      ? `La cabina accesible queda de ${anchoAcc.toFixed(1)} cm y se pidió de ${minAcc}: faltan ${(minAcc - anchoAcc).toFixed(1)} cm. Con las piezas del catálogo no da; ampliá el claro o bajá una cabina.`
+      ? `El cubículo de movilidad limitada queda de ${anchoAcc.toFixed(1)} cm y se pidió de ${minAcc}: faltan ${(minAcc - anchoAcc).toFixed(1)} cm. Con las piezas del catálogo no da; ampliá el claro o bajá una cabina.`
       : undefined
 
   return {

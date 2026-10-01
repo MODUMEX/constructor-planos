@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Cabina, Config, Pais, Tramo } from '../types'
-import { anchosPanelFabrica, anchosPilastra, esEspecial, esVariacionPanel, familiaDelFrente, medidasDeFrente, puertasPosibles, tipologia } from '../catalog'
+import { anchosPanelFabrica, anchosPilastra, esEspecial, esVariacionPanel, familiaDelFrente, ICONO_MR, medidasDeFrente, puertasPosibles, tipologia } from '../catalog'
 import { anchoTotal, arrancaElCuartoPmr, esEspacioLibre, minimoDe, nuevaCabina, pilastrasParaAncho, profundidadAccesible, puertaSugerida, snap, cierraConMingitorio, ladosDeCabina, lugaresDe, mamparaEn } from '../modulacion'
 import { medidaCercana, PILASTRAS_INTERNAS, PUERTA_ACCESIBLE_MIN } from '../modulador'
 import { Grupo, Item, Menu, Raya } from './Menu'
@@ -1313,7 +1313,7 @@ export default function EditorPlano({
                           fontSize={14} fill="#8fa2bb"
                           transform={`rotate(${horizontal ? -90 : 0} ${(c0.x + c1.x) / 2} ${(c0.y + c1.y) / 2})`}
                         >
-                          {`${cuarto.entrada === 'frente' ? 'Fondo de la accesible' : 'Fondo del lugar'} ${formatear(profC, unidad)}`}
+                          {`${cuarto.entrada === 'frente' ? 'Fondo del cubículo' : 'Fondo del lugar'} ${formatear(profC, unidad)}`}
                         </text>
                       </>
                     )}
@@ -1436,7 +1436,7 @@ export default function EditorPlano({
               disabled={cab.anchoCm < 150 && cab.tipo !== 'accesible'}
               onClick={() => { cambiarCabina(menu.tramoId, menu.indice, dejandoElOrinal('accesible')); cerrar() }}
             >
-              Accesible {cab.anchoCm < 150 && cab.tipo !== 'accesible' ? '(necesita 150 cm)' : ''}
+              {ICONO_MR} Movilidad limitada {cab.anchoCm < 150 && cab.tipo !== 'accesible' ? '(necesita 150 cm)' : ''}
             </Item>
             <Item activo={cab.tipo === 'vacia'} onClick={() => { cambiarCabina(menu.tramoId, menu.indice, { tipo: 'vacia' }); cerrar() }}>Vacía</Item>
             <Item activo={cab.tipo === 'regadera'} onClick={() => { cambiarCabina(menu.tramoId, menu.indice, dejandoElOrinal('regadera')); cerrar() }}>Regadera</Item>

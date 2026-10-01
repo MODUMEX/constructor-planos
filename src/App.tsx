@@ -18,7 +18,7 @@ import {
   acabadoEsElColor, acabadosPara, alturasDe, anchosPanel, claroAjustado, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, mgMedidas, MODELOS,
   type PiezaEspecial,
   PAISES, etiquetaTier, nombreHerraje, nombreModelo, tierDeColor, TIPOLOGIAS, tipologia, tipologiaEspejo,
-  ANCHOS_PILASTRA, esEspecial, esSoloOrinales, esVariacionPanel,
+  ANCHOS_PILASTRA, CUBICULO_MR, esEspecial, esSoloOrinales, esVariacionPanel, ICONO_MR,
 } from './catalog'
 import { medidaCercana } from './modulador'
 import VistaRender from './components/VistaRender'
@@ -2089,7 +2089,7 @@ export default function App() {
 
               {avisosAccesible.length > 0 && (
                 <div className="aviso-caja" style={{ margin: '0 0 12px' }}>
-                  <b>La cabina accesible no llega a su ancho</b>
+                  <b>{ICONO_MR} El {CUBICULO_MR.toLowerCase()} no llega a su ancho</b>
                   {avisosAccesible.map((t) => (
                     <span key={t.id}>{t.avisoAccesible}</span>
                   ))}
@@ -2223,7 +2223,7 @@ export default function App() {
                             <div className="fila" key={c.id}>
                               <span>
                                 {c.tipo === 'orinal' ? 'Orinal' : 'Cabina'} {i + 1}
-                                {c.tipo === 'accesible' ? ' · accesible' : ''}
+                                {c.tipo === 'accesible' ? ` · ${ICONO_MR} movilidad limitada` : ''}
                               </span>
                               <input
                                 className="editable"
@@ -2585,12 +2585,15 @@ export default function App() {
                       )}
                     </div>
                     <div className="campo">
-                      <label>KAP</label>
+                      <label>KAP · Kit de abrepuertas de pie</label>
                       <select value={config.kap ? 'SI' : 'NO'} onChange={(e) => setConfig({ kap: e.target.value === 'SI' })}>
                         <option value="NO">No</option>
                         <option value="SI">Sí</option>
                       </select>
-                      <span className="ayuda">Sale en el cajetín y en el CSV</span>
+                      <span className="ayuda">
+                        Pedal al pie de la puerta para abrirla sin tocarla con las manos. Va uno por
+                        puerta y sale en el cajetín del plano y en el CSV del CIP.
+                      </span>
                     </div>
                   </div>
                 </>
@@ -2700,16 +2703,16 @@ export default function App() {
                     {esVariacion && (
                       <>
                         <div className="campo">
-                          <label>Ancho de la accesible (cm)</label>
+                          <label>{ICONO_MR} Ancho del cubículo (cm)</label>
                           <CampoNumero
                             value={config.anchoAccesibleCm}
                             onChange={(n) => setConfig({ anchoAccesibleCm: n })}
                             min={150} max={400}
                           />
-                          <span className="ayuda">Se planta: no se mueve al modular</span>
+                          <span className="ayuda">{CUBICULO_MR}. Se planta: no se mueve al modular</span>
                         </div>
                         <div className="campo">
-                          <label>Fondo de la accesible (cm)</label>
+                          <label>{ICONO_MR} Fondo del cubículo (cm)</label>
                           <select
                             value={recesoDe(config) > 0 ? profundidadAccesible(config) : config.profundidadCm}
                             onChange={(e) => {
@@ -2733,7 +2736,7 @@ export default function App() {
                           </span>
                         </div>
                         <div className="campo">
-                          <label>Frente de la accesible</label>
+                          <label>{ICONO_MR} Frente del cubículo</label>
                           <div className="reparto">
                             pilastra {frenteMr.pilastra} + frente {frenteMr.frente} + puerta {frenteMr.puerta}
                             {' + cierre '}{frenteMr.cierre}
@@ -2750,7 +2753,7 @@ export default function App() {
                     {!esPmrCuarto && !esVariacion && !esSoloOrinales(config.tipologia) && (
                       <>
                         <div className="campo">
-                          <label>¿Lleva cabina accesible?</label>
+                          <label>¿Lleva {CUBICULO_MR.toLowerCase()}? {ICONO_MR}</label>
                           <select value={llevaAccesible ? 'si' : 'no'} onChange={(e) => setConfig({ llevaAccesible: e.target.value === 'si' })}>
                             <option value="no">No</option>
                             <option value="si">Sí</option>
@@ -2758,7 +2761,7 @@ export default function App() {
                         </div>
                         {llevaAccesible && (
                           <div className="campo">
-                            <label>Ancho de la accesible (cm)</label>
+                            <label>{ICONO_MR} Ancho del cubículo (cm)</label>
                             <CampoNumero
                               value={config.anchoAccesibleCm}
                               onChange={(n) => setConfig({ anchoAccesibleCm: n })}

@@ -392,7 +392,14 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
             ? pt(m, (u0 + u1) / 2, cuarto.profCm * 0.9)
             : pt(m, (u0 + u1) / 2, prof * 0.78),
         )
-        texto(doc, cab.tipo === 'accesible' ? 'ACCESIBLE' : esEspacioLibre(cab) ? 'LIBRE' : 'VACÍA', cx, cy, { size: 5.5, align: 'center', color: GRIS })
+        // "MOVILIDAD LIMITADA" entero no entra en una cabina de 150 cm a la
+        // escala del plano, asi que va partido en dos renglones
+        if (cab.tipo === 'accesible') {
+          texto(doc, 'MOVILIDAD', cx, cy - 2, { size: 5.5, align: 'center', color: GRIS })
+          texto(doc, 'LIMITADA', cx, cy + 3, { size: 5.5, align: 'center', color: GRIS })
+        } else {
+          texto(doc, esEspacioLibre(cab) ? 'LIBRE' : 'VACÍA', cx, cy, { size: 5.5, align: 'center', color: GRIS })
+        }
       }
 
       // La puerta cuelga de la PILASTRA, no del límite de la cabina: ese límite
