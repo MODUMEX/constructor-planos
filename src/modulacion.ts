@@ -1237,7 +1237,7 @@ export function bom(
     modeloCodigo: config.modelo,
     // el país importa, y la línea también: en México un mismo color puede ser
     // Grupo 1 en Superior y Grupo 2 en LEEDER
-    tier: tierDeColor(config.color, precios.pais, config.linea),
+    tier: tierDeColor(config.color, precios.pais, config.linea, config.acabado),
     moneda: precios.moneda,
     tipoCambio: precios.tipoCambio,
     tarifas: precios.tarifas,

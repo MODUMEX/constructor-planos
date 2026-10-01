@@ -58,7 +58,7 @@ export function lineasParaOdoo(
     const config = area.config
     const opciones = {
       modeloCodigo: config.modelo,
-      tier: tierDeColor(config.color, precios.pais, config.linea),
+      tier: tierDeColor(config.color, precios.pais, config.linea, config.acabado),
       moneda: precios.moneda,
       tipoCambio: precios.tipoCambio,
       tarifas: precios.tarifas,

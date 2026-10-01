@@ -1,5 +1,5 @@
 import { COLORES_MX, type ColorMX } from './datos/colores-mx'
-import type { Linea } from './types'
+import type { Acabado, Linea } from './types'
 
 /**
  * La lista de colores depende del país donde se fabrica: Costa Rica trabaja con
@@ -41,7 +41,9 @@ const GRUPOS_LEEDER: [RegExp, 1 | 2][] = [
   [/ebano/i, 1],
   [/fashion\s*white/i, 1],
   [/grafito\s*nocturno/i, 1],
-  [/gris\s*metalic/i, 2],
+  // la lista de materia prima escribe "Gris metalic" y la comercial "Gris
+  // Metalizado": son el mismo color
+  [/gris\s*metali[cz]/i, 2],
   [/skyline/i, 2],
   // El "^walnut" es para el nombre con el que se juntan —"Walnut" a secas—.
   // Va anclado a propósito: el "Italian Walnut" es OTRO color y no entra acá.
@@ -51,7 +53,7 @@ const GRUPOS_LEEDER: [RegExp, 1 | 2][] = [
 const GRUPOS_SUPERIOR: [RegExp, 1 | 2][] = [
   [/alumina|aluminak|alumink|aluminav/i, 1],
   [/grafito\s*nocturno/i, 1],
-  [/gris\s*metalic/i, 1],
+  [/gris\s*metali[cz]/i, 1],
   // el antiguo va ANTES que el blanco pelado, si no se lo come la otra regla
   [/blanco\s*antiguo/i, 2],
   [/^blanco|blanco\s*157|whitec/i, 2],
@@ -81,7 +83,7 @@ export function grupoMx(nombre: string, linea: Linea): 1 | 2 | null {
  * pantalla lo avisa como foto de referencia.
  */
 const RENDER_POR_NOMBRE: [RegExp, string][] = [
-  [/gris\s*metalic/i, 'inox-satin'],
+  [/gris\s*metali[cz]/i, 'inox-satin'],
   [/alumina|aluminak|alumink|aluminav/i, 'gris'],
   [/ebano|negro|black\s*premium/i, 'negro'],
   [/fashion\s*white|whitec|^blanco(\s|$)|blanco\s*1571/i, 'blanco'],
@@ -139,23 +141,80 @@ export function espesorDeLinea(linea: Linea): number {
  * Los apartados o especificados para un cliente solo se muestran adentro de
  * Modumex: a un distribuidor no se le enseña material comprometido con otro.
  */
-/**
- * Colores que la lista de precios NO reconoce en Superior 2.0. Están en la
- * materia prima pero no en ninguno de los dos grupos de esa línea, así que
- * ofrecerlos ahí los cotizaría como especiales sin serlo. Dayanna lo confirmó
- * el 22-sep-2026.
- */
-const FUERA_DE_SUPERIOR = /ebano|fashion\s*white/i
-
 export function coloresMxPara(linea: Linea, conReservados = true): ColorMX[] {
   const mm = espesorDeLinea(linea)
   return COLORES_MX.filter(
-    (c) =>
-      !c.descontinuado &&
-      c.espesorMm === mm &&
-      (conReservados || !c.reservado) &&
-      !(linea === 'SUPERIOR' && FUERA_DE_SUPERIOR.test(c.color)),
+    (c) => !c.descontinuado && c.espesorMm === mm && (conReservados || !c.reservado),
   )
+}
+
+// ---------------------------------------------------------------------------
+// Qué se OFRECE en México
+// ---------------------------------------------------------------------------
+//
+// La lista de materia prima dice lo que la planta COMPRA, que no es lo mismo
+// que lo que se le vende al distribuidor: ahí hay material de una sola compra,
+// restos y cosas que no están en la carta. Lo que se ofrece es esta lista, que
+// la dio Dayanna el 1-oct-2026 y manda sobre la materia prima.
+
+/** el laminado compacto de 12,7 de LEEDER */
+const LAMINADO_LEEDER_MX = [
+  'Alumina',
+  'Fashion White',
+  'Ebano',
+  'Gris Metalizado',
+  'Skyline Walnut',
+  'Walnut Heights',
+  'Grafito Nocturno',
+  'Rosa Margenta',
+  'Rosa',
+]
+
+/** y el de 3 mm de Superior 2.0, que lleva siete más */
+const LAMINADO_SUPERIOR_MX = [
+  'Alumina',
+  'Fashion White',
+  'Ebano',
+  'Champaña Metalizado',
+  'Gris Metalizado',
+  'Skyline Walnut',
+  'Walnut Heights',
+  'Lapis Blue',
+  'Holly Berry',
+  'Negro',
+  'Blanco',
+  'Blanco Antiguo',
+  'Grafito Nocturno',
+]
+
+/** la esmaltada antigrafiti de Superior 2.0: el acabado se pinta, no se lamina */
+const ESMALTADA_MX = ['Blanco', 'Gris Claro', 'Beige']
+
+/** y la fórmica, que son dos */
+const FORMICA_MX = ['White', 'Folkstone']
+
+/**
+ * Si ese acabado tiene lista de colores en México.
+ *
+ * El acero inoxidable y el Arte son su propio color: ahí no hay nada que
+ * elegir. La esmaltada antigrafiti y la fórmica SÍ tienen lista —tres y dos
+ * colores— aunque el acabado mande sobre el precio.
+ */
+export function eligeColorMx(acabado: Acabado): boolean {
+  return acabado !== 'Acero Inoxidable' && acabado !== 'Arte'
+}
+
+/**
+ * Los colores que se ofrecen, por línea y acabado, en el orden de la carta.
+ *
+ * En acero inoxidable y en Arte el acabado ES el color, así que no hay lista
+ * que elegir.
+ */
+export function ofrecidosMx(linea: Linea, acabado: Acabado): string[] {
+  if (acabado === 'Esmaltada Antigrafiti') return ESMALTADA_MX
+  if (acabado === 'Fórmica') return FORMICA_MX
+  if (acabado === 'Acero Inoxidable' || acabado === 'Arte') return []
+  return linea === 'SUPERIOR' ? LAMINADO_SUPERIOR_MX : LAMINADO_LEEDER_MX
 }
 
 /**
@@ -178,12 +237,21 @@ const FAMILIAS: [RegExp, string][] = [
   // "Blanco Antiguo" es OTRO color y va primero, o se lo come "Blanco"
   [/blanco\s*antiguo/i, 'Blanco Antiguo'],
   [/alumina|aluminak|alumink|aluminav/i, 'Alumina'],
+  // El "Italian Walnut" va primero y aparte: NO es ninguno de los otros dos.
+  // La carta lleva un solo skyline —"Skyline Walnut"—, así que el STD y el
+  // PREMIUM de la planta son ese mismo color.
+  [/italian\s*walnut/i, 'Italian Walnut'],
+  [/skyline/i, 'Skyline Walnut'],
+  [/walnut\s*(heights|premium|std)/i, 'Walnut Heights'],
   [/^negro|black\s*premium/i, 'Negro'],
   [/^blanco(\s|$)|blanco\s*157/i, 'Blanco'],
-  [/whitec/i, 'Whitec'],
-  [/gris\s*metalic/i, 'Gris metálico'],
-  [/skyline/i, 'Skyline'],
-  [/walnut\s*(heights|premium|std)/i, 'Walnut'],
+  [/gris\s*metali[cz]/i, 'Gris Metalizado'],
+  [/champa/i, 'Champaña Metalizado'],
+  [/grafito\s*nocturno/i, 'Grafito Nocturno'],
+  [/^ebano/i, 'Ebano'],
+  [/fashion\s*white/i, 'Fashion White'],
+  [/holl?y\s*berry/i, 'Holly Berry'],
+  [/lapi[sz]\s*blue/i, 'Lapis Blue'],
   // El lapislázuli y el Lapiz Blue quedan SEPARADOS: comparten grupo de precio
   // pero no la foto, así que no hay con qué decir que son el mismo color.
 ]
@@ -209,7 +277,13 @@ export function familiaMx(nombre: string): string {
  */
 function materialDeLaFamilia(delMismo: ColorMX[]): ColorMX {
   const apellido = /premium|std|est[áa]ndar|estandar|quality/i
-  return delMismo.find((c) => !apellido.test(c.color)) ?? delMismo[0]
+  // Primero una lámina LIBRE: si una de las del color está apartada para un
+  // cliente y la otra no, el color no está apartado y no tiene por qué salir
+  // con esa nota. El Skyline Walnut salía marcado para Planet Fitness aunque
+  // la planta tenga otra lámina igual sin comprometer.
+  const libres = delMismo.filter((c) => !c.reservado)
+  const donde = libres.length ? libres : delMismo
+  return donde.find((c) => !apellido.test(c.color)) ?? donde[0]
 }
 
 /**
@@ -232,28 +306,56 @@ export interface ColorMxAgrupado extends ColorMX {
  * despliega las láminas de ese color y ahí se escoge cuál se da de baja. Un
  * código adivinado acá haría cortar la lámina equivocada.
  */
-export function coloresMxAgrupados(linea: Linea, conReservados = true): ColorMxAgrupado[] {
-  const lista = coloresMxPara(linea, conReservados)
+export function coloresMxAgrupados(
+  linea: Linea,
+  conReservados = true,
+  acabado: Acabado = 'Laminado Compacto',
+): ColorMxAgrupado[] {
   const porFamilia = new Map<string, ColorMX[]>()
-  for (const c of lista) {
+  for (const c of coloresMxPara(linea, true)) {
     const f = familiaMx(c.color)
     const ya = porFamilia.get(f)
     if (ya) ya.push(c)
     else porFamilia.set(f, [c])
   }
-  return [...porFamilia.entries()].map(([nombre, delMismo]) => {
+
+  // La esmaltada se PINTA y la fórmica es otro material: sus colores no están
+  // en la lista de laminado, y buscarlos ahí hacía que el "Negro" esmaltado se
+  // llevara el código y el grupo de precio del laminado negro.
+  const esLaminado = acabado === 'Laminado Compacto'
+
+  const salida: ColorMxAgrupado[] = []
+  for (const nombre of ofrecidosMx(linea, acabado)) {
+    const todas = esLaminado ? (porFamilia.get(nombre) ?? []) : []
+    const delMismo = todas.filter((c) => conReservados || !c.reservado)
+    // tenía lámina pero toda apartada para otro cliente: a un distribuidor no
+    // se le ofrece
+    if (todas.length > 0 && delMismo.length === 0) continue
+    if (delMismo.length === 0) {
+      // Está en la carta pero todavía no en la lista de materia prima de esa
+      // línea. Se ofrece igual —el color existe— y sale SIN código: con cuál
+      // lámina se fabrica lo pregunta el CIP, que es donde se sabe.
+      salida.push({
+        color: nombre,
+        espesor: '',
+        espesorMm: espesorDeLinea(linea),
+        codigoBase: '',
+        nombre,
+        tambien: [],
+      })
+      continue
+    }
     const referencia = materialDeLaFamilia(delMismo)
     const unaSola = delMismo.length === 1
-    return {
+    salida.push({
       ...referencia,
-      // Si la familia tiene uno solo no hay nada que juntar, así que se deja el
-      // nombre con el que viene: renombrarlo sería cambiar por cambiar.
-      nombre: unaSola ? referencia.color : nombre,
+      nombre,
       // con varias láminas no se manda ninguna: la elige el CIP
       codigoBase: unaSola ? referencia.codigoBase : '',
       tambien: delMismo.filter((c) => c !== referencia).map((c) => c.color),
-    }
-  })
+    })
+  }
+  return salida
 }
 
 export function descontinuadosMx(): ColorMX[] {

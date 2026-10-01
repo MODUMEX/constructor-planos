@@ -27,7 +27,7 @@ import CampoNumero from './components/CampoNumero'
 import Usuarios from './components/Usuarios'
 import Solicitudes from './components/Solicitudes'
 import { contarSolicitudes } from './solicitudes'
-import { coloresMxAgrupados, slugRenderMx } from './coloresMx'
+import { coloresMxAgrupados, eligeColorMx, slugRenderMx } from './coloresMx'
 import { fotoDe, fotosHerraje, faltanFotosHerraje, terminacionesDe } from './renders'
 import {
   anchoAccesibleDe, anchoTotal, bom, claroDeOrinales, compensarPilastra, crearTramos, esEspacioLibre,
@@ -791,7 +791,9 @@ export default function App() {
           a = { ...a, config: { ...a.config, linea: 'LEEDER', espesorMm: espesorPorLinea('LEEDER') } }
         }
         if (paisFabricacion === 'MX') {
-          const disponibles = coloresMxAgrupados(a.config.linea, puedeColoresReservados(usuario))
+          const disponibles = coloresMxAgrupados(
+            a.config.linea, puedeColoresReservados(usuario), a.config.acabado,
+          )
           const sigue = disponibles.find((c) => c.nombre === a.config.color)
           const elegido = sigue ?? disponibles[0]
           if (!elegido) return a
@@ -861,13 +863,15 @@ export default function App() {
    * porque los de 3 mm son solo de Superior y los de 12 mm de LEEDER.
    */
   function colorInicial(linea: Config['linea'], acabado: Config['acabado']) {
+    // En México la esmaltada y la fórmica SÍ tienen lista de colores, aunque el
+    // precio lo siga mandando el acabado. El acero y el Arte no.
+    if (proyecto.paisFabricacion === 'MX' && eligeColorMx(acabado)) {
+      const primero = coloresMxAgrupados(linea, puedeColoresReservados(usuario), acabado)[0]
+      if (primero) return { color: primero.nombre, colorCodigo: primero.codigoBase }
+    }
     // el esmaltado y el acero son su propio color: no hay lista que elegir
     if (acabadoEsElColor(acabado)) {
       return { color: coloresPara(linea, acabado)[0].nombre, colorCodigo: undefined }
-    }
-    if (proyecto.paisFabricacion === 'MX') {
-      const primero = coloresMxAgrupados(linea, puedeColoresReservados(usuario))[0]
-      if (primero) return { color: primero.nombre, colorCodigo: primero.codigoBase }
     }
     return { color: coloresPara(linea, acabado)[0].nombre, colorCodigo: undefined }
   }
@@ -1493,7 +1497,7 @@ export default function App() {
     const cfg = proyecto.areas[0]?.config
     return {
       modeloCodigo: cfg?.modelo ?? 'ESTANDAR',
-      tier: tierDeColor(cfg?.color ?? '', proyecto.paisFabricacion, cfg?.linea),
+      tier: tierDeColor(cfg?.color ?? '', proyecto.paisFabricacion, cfg?.linea, cfg?.acabado),
       moneda,
       tipoCambio: TC,
       tarifas: tarifas?.tabla,
@@ -1689,7 +1693,7 @@ export default function App() {
       ivaPct: ivaDelDistribuidor(suyo.distribuidor),
       pais: suyo.paisFabricacion,
       modelo: config?.modelo ?? '',
-      tier: tierDeColor(config?.color ?? '', suyo.paisFabricacion, config?.linea),
+      tier: tierDeColor(config?.color ?? '', suyo.paisFabricacion, config?.linea, config?.acabado),
     }, lineas)
     if (!guardada.ok || !guardada.dato) return { ok: false, mensaje: guardada.mensaje }
 
@@ -2443,7 +2447,8 @@ export default function App() {
 
                   {/* El esmaltado y el acero no llevan color: el acabado ES el color,
                       así que no hay lista que elegir. */}
-                  {acabadoEsElColor(config.acabado) ? (
+                  {acabadoEsElColor(config.acabado)
+                    && !(proyecto.paisFabricacion === 'MX' && eligeColorMx(config.acabado)) ? (
                     <div className="aviso-caja" style={{ maxWidth: 720, marginTop: 24 }}>
                       <b>Este acabado es su propio color</b>
                       <span>
@@ -2454,6 +2459,7 @@ export default function App() {
                   ) : proyecto.paisFabricacion === 'MX' ? (
                     <ColoresMexico
                       linea={config.linea}
+                      acabado={config.acabado}
                       color={config.color}
                       verReservados={puedeColoresReservados(usuario)}
                       onElegir={(c) =>
@@ -2463,7 +2469,7 @@ export default function App() {
                   ) : (
                     <>
                       <h4 style={{ margin: '28px 0 10px', color: 'var(--text-2)' }}>
-                        Color · {etiquetaTier(tierDeColor(config.color, proyecto.paisFabricacion, config.linea))}
+                        Color · {etiquetaTier(tierDeColor(config.color, proyecto.paisFabricacion, config.linea, config.acabado))}
                       </h4>
                       <div className="pildoras">
                         {coloresPara(config.linea, config.acabado).map((c) => (
@@ -2495,7 +2501,7 @@ export default function App() {
                     <div className="campo">
                       <label>Color especial</label>
                       <input
-                        value={tierDeColor(config.color, proyecto.paisFabricacion, config.linea) === 'especial' ? config.color : ''}
+                        value={tierDeColor(config.color, proyecto.paisFabricacion, config.linea, config.acabado) === 'especial' ? config.color : ''}
                         placeholder="Escribí el color que pidió el cliente"
                         onChange={(e) => setConfig({ color: e.target.value })}
                       />
@@ -2964,7 +2970,7 @@ export default function App() {
                     </b>
                     <span>
                       {tarifas?.deLaNube
-                        ? `Precio por m² de ${nombreModelo(config.linea, config.modelo)} (${config.modelo}), color de tier ${etiquetaTier(tierDeColor(config.color, proyecto.paisFabricacion, config.linea))}, en ${nombreMoneda(moneda).toLowerCase()}${moneda === 'MXN' ? ` · ${modulosDelProyecto} módulo(s) en el proyecto` : ''}.`
+                        ? `Precio por m² de ${nombreModelo(config.linea, config.modelo)} (${config.modelo}), color de tier ${etiquetaTier(tierDeColor(config.color, proyecto.paisFabricacion, config.linea, config.acabado))}, en ${nombreMoneda(moneda).toLowerCase()}${moneda === 'MXN' ? ` · ${modulosDelProyecto} módulo(s) en el proyecto` : ''}.`
                         : `Todavía no llegaron las tarifas de Supabase${tarifas?.error ? `: ${tarifas.error}` : ''}. Se están usando las de la lista que trae el Constructor.`}
                     </span>
                   </div>

@@ -329,7 +329,20 @@ export function buscarColor(nombre: string): Color | undefined {
   )
 }
 
-export function tierDeColor(nombre: string, pais: Pais = 'CR', linea: Linea = 'LEEDER'): TierColor {
+export function tierDeColor(
+  nombre: string,
+  pais: Pais = 'CR',
+  linea: Linea = 'LEEDER',
+  acabado?: Acabado,
+): TierColor {
+  // Cuando el acabado ES el color, el precio lo manda ÉL y no el nombre que se
+  // haya elegido. En México la esmaltada y la fórmica tienen lista de colores
+  // —Beige, Gris, Negro y White, Folkstone—, y sin esto un "Negro" esmaltado se
+  // cobraba con el grupo del laminado negro.
+  if (acabado === 'Esmaltada Antigrafiti') return 'antigrafiti'
+  if (acabado === 'Acero Inoxidable') return 'aceroInox'
+  if (acabado === 'Fórmica') return 'formica'
+  if (acabado === 'Arte') return 'arte'
   // en Fórmica y Arte el acabado ES el color, así que el nombre del color es el
   // del acabado y de ahí sale el tier
   const limpio = (nombre || '').trim().toUpperCase()

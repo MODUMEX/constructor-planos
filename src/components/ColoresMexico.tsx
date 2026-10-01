@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { Linea } from '../types'
+import type { Acabado, Linea } from '../types'
 import {
   coloresMxAgrupados, descontinuadosMx, espesorDeLinea, type ColorMxAgrupado,
 } from '../coloresMx'
@@ -14,17 +14,23 @@ import {
  */
 export default function ColoresMexico({
   linea,
+  acabado,
   color,
   verReservados,
   onElegir,
 }: {
   linea: Linea
+  /** manda sobre la lista: la esmaltada y la fórmica tienen la suya */
+  acabado: Acabado
   color: string
   /** si se muestran los apartados para un cliente: solo adentro de Modumex */
   verReservados: boolean
   onElegir: (c: ColorMxAgrupado) => void
 }) {
-  const lista = useMemo(() => coloresMxAgrupados(linea, verReservados), [linea, verReservados])
+  const lista = useMemo(
+    () => coloresMxAgrupados(linea, verReservados, acabado),
+    [linea, verReservados, acabado],
+  )
   const descontinuados = descontinuadosMx().filter((c) => c.espesorMm === espesorDeLinea(linea))
 
   return (
