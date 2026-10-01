@@ -754,6 +754,15 @@ pre.payload {
   border-radius: 3px;
   padding: 2px 6px;
 }
+/* No es una nota al pie: la foto está mintiendo sobre el color y eso se le
+   enseña al cliente, así que se ve de lejos. */
+.render .referencia.aviso {
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--warn);
+  border-color: var(--warn);
+}
 .vacio-render {
   display: grid;
   place-items: center;

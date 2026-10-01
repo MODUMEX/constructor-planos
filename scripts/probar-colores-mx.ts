@@ -19,6 +19,7 @@ import {
   ofrecidosMx, slugRenderMx,
 } from '../src/coloresMx'
 import { etiquetaTier, tierDeColor } from '../src/catalog'
+import { fotoDe, SIN_FOTO_PROPIA } from '../src/renders'
 import type { Acabado, Linea } from '../src/types'
 
 let fallos = 0
@@ -158,6 +159,42 @@ for (const linea of ['LEEDER', 'SUPERIOR'] as Linea[]) {
   revisar(`  todas salen de la lista de la línea`, usados.every((n) => sueltos.some((s) => s.color === n)))
   const sinLamina = juntos.filter((c) => !c.espesor).map((c) => c.nombre)
   console.log(`    sin materia prima cargada: ${sinLamina.length ? sinLamina.join(' · ') : '(ninguno)'}`)
+}
+
+console.log('\n9 · cada color con SU foto')
+{
+  // la foto sale del color Y del acabado: el mismo "Blanco" no se ve igual
+  // laminado que pintado
+  revisar('el Blanco Antiguo tiene la suya, no la del Blanco',
+    slugRenderMx('Blanco Antiguo') === 'blanco-antiguo', slugRenderMx('Blanco Antiguo'))
+  revisar('el Lapis Blue de la carta encuentra la suya',
+    slugRenderMx('Lapis Blue') === 'lapis', slugRenderMx('Lapis Blue'))
+  revisar('el Blanco esmaltado no toma la foto del laminado',
+    slugRenderMx('Blanco', 'Esmaltada Antigrafiti') === 'esmalte-blanco',
+    slugRenderMx('Blanco', 'Esmaltada Antigrafiti'))
+  revisar('y el Beige tiene la suya',
+    slugRenderMx('Beige', 'Esmaltada Antigrafiti') === 'esmalte-beige')
+
+  // y la foto que se nombra EXISTE: si no, se cae a una de referencia
+  for (const [linea, acabado, modelo] of [
+    ['LEEDER', 'Laminado Compacto', 'ESTANDAR'],
+    ['SUPERIOR', 'Laminado Compacto', 'SUP_ESTANDAR'],
+    ['SUPERIOR', 'Esmaltada Antigrafiti', 'SUP_ESTANDAR'],
+  ] as [Linea, Acabado, string][]) {
+    const sinFoto: string[] = []
+    for (const c of coloresMxAgrupados(linea, true, acabado)) {
+      // igual que en la app: sin render propio se pide un slug que no existe,
+      // para que la foto de respaldo salga marcada
+      const slug = slugRenderMx(c.nombre, acabado) ?? SIN_FOTO_PROPIA
+      const f = fotoDe({ linea, modelo, acabado, color: c.nombre, slugColor: slug })
+      if (!f) { sinFoto.push(c.nombre + ' (sin ninguna foto)'); continue }
+      if (f.sinColor) {
+        sinFoto.push(c.nombre)
+        revisar(`  ${c.nombre}: avisa que la foto no es del color`, f.nota?.includes('no es de ese color') === true, f.nota)
+      }
+    }
+    console.log(`    ${linea} · ${acabado} — sin foto propia: ${sinFoto.length ? sinFoto.join(" · ") : "(ninguno)"}`)
+  }
 }
 
 console.log(fallos ? `\n${fallos} revisiones mal.\n` : '\nTodo cuadra.\n')

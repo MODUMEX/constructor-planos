@@ -28,7 +28,7 @@ import Usuarios from './components/Usuarios'
 import Solicitudes from './components/Solicitudes'
 import { contarSolicitudes } from './solicitudes'
 import { coloresMxAgrupados, eligeColorMx, slugRenderMx } from './coloresMx'
-import { fotoDe, fotosHerraje, faltanFotosHerraje, terminacionesDe } from './renders'
+import { fotoDe, fotosHerraje, faltanFotosHerraje, SIN_FOTO_PROPIA, terminacionesDe } from './renders'
 import {
   anchoAccesibleDe, anchoTotal, bom, claroDeOrinales, compensarPilastra, crearTramos, esEspacioLibre,
   frenteAccesible, invertirTramo, modularConCatalogo, nuevoId, pedidoDeModulacion,
@@ -757,7 +757,12 @@ export default function App() {
 
   /** los colores de México no están en el catálogo, así que el render se busca por nombre */
   function conFoto(cfg: Config, cabina?: TipoCabina) {
-    const slugColor = proyecto.paisFabricacion === 'MX' ? slugRenderMx(cfg.color) : undefined
+    // En México el color se elige también en la esmaltada, así que cuando ese
+    // color todavía no tiene render hay que decirlo en vez de enseñar la foto
+    // genérica del acabado como si fuera la suya.
+    const slugColor = proyecto.paisFabricacion === 'MX'
+      ? (slugRenderMx(cfg.color, cfg.acabado) ?? SIN_FOTO_PROPIA)
+      : undefined
     return { ...cfg, cabina, slugColor }
   }
 

@@ -14,12 +14,30 @@ import type { Acabado, HerrajeAcabado, Linea, Terminacion, TipoCabina } from './
  * la foto no es exactamente esa combinación.
  */
 
+/**
+ * El slug con el que se pide una foto de un color que TODAVÍA no tiene render.
+ *
+ * No existe ningún archivo con este nombre, y eso es a propósito: la búsqueda
+ * no lo encuentra, cae en la foto de respaldo y la marca como "este no es el
+ * color". Hace falta porque en la esmaltada la foto genérica del acabado sí
+ * existe, y sin esto un color sin render se mostraba como si fuera el suyo.
+ */
+export const SIN_FOTO_PROPIA = '__sin-foto'
+
 export interface Foto {
   archivo: string
   /** true si la foto no es de esa combinación exacta, sino la más parecida */
   referencia: boolean
   /** qué se cambió para encontrarla, para poder avisarlo en pantalla */
   nota?: string
+  /**
+   * El COLOR de la foto no es el que se eligió: todavía no hay render de ese
+   * color y lo que se muestra es solo un ejemplo del modelo. Va aparte de
+   * `referencia` porque es lo que de verdad hay que advertirle al cliente:
+   * una foto de otro modelo igual le sirve para ver el color, pero una foto de
+   * otro color no le sirve para nada.
+   */
+  sinColor?: boolean
 }
 
 function corto(acabado: Acabado): 'lam' | 'esm' | 'inox' {
@@ -58,7 +76,9 @@ function candidatosModelo(modelo: string, cabina?: TipoCabina): string[] {
  */
 function slugExacto(color: string, acabado: Acabado, slugColor?: string): string | undefined {
   if (corto(acabado) === 'inox') return 'acero-inoxidable'
-  if (corto(acabado) === 'esm') return 'esmaltada-antigrafiti'
+  // La esmaltada de México elige color —Blanco, Gris Claro, Beige— y hay foto
+  // de algunos: si viene con la suya, esa manda sobre la genérica.
+  if (corto(acabado) === 'esm') return slugColor ?? 'esmaltada-antigrafiti'
   return slugColor ?? buscarColor(color)?.slug
 }
 
@@ -94,11 +114,10 @@ export function fotoDe({ linea, modelo, acabado, color, cabina, slugColor }: Con
       if (im === 0 && colorExacto) return { archivo, referencia: false }
       const notas: string[] = []
       if (im > 0) notas.push(`la foto es del modelo ${m.replace('__', '').toLowerCase()}`)
-      if (!colorExacto) {
-        const nombre = COLORES.find((x) => x.slug === c)?.nombre ?? c
-        notas.push(`el color de la foto es ${nombre}`)
-      }
-      return { archivo, referencia: true, nota: notas.join(' y ') }
+      // Sin render de ese color no se nombra el de la foto: lo que importa no
+      // es qué color se está viendo sino que NO es el que se eligió.
+      if (!colorExacto) notas.push('la foto no es de ese color, es solo un ejemplo del modelo')
+      return { archivo, referencia: true, nota: notas.join(' y '), sinColor: !colorExacto }
     }
   }
   return null

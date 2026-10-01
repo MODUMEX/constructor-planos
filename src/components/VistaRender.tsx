@@ -31,8 +31,10 @@ export default function VistaRender({
         <figcaption>
           {titulo}
           {foto.referencia && (
-            <span className="referencia" title={foto.nota}>
-              foto de referencia · {foto.nota}
+            <span className={foto.sinColor ? 'referencia aviso' : 'referencia'} title={foto.nota}>
+              {foto.sinColor
+                ? `⚠ Este NO es el color · ${foto.nota}`
+                : `foto de referencia · ${foto.nota}`}
             </span>
           )}
         </figcaption>

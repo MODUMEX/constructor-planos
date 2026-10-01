@@ -78,11 +78,17 @@ export function grupoMx(nombre: string, linea: Linea): 1 | 2 | null {
 
 /**
  * Qué render le corresponde a un color de México. Es una equivalencia de
- * FOTO, no de precio: solo se mapea cuando el nombre del material y el del
- * render son el mismo. Lo que no está acá se queda sin foto propia y la
- * pantalla lo avisa como foto de referencia.
+ * FOTO, no de precio: solo se mapea cuando hay una foto de ese color. Lo que
+ * no está acá se queda sin foto propia y la pantalla lo avisa como foto de
+ * referencia.
+ *
+ * El ORDEN manda: la regla más específica va primero, igual que en las
+ * familias. Antes se ordenaba por el largo de la expresión, y con eso el
+ * "Blanco Antiguo" lo agarraba la regla del blanco y salía con la foto
+ * equivocada teniendo la suya.
  */
 const RENDER_POR_NOMBRE: [RegExp, string][] = [
+  [/blanco\s*antiguo/i, 'blanco-antiguo'],
   [/gris\s*metali[cz]/i, 'inox-satin'],
   [/alumina|aluminak|alumink|aluminav/i, 'gris'],
   [/ebano|negro|black\s*premium/i, 'negro'],
@@ -90,15 +96,24 @@ const RENDER_POR_NOMBRE: [RegExp, string][] = [
   [/^walnut(\s|$)|walnut\s*(heights|premium|std)/i, 'ambar-wood'],
   [/skyline/i, 'nogal-grafito'],
   [/grafito\s*nocturno/i, 'grafito-nocturno'],
-  [/blanco\s*antiguo/i, 'blanco-antiguo'],
-  [/holly/i, 'holly'],
-  [/lapiz\s*blue/i, 'lapis'],
+  [/holl?y\s*berry|holly/i, 'holly'],
+  [/lapi[sz]\s*blue/i, 'lapis'],
 ]
 
-export function slugRenderMx(nombre: string): string | undefined {
-  // "Blanco Antiguo" tiene que ganarle a "Blanco", así que se busca de atrás
-  const orden = [...RENDER_POR_NOMBRE].sort((a, b) => b[0].source.length - a[0].source.length)
-  return orden.find(([re]) => re.test(pelado(nombre)))?.[1]
+/**
+ * La esmaltada tiene sus propias fotos: el mismo "Blanco" no se ve igual
+ * laminado que pintado, y el render se llama distinto.
+ */
+const RENDER_ESMALTE: [RegExp, string][] = [
+  [/^blanco/i, 'esmalte-blanco'],
+  [/beige/i, 'esmalte-beige'],
+]
+
+export function slugRenderMx(nombre: string, acabado?: Acabado): string | undefined {
+  const n = pelado(nombre)
+  if (acabado === 'Esmaltada Antigrafiti') return RENDER_ESMALTE.find(([re]) => re.test(n))?.[1]
+  if (acabado === 'Acero Inoxidable') return 'acero-inoxidable'
+  return RENDER_POR_NOMBRE.find(([re]) => re.test(n))?.[1]
 }
 
 /**
