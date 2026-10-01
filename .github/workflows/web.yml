@@ -9,14 +9,20 @@ name: Publicar la pagina web
 # el actualizador- esta detras de enEscritorio(), asi que en el navegador
 # simplemente no se usa y el PDF se baja como descarga normal.
 #
-# Se dispara con la MISMA etiqueta que el instalador, para que la pagina y el
-# escritorio esten siempre en la misma version: si un distribuidor reporta algo,
-# los dos dicen el mismo numero.
+# Se dispara al subir a MAIN, no con la etiqueta. Se probo con la etiqueta -que
+# seria lo logico, para que la pagina y el instalador dijeran siempre el mismo
+# numero- y GitHub lo bloquea: el entorno "github-pages" trae una regla que
+# solo deja desplegar desde la rama por defecto, asi que el trabajo de publicar
+# ni siquiera arranca (le paso a v2.76.0 y a v2.77.0).
+#
+# En la practica da igual: cada version sube a main el cambio de numero y
+# enseguida la etiqueta, asi que la pagina queda en la misma version que el
+# instalador, solo que unos minutos antes porque no tiene que compilar Rust.
 
 on:
   push:
-    tags: ['v*']
-  # para volver a publicar la pagina sin subir una version nueva:
+    branches: [main]
+  # para volver a publicar la pagina sin tocar nada:
   # pestana Actions > Publicar la pagina web > Run workflow
   workflow_dispatch:
 
