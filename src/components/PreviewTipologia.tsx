@@ -53,13 +53,20 @@ function Panel({ x, y = Y0, d = D }: { x: number; y?: number; d?: number }) {
   return <rect x={x - 1.2} y={y} width={2.4} height={d} fill={PIEZA} />
 }
 
+/** cuánto se corre la punta de una hoja abierta a 45 grados */
+const ABIERTA_45 = Math.SQRT1_2
+
 /**
- * La hoja de una puerta abierta, con su arco. Va a 45 grados, igual que en el
- * plano que después sale impreso.
+ * La hoja de una puerta abierta, con su arco de barrido. Abre 45 grados desde
+ * su propio vano, igual que en el plano que después sale impreso.
  *
- * `dx` / `dy` son hacia dónde barre: las de cabina abren hacia el pasillo, que
- * queda abajo; la del cuarto accesible cuelga del divisor y barre hacia abajo y
- * hacia la derecha, que es por donde se entra.
+ * El arco va de la posición CERRADA a la abierta, no desde el gozne: dibujado
+ * desde el gozne la cuerda daba el doble y la puerta se veía abierta de par en
+ * par.
+ *
+ * `eje` dice sobre qué línea está cerrada: las de cabina van sobre el frente,
+ * que es horizontal; la del cuarto accesible va sobre el divisor, que corre a
+ * lo hondo. `dx` / `dy` son hacia dónde barre.
  */
 function Puerta({
   x,
@@ -67,6 +74,7 @@ function Puerta({
   hoja,
   dx,
   dy = -1,
+  eje = 'x',
 }: {
   /** el gozne */
   x: number
@@ -74,18 +82,23 @@ function Puerta({
   hoja: number
   dx: 1 | -1
   dy?: 1 | -1
+  eje?: 'x' | 'y'
 }) {
-  const barrido = dx * dy > 0 ? 1 : 0
+  const cerradaX = eje === 'x' ? x + dx * hoja : x
+  const cerradaY = eje === 'x' ? y : y + dy * hoja
+  const abiertaX = x + dx * hoja * ABIERTA_45
+  const abiertaY = y + dy * hoja * ABIERTA_45
+  const barrido = eje === 'x' ? (dx * dy > 0 ? 1 : 0) : (dx * dy > 0 ? 0 : 1)
   return (
     <g>
       <path
-        d={`M ${x} ${y} A ${hoja} ${hoja} 0 0 ${barrido} ${x + dx * hoja} ${y + dy * hoja}`}
+        d={`M ${cerradaX} ${cerradaY} A ${hoja} ${hoja} 0 0 ${barrido} ${abiertaX} ${abiertaY}`}
         fill="none"
         stroke={ARCO}
         strokeWidth={0.9}
         strokeDasharray="2 1.6"
       />
-      <line x1={x} y1={y} x2={x + dx * hoja} y2={y + dy * hoja} stroke={ARCO} strokeWidth={1.5} />
+      <line x1={x} y1={y} x2={abiertaX} y2={abiertaY} stroke={ARCO} strokeWidth={1.5} />
     </g>
   )
 }
@@ -165,7 +178,9 @@ function VariacionPanel({ muroIzq, muroDer }: { muroIzq: boolean; muroDer: boole
       {/* el frente: la pilastra lateral, el panel y el vano de la puerta */}
       <rect x={x0} y={yFrente - 1.2} width={pilastra - x0} height={2.4} fill={PIEZA} />
       <rect x={pilastra} y={yFrente - 1.2} width={puerta - pilastra} height={2.4} fill={PIEZA} />
-      <Puerta x={puerta} y={yFrente} hoja={hoja} dx={-1} dy={1} />
+      {/* el gozne va del lado de la pilastra lateral y la hoja barre sobre su
+          propio vano, hacia el pasillo */}
+      <Puerta x={puerta} y={yFrente} hoja={hoja} dx={1} dy={1} />
       {/* el panel que hace de pared: corrido de todo el fondo de la accesible */}
       <Panel x={xPanel} y={Y0} d={DA} />
       <Accesible x={26} y={26} />
@@ -300,8 +315,13 @@ export default function PreviewTipologia({ id, size = 220 }: { id: TipologiaId; 
             {/* el divisor: panel, el vano de la puerta, y la pilastra que cierra */}
             <Panel x={xDiv} y={Y0} d={puertaDesde - Y0} />
             <Panel x={xDiv} y={puertaHasta} d={yFin - puertaHasta} />
-            {/* barre hacia el pasillo, que en el cuarto queda a la derecha y abajo */}
-            <Puerta x={xDiv} y={puertaDesde} hoja={puertaHasta - puertaDesde} dx={1} dy={1} />
+            {/* Una puerta no se cuelga nunca de un panel: el gozne va en la
+                PILASTRA del divisor, que es la pieza de abajo. Desde ahí barre
+                hacia el pasillo, que queda a la derecha. */}
+            <Puerta
+              x={xDiv} y={puertaHasta} hoja={puertaHasta - puertaDesde}
+              dx={1} dy={-1} eje="y"
+            />
             <Accesible x={26} y={44} />
             <Muro x={107} y={Y0} w={5} h={D} />
             <Tira x0={xDiv} ancho={51} n={2} muroIzq muroDer />
