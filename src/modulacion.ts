@@ -1,13 +1,15 @@
 import {
   GRUESO_PILASTRA, MIN_ACCESIBLE_CM, MIN_CABINA_CM, SNAP_CM, anchosPuerta, MARGEN_PUERTA_CM,
-  LARGO_SECUNDARIO_CM, PIEZA_PIDE_COSTILLA_CM,
+  COSTILLA_MINIMA_CM, LARGO_SECUNDARIO_CM, PIEZA_PIDE_COSTILLA_CM,
 } from './catalog'
-import type { Cabina, Config, Moneda, Pais, Tramo, TipologiaId, RenglonBOM } from './types'
+import type { Cabina, Config, Moneda, Pais, Soporte, Tramo, TipologiaId, RenglonBOM } from './types'
 import {
   alturasDe, ANCHOS_PILASTRA, anchosPilastra, esEspecial, esSoloOrinales, esVariacionPanel, familiaDelFrente,
   llevaAccesibleSiempre, mamparaDe, tipologia, tierDeColor, type MedidaMG,
 } from './catalog'
-import { ajustarPilastras, GRUESO_MG_PIEZA, medidaCercana, modularTira, PILASTRAS_INTERNAS } from './modulador'
+import {
+  ajustarPilastras, GRUESO_MG_PIEZA, medidaCercana, modularTira, PILASTRA_MINIMA_CM, PILASTRAS_INTERNAS,
+} from './modulador'
 import { precioPieza, type TablaTarifas } from './tarifas'
 
 let seq = 0
@@ -142,7 +144,16 @@ export function modularConCatalogo(
     /** el panel de las cabinas: decide hacia dónde abre la puerta por defecto */
     profundidadCm?: number
   },
-): { cabinas: Cabina[]; pilastras: number[]; canaletaCm: number; ajuste: Tramo['ajuste']; mensaje: string; avisoAccesible?: string } | null {
+): {
+  cabinas: Cabina[]
+  pilastras: number[]
+  canaletaCm: number
+  /** lo que queda para resolver con el herraje en la instalación, en cm */
+  ajusteCm: number
+  ajuste: Tramo['ajuste']
+  mensaje: string
+  avisoAccesible?: string
+} | null {
   // ------------------------------------------------------------------
   // El cuarto PMR no negocia su ancho.
   //
@@ -160,7 +171,7 @@ export function modularConCatalogo(
     }
     const nResto = cantidad - 1
     if (nResto <= 0) {
-      return { cabinas: [cuarto], pilastras: [0, 0], canaletaCm: 0, ajuste: 'exacto', mensaje: 'Solo el cuarto' }
+      return { cabinas: [cuarto], pilastras: [0, 0], canaletaCm: 0, ajusteCm: 0, ajuste: 'exacto', mensaje: 'Solo el cuarto' }
     }
     // Las fronteras del resto están corridas una posición: la 0 de la tira
     // entera es el muro del cuarto, y ahí no va pilastra.
@@ -193,6 +204,7 @@ export function modularConCatalogo(
       cabinas: [cuarto, ...delResto.cabinas],
       pilastras: [0, ...delResto.pilastras],
       canaletaCm: delResto.canaletaCm,
+      ajusteCm: delResto.ajusteCm,
       ajuste: delResto.ajuste,
       mensaje: delResto.mensaje,
       avisoAccesible: claroCm - cuartoCm < 0
@@ -330,6 +342,9 @@ export function modularConCatalogo(
     cabinas,
     pilastras,
     canaletaCm: m.canaleta?.anchoCm ?? 0,
+    // solo cuenta como ajuste de obra cuando la tira CIERRA: si falta o sobra
+    // de más, lo que hay que hacer es volver a modular, no forzar el herraje
+    ajusteCm: m.ajuste === 'exacto' && m.diferencia > 0.05 ? Math.round(m.diferencia * 10) / 10 : 0,
     ajuste: m.ajuste,
     mensaje: m.mensaje,
     avisoAccesible,
@@ -426,7 +441,7 @@ export function reajustarConPuertas(
    * el cuarto del Tipo C sí, la cabina accesible de las "variación panel" no.
    */
   cuartoComeMuro = true,
-): { cabinas: Cabina[]; pilastras: number[]; canaletaCm: number; ajuste: Tramo['ajuste']; mensaje: string } | null {
+): { cabinas: Cabina[]; pilastras: number[]; canaletaCm: number; ajusteCm: number; ajuste: Tramo['ajuste']; mensaje: string } | null {
   const n = cabinas.length
   if (n === 0) return null
   /** lo que le queda al resto de la tira después de plantar el cuarto */
@@ -437,7 +452,7 @@ export function reajustarConPuertas(
   // también al cambiar una puerta.
   if (cuartoPmrCm > 0 && cabinas[0]?.tipo === 'accesible') {
     if (n === 1) {
-      return { cabinas: [{ ...cabinas[0], anchoCm: cuartoPmrCm }], pilastras: [0, 0], canaletaCm: 0, ajuste: 'exacto', mensaje: 'Solo el cuarto' }
+      return { cabinas: [{ ...cabinas[0], anchoCm: cuartoPmrCm }], pilastras: [0, 0], canaletaCm: 0, ajusteCm: 0, ajuste: 'exacto', mensaje: 'Solo el cuarto' }
     }
     const resto = reajustarConPuertas(
       cabinas.slice(1), claroCm - cuartoPmrCm, murosDelResto, extremoAbierto,
@@ -450,6 +465,7 @@ export function reajustarConPuertas(
       cabinas: [{ ...cabinas[0], anchoCm: cuartoPmrCm }, ...resto.cabinas],
       pilastras: [0, ...resto.pilastras],
       canaletaCm: resto.canaletaCm,
+      ajusteCm: resto.ajusteCm,
       ajuste: resto.ajuste,
       mensaje: resto.mensaje,
     }
@@ -493,6 +509,7 @@ export function reajustarConPuertas(
       cabinas: [...resto.cabinas, { ...cabinas[n - 1], anchoCm: cuartoPmrCm }],
       pilastras: [...resto.pilastras, 0],
       canaletaCm: resto.canaletaCm,
+      ajusteCm: resto.ajusteCm,
       ajuste: resto.ajuste,
       mensaje: resto.mensaje,
     }
@@ -574,6 +591,7 @@ export function reajustarConPuertas(
     cabinas: nuevas,
     pilastras,
     canaletaCm: r.canaleta?.anchoCm ?? 0,
+    ajusteCm: r.ajuste === 'exacto' && r.diferencia > 0.05 ? Math.round(r.diferencia * 10) / 10 : 0,
     ajuste: r.ajuste,
     mensaje: r.mensaje,
   }
@@ -815,6 +833,54 @@ function anchosConPilastras(tramo: Tramo, pilastras: number[]): Cabina[] {
 }
 
 /**
+ * Qué soporte lleva la pilastra de la frontera `k`, o null si no pide ninguno.
+ *
+ * Solo las PUNTAS —la de esquina y la que apoya contra muro— y solo pasadas
+ * los 55 cm: una central trabaja agarrada de los paneles de sus dos cabinas.
+ * Sin nada elegido sale la COSTILLA, que es lo que manda la regla.
+ */
+export function soporteDe(tramo: Tramo, config: Config, k: number): Soporte | null {
+  const n = tramo.cabinas.length
+  if (k !== 0 && k !== n) return null
+  const ancho = tramo.pilastras?.[k] ?? config.anchoPilastraCm
+  if (!ancho || ancho <= PIEZA_PIDE_COSTILLA_CM) return null
+  return tramo.soportes?.[k] ?? 'costilla'
+}
+
+/** de cuánto es la pieza de ese soporte; el refuerzo no lleva pieza */
+export function anchoDeSoporte(tipo: Soporte): number {
+  if (tipo === 'costilla') return COSTILLA_MINIMA_CM
+  if (tipo === 'sandwich') return PILASTRA_MINIMA_CM
+  return 0
+}
+
+export interface SoporteDePunta {
+  /** la frontera de la pilastra que lo lleva */
+  frontera: number
+  tipo: Soporte
+  /** lo que mide la pieza, en cm; 0 en el refuerzo, que es herraje */
+  anchoCm: number
+  /** la pilastra a la que da soporte */
+  pilastraCm: number
+}
+
+/** todos los soportes de un tramo, para dibujarlos y para el despiece */
+export function soportesDe(tramo: Tramo, config: Config): SoporteDePunta[] {
+  const salida: SoporteDePunta[] = []
+  for (const k of [0, tramo.cabinas.length]) {
+    const tipo = soporteDe(tramo, config, k)
+    if (!tipo) continue
+    salida.push({
+      frontera: k,
+      tipo,
+      anchoCm: anchoDeSoporte(tipo),
+      pilastraCm: tramo.pilastras?.[k] ?? config.anchoPilastraCm,
+    })
+  }
+  return salida
+}
+
+/**
  * Las piezas de FRENTE de un tramo que pasan de la medida en la que hay que
  * darles soporte.
  *
@@ -826,11 +892,15 @@ export function piezasQuePidenCostilla(tramo: Tramo, config: Config): string[] {
   const avisos: string[] = []
   const n = tramo.cabinas.length
 
-  // las pilastras y paneles de frente de la tira
+  // Las pilastras de PUNTA: son las de esquina y las que apoyan contra muro, y
+  // son las que la regla manda reforzar pasados los 55 cm. Las centrales no:
+  // esas trabajan agarradas de los paneles de las dos cabinas.
   ;(tramo.pilastras ?? []).forEach((ancho, k) => {
     if (!ancho || ancho <= PIEZA_PIDE_COSTILLA_CM) return
+    if (k !== 0 && k !== n) return
     const familia = familiaDelFrente(ancho, config.modelo)
-    const donde = k === 0 ? 'de arranque' : k === n ? 'de cierre' : `entre la ${k} y la ${k + 1}`
+    const contraMuro = k === 0 ? tramo.muroInicio : tramo.muroFin
+    const donde = `${k === 0 ? 'de arranque' : 'de cierre'}${contraMuro ? ' (a muro)' : ' (de esquina)'}`
     avisos.push(`${familia === 'PN' ? 'El panel' : 'La pilastra'} ${donde}, de ${ancho} cm`)
   })
 
@@ -1210,6 +1280,7 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
       cabinas: conCatalogo.cabinas,
       pilastras: conCatalogo.pilastras,
       canaletaCm: conCatalogo.canaletaCm,
+      ajusteCm: conCatalogo.ajusteCm,
       ajuste: conCatalogo.ajuste,
       mensaje: conCatalogo.mensaje,
       avisoAccesible: conCatalogo.avisoAccesible,

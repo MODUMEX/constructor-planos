@@ -9,7 +9,7 @@ import {
   type Marco,
 } from '../geometria'
 import { alturasDe, alzadoDe, mamparaDe, nombreHerraje, tipologia } from '../catalog'
-import { anchoTotal, arrancaElCuartoPmr, esEspacioLibre, ladosDeCabina, lugaresDe, mamparaEn } from '../modulacion'
+import { anchoDeSoporte, anchoTotal, arrancaElCuartoPmr, esEspacioLibre, ladosDeCabina, lugaresDe, mamparaEn, soportesDe } from '../modulacion'
 import type { CuartoPmr } from '../geometria'
 import { agrupar, modeloParaCsv, nombreLinea, nombreSistema, piezasDeArea } from './piezas'
 import { ALTO_ORINAL_CM, ALTO_REGADERA_CM, ALTO_WC_CM, ORINAL, REGADERA, WC } from '../assets/sanitarios'
@@ -332,6 +332,51 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
     // descarga y no en el centro de su cabina.
     const descargas = area.config.usaCentrosCarga === true ? descargasDe(tramo, area.config) : []
     const ejeDeCabina = new Map(descargas.map((d) => [d.indice, d.uCm]))
+
+    // ------------------------------------------------------------------
+    // El refuerzo de las pilastras de punta grandes, cada uno con su forma:
+    // la COSTILLA es una pieza de canto de 19, el REFUERZO una diagonal de la
+    // pilastra a la pared y el SÁNDWICH una segunda pilastra con herraje en T.
+    // ------------------------------------------------------------------
+    for (const s of soportesDe(tramo, area.config)) {
+      const k = s.frontera
+      const alFinal = k > 0
+      const cortes = [0, ...acum.slice(1), largo]
+      const centroPil = centroPilastra(tramo, cortes, k, s.pilastraCm, cuarto)
+      const cara = centroPil + (alFinal ? 1 : -1) * (s.pilastraCm / 2)
+
+      if (s.tipo === 'refuerzo') {
+        doc.setDrawColor(90, 90, 90)
+        doc.setLineWidth(0.4)
+        const [ax, ay] = aHoja(e, pt(m, cara, prof - grueso))
+        const [bx, by] = aHoja(e, pt(m, cara + (alFinal ? 1 : -1) * 22, prof - 24))
+        doc.line(ax, ay, bx, by)
+        const [tx, ty] = aHoja(e, pt(m, cara + (alFinal ? 1 : -1) * 13, prof - 16))
+        texto(doc, 'REF', tx, ty, { size: 5, align: 'center', color: GRIS })
+        continue
+      }
+
+      const largoPieza = anchoDeSoporte(s.tipo)
+      doc.setFillColor(TINTA, TINTA, TINTA)
+      const [ax, ay] = aHoja(e, pt(m, cara, prof - largoPieza))
+      const [bx, by] = aHoja(e, pt(m, cara + (alFinal ? -1 : 1) * grueso, prof))
+      doc.rect(
+        Math.min(ax, bx), Math.min(ay, by),
+        Math.max(Math.abs(bx - ax), 0.5), Math.max(Math.abs(by - ay), 0.5), 'F',
+      )
+      if (s.tipo === 'sandwich') {
+        // el herraje en T que amarra las dos pilastras
+        doc.setDrawColor(MARCA[0], MARCA[1], MARCA[2])
+        doc.setLineWidth(0.45)
+        const [t1x, t1y] = aHoja(e, pt(m, cara - grueso, prof - largoPieza))
+        const [t2x, t2y] = aHoja(e, pt(m, cara + grueso, prof - largoPieza))
+        doc.line(t1x, t1y, t2x, t2y)
+      }
+      const [rx, ry] = aHoja(e, pt(m, cara + (alFinal ? -1 : 1) * 9, prof - largoPieza - 3))
+      texto(doc, s.tipo === 'costilla' ? `CO ${largoPieza}` : `SW ${largoPieza}`, rx, ry, {
+        size: 5, align: 'center', color: GRIS,
+      })
+    }
 
     tramo.cabinas.forEach((cab, i) => {
       const u0 = acum[i]
@@ -1118,7 +1163,39 @@ function cuadroDePiezas(doc: jsPDF, area: Area, x: number, y: number, w: number)
   texto(doc, `Juego completo en ${nombreHerraje(area.config.herrajeAcabado).toLowerCase()}`, cols[0], fila + 11, {
     size: 6,
   })
+
+  notasDeObra(doc, area, cols[0], fila + 18, w)
 }
+
+/**
+ * Las NOTAS del plano: lo que el instalador tiene que saber y no se ve en el
+ * dibujo.
+ *
+ * La del ajuste es la que pide la regla de modulación: cuando las piezas
+ * quedan hasta 1 cm cortas lo absorbe el herraje, pero el plano tiene que
+ * decir CUÁNTO. El Constructor viejo la ponía con otra regla y por eso salía
+ * mal.
+ */
+function notasDeObra(doc: jsPDF, area: Area, x: number, y: number, w: number) {
+  const notas: string[] = []
+  for (const t of area.tramos) {
+    const ajuste = (t.canaletaCm ?? 0) > 0 ? 0 : (t.ajusteCm ?? 0)
+    if (ajuste > 0) {
+      notas.push(`Ajuste de ${ajuste.toFixed(1)} cm en la instalación${area.tramos.length > 1 ? ` (${t.nombre})` : ''}.`)
+    }
+  }
+  notas.push('Dejar 8 cm como mínimo entre la fijación de la pilastra y el final del muro.')
+
+  texto(doc, 'NOTAS', x, y, { size: 5.5, bold: true, color: GRIS })
+  let fila = y + 4
+  for (const n of notas) {
+    for (const linea of doc.splitTextToSize(`· ${n}`, w) as string[]) {
+      texto(doc, linea, x, fila, { size: 5.6 })
+      fila += 3.4
+    }
+  }
+}
+
 
 function cajetin(doc: jsPDF, proyecto: Proyecto, area: Area, hoja: number, hojas: number, fecha: string) {
   const y = HOJA.h - M - CAJETIN_H

@@ -13,7 +13,7 @@ import {
   autorizar as autorizarEnOdoo, cuadran, guardarCotizacion, lineasParaOdoo, rechazar as rechazarCotizacion,
 } from './odoo/enviar'
 import { esAdmin, faltaParaVencer, IVA_CR, puedeCatalogos, puedeColoresReservados, puedeDistribuidores, puedePiezas, puedeUsuarios, renovarSesion, type Usuario } from './auth'
-import type { Area, Cabina, Config, Moneda, Pais, Proyecto, TipoCabina, TipologiaId, Tramo } from './types'
+import type { Area, Cabina, Config, Soporte, Moneda, Pais, Proyecto, TipoCabina, TipologiaId, Tramo } from './types'
 import {
   acabadoEsElColor, acabadosPara, alturasDe, anchosPanel, claroAjustado, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, mgMedidas, MODELOS,
   type PiezaEspecial,
@@ -953,7 +953,7 @@ export default function App() {
         x.id !== tramoId
           ? x
           : r
-            ? { ...x, cabinas: r.cabinas, pilastras: r.pilastras, canaletaCm: r.canaletaCm, ajuste: r.ajuste, mensaje: r.mensaje, pilastrasFijas: undefined }
+            ? { ...x, cabinas: r.cabinas, pilastras: r.pilastras, canaletaCm: r.canaletaCm, ajusteCm: r.ajusteCm, ajuste: r.ajuste, mensaje: r.mensaje, pilastrasFijas: undefined }
             : { ...x, cabinas, pilastrasFijas: undefined },
       ),
     })
@@ -1025,7 +1025,7 @@ export default function App() {
       tramos: area.tramos.map((x) =>
         x.id !== t.id
           ? x
-          : { ...x, cabinas: r.cabinas, pilastras: r.pilastras, canaletaCm: r.canaletaCm, ajuste: r.ajuste, mensaje: r.mensaje, pilastrasFijas: clavadas ?? x.pilastrasFijas },
+          : { ...x, cabinas: r.cabinas, pilastras: r.pilastras, canaletaCm: r.canaletaCm, ajusteCm: r.ajusteCm, ajuste: r.ajuste, mensaje: r.mensaje, pilastrasFijas: clavadas ?? x.pilastrasFijas },
       ),
     })
     return true
@@ -1065,7 +1065,7 @@ export default function App() {
         x.id !== tramoId
           ? x
           : r
-            ? { ...x, cabinas: r.cabinas, pilastras: r.pilastras, canaletaCm: r.canaletaCm, ajuste: r.ajuste, mensaje: r.mensaje, pilastrasFijas: undefined }
+            ? { ...x, cabinas: r.cabinas, pilastras: r.pilastras, canaletaCm: r.canaletaCm, ajusteCm: r.ajusteCm, ajuste: r.ajuste, mensaje: r.mensaje, pilastrasFijas: undefined }
             : { ...x, cabinas },
       ),
     })
@@ -1177,7 +1177,7 @@ export default function App() {
     setArea({
       tramos: area.tramos.map((x) =>
         x.id === tramoId
-          ? conEspejo(x, { cabinas: r.cabinas, pilastras: r.pilastras, canaletaCm: r.canaletaCm, ajuste: r.ajuste, mensaje: r.mensaje, avisoAccesible: r.avisoAccesible })
+          ? conEspejo(x, { cabinas: r.cabinas, pilastras: r.pilastras, canaletaCm: r.canaletaCm, ajusteCm: r.ajusteCm, ajuste: r.ajuste, mensaje: r.mensaje, avisoAccesible: r.avisoAccesible })
           : x,
       ),
     })
@@ -1241,6 +1241,23 @@ export default function App() {
           : x,
       ),
     })
+  }
+
+  /**
+   * Con qué se refuerza una pilastra de punta grande.
+   *
+   * Solo se guarda lo que el vendedor ELIGE: sin nada guardado sale la
+   * costilla, que es lo que manda la regla. Va directo al tramo, sin volver a
+   * modular: el refuerzo no cambia el reparto del claro.
+   */
+  function onSoporte(tramoId: string, frontera: number, tipo: Soporte) {
+    const t = area.tramos.find((x) => x.id === tramoId)
+    if (!t) return
+    const soportes = Array.from(
+      { length: t.cabinas.length + 1 },
+      (_, k) => (k === frontera ? tipo : (t.soportes?.[k] ?? null)),
+    )
+    setArea({ tramos: area.tramos.map((x) => (x.id === tramoId ? { ...x, soportes } : x)) })
   }
 
   function onPilastra(tramoId: string, indice: number, anchoCm: number) {
@@ -1357,7 +1374,7 @@ export default function App() {
     setArea({
       tramos: area.tramos.map((x) =>
         x.id === tramoId
-          ? conEspejo(x, { cabinas: r.cabinas, pilastras: r.pilastras, canaletaCm: r.canaletaCm, ajuste: r.ajuste, mensaje: r.mensaje, avisoAccesible: r.avisoAccesible, pilastrasFijas: elegidas })
+          ? conEspejo(x, { cabinas: r.cabinas, pilastras: r.pilastras, canaletaCm: r.canaletaCm, ajusteCm: r.ajusteCm, ajuste: r.ajuste, mensaje: r.mensaje, avisoAccesible: r.avisoAccesible, pilastrasFijas: elegidas })
           : x,
       ),
     })
@@ -2112,13 +2129,13 @@ export default function App() {
 
               {piezasSinSoporte.length > 0 && (
                 <div className="aviso-caja" style={{ margin: '0 0 12px' }}>
-                  <b>Hay piezas que piden soporte</b>
+                  <b>Hay pilastras reforzadas</b>
                   <span>
-                    {piezasSinSoporte.join(' · ')}. De un metro para arriba una pieza de frente no
-                    trabaja sola. Cuál soporte lleva lo decide el cliente, así que no se agrega solo:
-                    la <b>costilla</b> se carga en <b>Cotización → Piezas extra</b> con la medida que
-                    pida; el <b>refuerzo</b> ya va en los herrajes; y el <b>sándwich</b> se solicita
-                    aparte.
+                    {piezasSinSoporte.join(' · ')}. De 55 cm para arriba una pilastra de punta no
+                    trabaja sola, así que la app le pone una <b>costilla de 19</b> y ya entra en el
+                    despiece. Si en obra va de otra forma, tocá la pieza en el plano y cambiala por
+                    <b> refuerzo</b> —la diagonal a la pared, que va en los herrajes— o por
+                    <b> sándwich</b>, que es una segunda pilastra de 24 con herraje en T.
                   </span>
                 </div>
               )}
@@ -2142,6 +2159,7 @@ export default function App() {
                     onTipoPuerta={onTipoPuerta}
                     onAnchoLibre={onAnchoLibre}
                     onPilastraPmr={(anchoCm) => setConfig({ pilastraPmrCm: anchoCm })}
+                    onSoporte={onSoporte}
                     onLateralMr={(cual, anchoCm) =>
                       setConfig(cual === 'lateral'
                         ? { pilastraLateralMrCm: anchoCm ?? undefined }

@@ -1,10 +1,12 @@
 /**
  * La COSTILLA: el soporte de una pieza de frente grande.
  *
- * Regla de Dayanna (30-sep-2026): *"es una pilastra costilla, se maneja como un
- * extra para dar soporte cuando el panel o pl mide más de 100cm, puede no
- * aparecer pero sí debe poder agregarse en la cotización. Y que salga un aviso
- * si se necesita cuando se está modulando"*.
+ * Regla de modulación de Modumex (Módulo 6): **una pilastra de ESQUINA o A
+ * MURO de más de 55 cm lleva refuerzo**. Las centrales no: esas trabajan
+ * agarradas de los paneles de las dos cabinas.
+ *
+ * Al principio se había entendido "más de 100 cm" y sobre cualquier pieza; la
+ * lámina de capacitación del 1-oct-2026 lo corrigió.
  *
  * La medida NO es fija: la hoja de LEEDER dibuja una de 19 y hay planos con una
  * de 10 para una pilastra de 50. Y se puede cambiar por un refuerzo o por un
@@ -13,10 +15,11 @@
  *
  *   npm run probar-costilla
  */
-import { PIEZA_PIDE_COSTILLA_CM } from '../src/catalog'
+import { COSTILLA_MINIMA_CM, PIEZA_PIDE_COSTILLA_CM } from '../src/catalog'
 import { esPorM2, etiquetaExtra, FAMILIAS_EXTRA, renglonesDeExtras } from '../src/extras'
-import { crearTramos, piezasQuePidenCostilla } from '../src/modulacion'
-import type { Config, Extra, TipologiaId, Tramo } from '../src/types'
+import { anchoDeSoporte, crearTramos, piezasQuePidenCostilla, soporteDe } from '../src/modulacion'
+import { piezasDeArea } from '../src/exportar/piezas'
+import type { Area, Config, Extra, TipologiaId, Tramo } from '../src/types'
 
 let fallos = 0
 function revisar(que: string, bien: boolean, detalle = '') {
@@ -51,65 +54,98 @@ console.log('\n1 · la costilla se puede cargar en la cotización')
   revisar('cada una con su cantidad', renglones[0]?.cantidad === 2 && renglones[1]?.cantidad === 1)
 }
 
-console.log('\n2 · el aviso salta con una pieza de más de un metro')
+console.log('\n2 · el aviso salta pasados los 55 cm, y solo en las de PUNTA')
 {
-  revisar('el tope es un metro', PIEZA_PIDE_COSTILLA_CM === 100)
+  revisar('el tope son 55 cm', PIEZA_PIDE_COSTILLA_CM === 55)
+  revisar('y la costilla mide 19 como mínimo', COSTILLA_MINIMA_CM === 19)
 
   // El buscador no llega solo a una pieza tan grande, pero el vendedor sí:
-  // arrastrando una pilastra puede pedir hasta un panel de relleno. Así que la
-  // tira se arma a mano, que es justo el caso que hay que avisar.
+  // arrastrando una pilastra puede pedir hasta un panel de relleno.
   const config = cfg('RECTA_ENTRE_MUROS', { puertaCm: 60 })
   const base = crearTramos('RECTA_ENTRE_MUROS', 420, 4, config, 'CR')[0]
-  const t: Tramo = { ...base, pilastras: [24, 120, 50, 150, 24] }
-  const anchas = (t.pilastras ?? []).filter((a) => a > PIEZA_PIDE_COSTILLA_CM)
+  const t: Tramo = { ...base, pilastras: [100, 120, 50, 150, 70] }
   const avisos = piezasQuePidenCostilla(t, config)
-  console.log(`    pilastras: ${(t.pilastras ?? []).join(' | ')}`)
-  revisar('hay dos que se pasan del metro', anchas.length === 2, anchas.join(' y '))
-  revisar('avisa por cada una', avisos.length === 2, `${avisos.length} avisos`)
-  if (avisos.length) console.log(`    ${avisos.join(' · ')}`)
+  console.log(`    pilastras: ${(t.pilastras ?? []).join(" | ")}`)
+  if (avisos.length) console.log(`    ${avisos.join(" · ")}`)
+  revisar('avisa por las dos de punta', avisos.length === 2, `${avisos.length} avisos`)
+  revisar('y NO por las centrales, por grandes que sean',
+    !avisos.some((a) => /entre la/.test(a)), avisos.join(' | '))
   revisar('el aviso dice la medida', avisos.every((a) => /\d+ cm$/.test(a)))
-  revisar(
-    'distingue panel de pilastra',
-    avisos.some((a) => /^La pilastra/.test(a)) && avisos.some((a) => /^El panel/.test(a)),
-    avisos.join(' | '),
-  )
-  revisar('y dice dónde está cada una', avisos.every((a) => /entre la|de arranque|de cierre/.test(a)))
+  revisar('y si es de esquina o a muro', avisos.every((a) => /\(a muro\)|\(de esquina\)/.test(a)),
+    avisos.join(' | '))
+}
+
+console.log('\n2b · una pilastra de punta chica no pide nada')
+{
+  const config = cfg('RECTA_ENTRE_MUROS', { puertaCm: 60 })
+  const base = crearTramos('RECTA_ENTRE_MUROS', 420, 4, config, 'CR')[0]
+  const t: Tramo = { ...base, pilastras: [55, 30, 30, 30, 24] }
+  revisar('55 justo no avisa: la regla es MÁS de 55', piezasQuePidenCostilla(t, config).length === 0,
+    piezasQuePidenCostilla(t, config).join(' · '))
 }
 
 console.log('\n3 · una tira normal no avisa de nada')
 {
   const config = cfg('RECTA_ENTRE_MUROS', { puertaCm: 60 })
-  const t = crearTramos('RECTA_ENTRE_MUROS', 420, 4, config, 'CR')[0]
-  console.log(`    pilastras: ${(t.pilastras ?? []).join(' | ')}`)
-  revisar('sin piezas grandes no hay aviso', piezasQuePidenCostilla(t, config).length === 0)
-  revisar(
-    'y el panel de la cabina, que es más hondo que un metro, NO cuenta',
+  const t = crearTramos('RECTA_ENTRE_MUROS', 370, 4, config, 'CR')[0]
+  console.log(`    pilastras: ${(t.pilastras ?? []).join(" | ")}`)
+  revisar('sin piezas grandes no hay aviso', piezasQuePidenCostilla(t, config).length === 0,
+    piezasQuePidenCostilla(t, config).join(' · '))
+  revisar('y el panel de la cabina, que es más hondo que 55, NO cuenta',
     config.profundidadCm > PIEZA_PIDE_COSTILLA_CM && piezasQuePidenCostilla(t, config).length === 0,
-    `panel de ${config.profundidadCm}`,
-  )
+    `panel de ${config.profundidadCm}`)
 }
 
-console.log('\n4 · el frente de la accesible también se mira')
+console.log('\n4 · el frente del cubículo de movilidad limitada también se mira')
 {
-  // 204 de ancho con puerta de 90 deja un frente de 95: no llega al tope
-  const chico = cfg('MR_PANEL_U', {
+  // 204 de ancho con puerta de 100 deja un frente de 66: pasa de 55
+  const c = cfg('MR_PANEL_U', {
     profundidadCm: 135, anchoAccesibleCm: 204, profundidadAccesibleCm: 180, puertaAccesibleCm: 100,
   })
-  const tChico = crearTramos('MR_PANEL_U', 500, 4, chico, 'CR')[0]
-  const acc = tChico.cabinas[0]
-  console.log(`    accesible de ${acc.anchoCm} con puerta de ${acc.puerta.anchoCm}`)
-  const avisosChico = piezasQuePidenCostilla(tChico, chico).filter((a) => /accesible/.test(a))
-  revisar('un frente de 85 no pide soporte', avisosChico.length === 0, avisosChico.join(' · '))
+  const t = crearTramos('MR_PANEL_U', 500, 4, c, 'CR')[0]
+  const acc = t.cabinas[0]
+  console.log(`    cubículo de ${acc.anchoCm} con puerta de ${acc.puerta.anchoCm}`)
+  const avisos = piezasQuePidenCostilla(t, c).filter((a) => /accesible/.test(a))
+  revisar('un frente de 66 ya pide soporte', avisos.length === 1, avisos.join(' · '))
 
-  // con la cabina más ancha y la misma puerta, el frente pasa del metro
-  const grande = cfg('MR_PANEL_U', {
-    profundidadCm: 135, anchoAccesibleCm: 240, profundidadAccesibleCm: 180, puertaAccesibleCm: 100,
+  // con la puerta más ancha el frente baja de 55 y deja de pedirlo
+  const c2 = cfg('MR_PANEL_U', {
+    profundidadCm: 135, anchoAccesibleCm: 164, profundidadAccesibleCm: 180, puertaAccesibleCm: 100,
   })
-  const tGrande = crearTramos('MR_PANEL_U', 560, 4, grande, 'CR')[0]
-  const accG = tGrande.cabinas[0]
-  const avisosGrande = piezasQuePidenCostilla(tGrande, grande).filter((a) => /accesible/.test(a))
-  console.log(`    accesible de ${accG.anchoCm} con puerta de ${accG.puerta.anchoCm}`)
-  revisar('un frente de más de un metro sí', avisosGrande.length === 1, avisosGrande.join(' · '))
+  const t2 = crearTramos('MR_PANEL_U', 450, 4, c2, 'CR')[0]
+  const avisos2 = piezasQuePidenCostilla(t2, c2).filter((a) => /accesible/.test(a))
+  revisar('un frente chico no', avisos2.length === 0, avisos2.join(' · '))
+}
+
+console.log('\n5 · los tres refuerzos: costilla, refuerzo y sándwich')
+{
+  const c = cfg('RECTA_MURO_IZQ', { puertaCm: 60 })
+  const base = crearTramos('RECTA_MURO_IZQ', 370, 3, c, 'CR')[0]
+  // la pilastra contra el muro se agranda a 100: pasa de 55 y pide refuerzo
+  const t: Tramo = { ...base, pilastras: [100, 24, 24, 19] }
+
+  revisar('sin elegir nada sale la costilla', soporteDe(t, c, 0) === 'costilla', String(soporteDe(t, c, 0)))
+  revisar('y mide 19', anchoDeSoporte('costilla') === 19)
+  revisar('el sándwich es una segunda pilastra de 24', anchoDeSoporte('sandwich') === 24)
+  revisar('el refuerzo no lleva pieza: va en los herrajes', anchoDeSoporte('refuerzo') === 0)
+  revisar('la pilastra chica del otro extremo no pide nada', soporteDe(t, c, 3) === null)
+
+  // y lo que el vendedor elige manda
+  const conRef: Tramo = { ...t, soportes: ['refuerzo', null, null, null] }
+  revisar('elegir refuerzo lo cambia', soporteDe(conRef, c, 0) === 'refuerzo')
+
+  // en el despiece: la costilla y el sándwich son material, el refuerzo no
+  const pls = (tr: Tramo) => {
+    const a: Area = { id: 'a', nombre: 'Baño', piso: '1', config: c, tramos: [tr] }
+    return piezasDeArea(a).filter((p) => p.familia === 'PL').map((p) => p.anchoCm)
+  }
+  revisar('la costilla entra en el despiece', pls(t).filter((a) => a === 19).length === 2,
+    pls(t).join(' · '))
+  revisar('el refuerzo no agrega pieza', pls(conRef).filter((a) => a === 19).length === 1,
+    pls(conRef).join(' · '))
+  const conSw: Tramo = { ...t, soportes: ['sandwich', null, null, null] }
+  revisar('el sándwich agrega una pilastra de 24', pls(conSw).filter((a) => a === 24).length === 3,
+    pls(conSw).join(' · '))
 }
 
 console.log(fallos ? `\n${fallos} revisiones mal.\n` : '\nTodo cuadra.\n')

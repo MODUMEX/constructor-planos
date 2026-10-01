@@ -560,15 +560,22 @@ export function medidaQueCabe(opciones: number[], max: number): number | null {
 /**
  * De qué medida para arriba una pieza de FRENTE pide soporte.
  *
- * Un panel o una pilastra de más de un metro no trabaja solo: se le agrega una
- * COSTILLA de canto, o se cambia por un refuerzo o por un sándwich. Cuál de las
- * tres se usa, y de cuánto, lo decide el cliente en la cotización: la app no lo
- * pone solo, solo avisa que hace falta.
+ * Regla de modulación de Modumex (Módulo 6): **una pilastra de ESQUINA o A
+ * MURO de más de 55 cm lleva refuerzo**. Puede ser una COSTILLA de canto —19
+ * cm como mínimo—, un refuerzo superior o un sándwich; cuál de los tres lo
+ * decide el cliente, así que la app no lo pone solo: avisa que hace falta.
+ *
+ * Antes estaba en 100 cm, que era lo que se había entendido. La lámina de
+ * capacitación lo deja en 55 y el dibujo lo confirma: una pilastra de 100 en
+ * el cubículo de movilidad limitada lleva su costilla de 19.
  *
  * Se mira la pieza del FRENTE —lo que cierra la cabina hacia el pasillo— y no
  * el panel divisor de una cabina normal, que va agarrado de sus dos pilastras.
  */
-export const PIEZA_PIDE_COSTILLA_CM = 100
+export const PIEZA_PIDE_COSTILLA_CM = 55
+
+/** lo que mide como mínimo una costilla */
+export const COSTILLA_MINIMA_CM = 19
 
 /** una puerta necesita este margen contra el ancho de la cabina */
 export const MARGEN_PUERTA_CM = 8

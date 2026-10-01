@@ -1,6 +1,6 @@
 import type { Area, Cabina, Config, Tramo } from '../types'
 import { alturasDe, esSoloOrinales, esVariacionPanel, familiaDelFrente, llevaAccesibleSiempre, mamparaDe, nombreModelo, tipologia } from '../catalog'
-import { arrancaConMingitorio } from '../modulacion'
+import { arrancaConMingitorio, soportesDe } from '../modulacion'
 import { cierraConMingitorio, fronteraDeOrinal } from '../modulacion'
 import { cuartoPmr } from '../geometria'
 
@@ -355,6 +355,7 @@ export function piezasDeArea(area: Area): Pieza[] {
   )
   piezas.push(...pilastraDelDivisor(area))
   piezas.push(...piezasDelFrente(area))
+  piezas.push(...piezasDeSoporte(area))
 
   // orinales sueltos de un baño mixto: N orinales llevan N−1 divisores.
   // En un área de solo orinales los divisores ya salieron de las propias cabinas.
@@ -378,6 +379,31 @@ export function piezasDeArea(area: Area): Pieza[] {
     })
   }
   return piezas
+}
+
+/**
+ * Las piezas que refuerzan una pilastra de punta grande.
+ *
+ * La COSTILLA y el SÁNDWICH son material y se fabrican: la primera es una
+ * pieza de canto de 19 y el segundo una segunda pilastra de 24, espalda con
+ * espalda. El REFUERZO no: va en el juego de herrajes, así que no suma pieza.
+ */
+function piezasDeSoporte(area: Area): Pieza[] {
+  const salida: Pieza[] = []
+  for (const tramo of area.tramos) {
+    for (const s of soportesDe(tramo, area.config)) {
+      if (s.anchoCm <= 0) continue
+      const contraMuro = s.frontera === 0 ? tramo.muroInicio : tramo.muroFin
+      salida.push({
+        familia: 'PL',
+        anchoCm: s.anchoCm,
+        altoCm: altoPilastra(area.config),
+        subTipo: contraMuro ? 'PLLATMUR' : 'PLLAT',
+        area: area.nombre,
+      })
+    }
+  }
+  return salida
 }
 
 export interface RenglonAgrupado {

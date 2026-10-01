@@ -1,7 +1,7 @@
 {
   "name": "constructor-de-planos",
   "private": true,
-  "version": "2.77.0",
+  "version": "2.78.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -39,6 +39,7 @@
     "bom-odoo": "esbuild scripts/bom-odoo.ts --bundle --platform=node --format=esm --outfile=.bom.mjs --log-level=warning && node .bom.mjs",
     "probar-sesion": "node scripts/empaquetar-prueba.mjs scripts/probar-sesion.ts .sesion.mjs && node .sesion.mjs",
     "probar-variacion": "esbuild scripts/probar-variacion-panel.ts --bundle --platform=node --format=esm --outfile=.var.mjs --log-level=warning --define:import.meta.env={} && node .var.mjs",
+    "ejemplo-soportes": "node scripts/empaquetar-prueba.mjs scripts/ejemplo-soportes.tsx .ejsop.mjs && node .ejsop.mjs",
     "ejemplo-tipologias": "node scripts/empaquetar-prueba.mjs scripts/ejemplo-tipologias.tsx .ejtip.mjs && node .ejtip.mjs",
     "ejemplo-centros": "node scripts/empaquetar-prueba.mjs scripts/ejemplo-centros.tsx .ejcen.mjs && node .ejcen.mjs",
     "ejemplo-variacion": "node scripts/empaquetar-prueba.mjs scripts/ejemplo-variacion.tsx .ejemplo.mjs && node .ejemplo.mjs",

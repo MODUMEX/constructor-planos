@@ -134,8 +134,24 @@ export interface Tramo {
    * va al punto medio de sus dos descargas.
    */
   centrosCm?: (number | null)[]
+  /**
+   * El soporte elegido para cada pilastra de PUNTA, por número de frontera.
+   *
+   * Solo las puntas lo piden, y solo pasados los 55 cm. Donde no hay nada
+   * elegido sale la costilla, que es lo que manda la regla; acá se guarda
+   * únicamente lo que el vendedor cambió sobre el plano.
+   */
+  soportes?: (Soporte | null)[]
   /** relleno contra la pared cuando las piezas quedan cortas por 5 cm o menos */
   canaletaCm?: number
+  /**
+   * Lo que le falta a la tira para cerrar el claro y se resuelve EN LA OBRA,
+   * en cm: hasta 1 cm lo absorbe el herraje. El plano lo tiene que decir, así
+   * que se guarda en vez de deducirlo —el total de las piezas no se puede
+   * comparar con el claro a secas, porque cada puerta traslapa sobre sus
+   * pilastras—.
+   */
+  ajusteCm?: number
   /**
    * Cómo cerró la tira contra el claro: 'exacto', 'canaleta' (falta relleno),
    * 'sobra' (queda un hueco que la canaleta no tapa) o 'falta' (las piezas se
@@ -167,6 +183,17 @@ export type TipologiaId =
   | 'MR_PANEL_E'
   | 'MR_PANEL_L'
   | 'MR_PANEL_U'
+
+/**
+ * Con qué se refuerza una pilastra de punta que pasa de 55 cm.
+ *
+ *   costilla → una pieza de canto, de 19 cm como mínimo, pegada a la pilastra
+ *   refuerzo → el refuerzo superior, que ya va en el juego de herrajes
+ *   sandwich → una SEGUNDA pilastra, de 24 como mínimo, espalda con espalda
+ *
+ * La costilla es la que sale por defecto. Las tres se eligen sobre el plano.
+ */
+export type Soporte = 'costilla' | 'refuerzo' | 'sandwich'
 
 export type Terminacion = 'ZOCLO' | 'PATAS'
 

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { Cabina, Config, Pais, Tramo } from '../types'
-import { anchosPanelFabrica, anchosPilastra, esEspecial, esVariacionPanel, familiaDelFrente, ICONO_MR, medidasDeFrente, puertasPosibles, tipologia } from '../catalog'
+import type { Cabina, Config, Pais, Soporte, Tramo } from '../types'
+import { anchosPanelFabrica, anchosPilastra, COSTILLA_MINIMA_CM, esEspecial, esVariacionPanel, familiaDelFrente, ICONO_MR, medidasDeFrente, puertasPosibles, tipologia } from '../catalog'
 import { anchoTotal, arrancaElCuartoPmr, esEspacioLibre, minimoDe, nuevaCabina, pilastrasParaAncho, profundidadAccesible, puertaSugerida, snap, cierraConMingitorio, ladosDeCabina, lugaresDe, mamparaEn } from '../modulacion'
-import { medidaCercana, PILASTRAS_INTERNAS, PUERTA_ACCESIBLE_MIN } from '../modulador'
+import { medidaCercana, PILASTRA_MINIMA_CM, PILASTRAS_INTERNAS, PUERTA_ACCESIBLE_MIN } from '../modulador'
 import { Grupo, Item, Menu, Raya } from './Menu'
 import {
   anchoDeOrinal, cajaDelPlano, centroPilastra, cuartoPmr, ESPESOR_MURO, esMingitorio, marcosDe, profundidadDeDivisor,
@@ -12,6 +12,7 @@ import {
 } from '../geometria'
 import { ALTO_ORINAL_CM, ALTO_REGADERA_CM, ALTO_WC_CM, ORINAL, REGADERA, WC } from '../assets/sanitarios'
 import { descargasDe, escalaDeTramo, hayCentros } from '../descargas'
+import { anchoDeSoporte, soporteDe, soportesDe } from '../modulacion'
 
 /**
  * La zona invisible para agarrar una pilastra, EN PÍXELES DE PANTALLA.
@@ -103,6 +104,8 @@ interface Props {
    * `null` vuelven a salir de la modulación.
    */
   onLateralMr: (cual: 'lateral' | 'cierre', anchoCm: number | null) => void
+  /** cambiar con qué se refuerza una pilastra de punta grande */
+  onSoporte: (tramoId: string, frontera: number, tipo: Soporte) => void
 
 }
 
@@ -113,6 +116,8 @@ type MenuEstado =
   | { tipo: 'pilastra'; tramoId: string; indice: number; x: number; y: number }
   // las dos pilastras del frente de la cabina accesible, que no son de la tira
   | { tipo: 'lateralMr'; cual: 'lateral' | 'cierre'; x: number; y: number }
+  // el refuerzo de una pilastra de punta grande: costilla, refuerzo o sándwich
+  | { tipo: 'soporte'; tramoId: string; indice: number; x: number; y: number }
   | null
 
 export default function EditorPlano({
@@ -132,6 +137,7 @@ export default function EditorPlano({
   onAnchoLibre,
   onPilastraPmr,
   onLateralMr,
+  onSoporte,
   onOrinal,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
@@ -1007,6 +1013,86 @@ export default function EditorPlano({
               })()}
 
               {/* ------------------------------------------------------------
+                  El refuerzo de las pilastras de punta grandes. Cada uno se ve
+                  distinto, como en los planos de Modumex:
+
+                    · COSTILLA → una pieza de canto de 19, perpendicular
+                    · REFUERZO → una diagonal que va de la pilastra a la pared
+                    · SÁNDWICH → una segunda pilastra de 24 con su herraje en T
+
+                  Se toca y se cambia por cualquiera de los tres.
+                  ------------------------------------------------------------ */}
+              {soportesDe(tramo, config).map((s) => {
+                const k = s.frontera
+                const alFinal = k > 0
+                const cortes = [0, ...acum.slice(1), largo]
+                const centro = centroPilastra(tramo, cortes, k, s.pilastraCm, cuarto)
+                // la cara LIBRE de la pilastra: la que da al muro o a la esquina
+                const cara = centro + (alFinal ? 1 : -1) * (s.pilastraCm / 2)
+                const largoPieza = anchoDeSoporte(s.tipo)
+                const clave = `sop:${k}`
+                const activo = sobre === clave
+                const abrir = (e: React.MouseEvent) => {
+                  e.preventDefault(); e.stopPropagation()
+                  setMenu({ tipo: 'soporte', tramoId: tramo.id, indice: k, x: e.clientX, y: e.clientY })
+                }
+
+                // el refuerzo no es una pieza sino una diagonal de la pilastra al muro
+                if (s.tipo === 'refuerzo') {
+                  const a = pt(m, cara, prof - grueso)
+                  const b = pt(m, cara + (alFinal ? 1 : -1) * 22, prof - 24)
+                  const medio = pt(m, cara + (alFinal ? 1 : -1) * 13, prof - 15)
+                  return (
+                    <g key={clave} style={{ cursor: 'pointer' }} onClick={abrir} onContextMenu={abrir}
+                      onPointerEnter={() => setSobre(clave)}
+                      onPointerLeave={() => setSobre((x) => (x === clave ? null : x))}
+                    >
+                      <title>{`Refuerzo de la pilastra de ${s.pilastraCm} cm — tocalo para cambiarlo`}</title>
+                      <line x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                        stroke={activo ? '#2e6fd9' : '#6f7f95'} strokeWidth={2.4} strokeLinecap="round" />
+                      {verCotas && (
+                        <text x={medio.x} y={medio.y} fontSize={12} fill="#7f8fa3" textAnchor="middle">REF</text>
+                      )}
+                    </g>
+                  )
+                }
+
+                // la costilla y el sándwich SÍ son pieza: van de canto, metidas
+                // hacia adentro de la cabina desde la cara de la pilastra
+                const a = pt(m, cara, prof - largoPieza)
+                const b = pt(m, cara + (alFinal ? -1 : 1) * grueso, prof)
+                const rotulo = pt(m, cara + (alFinal ? -1 : 1) * 9, prof - largoPieza - 5)
+                return (
+                  <g key={clave} style={{ cursor: 'pointer' }} onClick={abrir} onContextMenu={abrir}
+                    onPointerEnter={() => setSobre(clave)}
+                    onPointerLeave={() => setSobre((x) => (x === clave ? null : x))}
+                  >
+                    <title>
+                      {(s.tipo === 'costilla' ? 'Costilla' : 'Sándwich') + ' de ' + largoPieza +
+                        ' cm en la pilastra de ' + s.pilastraCm + ' — tocalo para cambiarlo'}
+                    </title>
+                    <rect
+                      x={Math.min(a.x, b.x)} y={Math.min(a.y, b.y)}
+                      width={Math.max(Math.abs(b.x - a.x), MIN_PIEZA_PX)}
+                      height={Math.max(Math.abs(b.y - a.y), MIN_PIEZA_PX)}
+                      fill={activo ? '#2e6fd9' : '#3c4e63'} stroke="#5f7590" strokeWidth={0.5}
+                    />
+                    {/* el sándwich se amarra con herraje en T */}
+                    {s.tipo === 'sandwich' && (() => {
+                      const t1 = pt(m, cara - grueso, prof - largoPieza)
+                      const t2 = pt(m, cara + grueso, prof - largoPieza)
+                      return <line x1={t1.x} y1={t1.y} x2={t2.x} y2={t2.y} stroke="#2a4c8f" strokeWidth={2.6} />
+                    })()}
+                    {verCotas && (
+                      <text x={rotulo.x} y={rotulo.y} fontSize={12} fill="#7f8fa3" textAnchor="middle">
+                        {s.tipo === 'costilla' ? `CO ${largoPieza}` : `SW ${largoPieza}`}
+                      </text>
+                    )}
+                  </g>
+                )
+              })}
+
+              {/* ------------------------------------------------------------
                   Centros de carga: el eje de cada descarga y la cadena de cotas
                   que la ubica contra los muros, como viene en el plano del
                   arquitecto. Es lo que deja comparar la plomería con la tira.
@@ -1530,6 +1616,37 @@ export default function EditorPlano({
           tenían menú: el del panel solo existe entre dos cabinas. Acá se
           elige la medida de una lista y listo.
           ------------------------------------------------------------------ */}
+      {menu && menu.tipo === 'soporte' && (() => {
+        const t = tramoPorId(menu.tramoId)
+        const cerrar = () => setMenu(null)
+        if (!t) return null
+        const k = menu.indice
+        const actual = soporteDe(t, config, k)
+        const pilastra = t.pilastras?.[k] ?? config.anchoPilastraCm
+        const opciones: { id: Soporte; nombre: string; nota: string }[] = [
+          { id: 'costilla', nombre: `Costilla de ${COSTILLA_MINIMA_CM} cm`, nota: 'Una pieza de canto pegada a la pilastra' },
+          { id: 'refuerzo', nombre: 'Refuerzo', nota: 'Diagonal de la pilastra a la pared; va en el juego de herrajes' },
+          { id: 'sandwich', nombre: 'Sándwich', nota: `Segunda pilastra de ${PILASTRA_MINIMA_CM} cm con herraje en T` },
+        ]
+        return (
+          <Menu
+            pos={{ x: menu.x, y: menu.y }}
+            titulo={`Refuerzo de la pilastra de ${pilastra} cm`}
+            detalle="Toda pilastra de punta de más de 55 cm lleva uno"
+            onCerrar={cerrar}
+          >
+            {opciones.map((o) => (
+              <Item key={o.id} activo={actual === o.id} onClick={() => { onSoporte(menu.tramoId, k, o.id); cerrar() }}>
+                {o.nombre}
+              </Item>
+            ))}
+            <div className="nota-menu">
+              {opciones.find((o) => o.id === actual)?.nota}
+            </div>
+          </Menu>
+        )
+      })()}
+
       {menu && menu.tipo === 'lateralMr' && (() => {
         const cerrar = () => setMenu(null)
         const pedida = menu.cual === 'lateral' ? config.pilastraLateralMrCm : config.pilastraCierreMrCm
