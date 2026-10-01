@@ -42,6 +42,14 @@ function guardarArchivo(): Plugin {
 }
 
 export default defineConfig({
+  /**
+   * De donde cuelga la aplicacion.
+   *
+   * En escritorio y en desarrollo es la raiz. En GitHub Pages la pagina vive en
+   * /constructor-planos/, asi que los archivos hay que pedirlos desde ahi: eso
+   * lo pone el flujo de publicacion con BASE_WEB.
+   */
+  base: process.env.BASE_WEB ?? '/',
   define: { __VERSION_APP__: JSON.stringify(version) },
   plugins: [react(), guardarArchivo()],
   server: {

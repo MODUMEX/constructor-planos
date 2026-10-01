@@ -1,4 +1,4 @@
-import { fotoDe, type Consulta } from '../renders'
+import { fotoDe, urlDeFoto, type Consulta } from '../renders'
 
 /**
  * La foto del modelo con el color elegido. Si esa combinación exacta no tiene
@@ -26,7 +26,7 @@ export default function VistaRender({
 
   return (
     <figure className="render">
-      <img src={foto.archivo} alt={titulo ?? 'Render del modelo'} style={{ height: alto }} />
+      <img src={urlDeFoto(foto.archivo)} alt={titulo ?? 'Render del modelo'} style={{ height: alto }} />
       {(titulo || foto.referencia) && (
         <figcaption>
           {titulo}

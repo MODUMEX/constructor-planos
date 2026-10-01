@@ -1,0 +1,72 @@
+name: Publicar la pagina web
+
+# La misma aplicacion, servida como pagina en GitHub Pages:
+#   https://modumex.github.io/constructor-planos/
+#
+# No hace falta otro repositorio: es el MISMO codigo. La version de escritorio
+# se compila con Tauri y esta se compila con Vite a una carpeta de archivos
+# estaticos. Todo lo que es de escritorio -guardar con el dialogo de Windows,
+# el actualizador- esta detras de enEscritorio(), asi que en el navegador
+# simplemente no se usa y el PDF se baja como descarga normal.
+#
+# Se dispara con la MISMA etiqueta que el instalador, para que la pagina y el
+# escritorio esten siempre en la misma version: si un distribuidor reporta algo,
+# los dos dicen el mismo numero.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# si se suben dos etiquetas seguidas, que la ultima gane sin pelearse
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  construir:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # La pagina NO cuelga de la raiz del dominio sino de /constructor-planos/,
+      # asi que los archivos hay que pedirlos desde ahi. En escritorio la base
+      # sigue siendo "/" y por eso va por variable y no fija en el vite.config.
+      - run: npm run build
+        env:
+          BASE_WEB: /constructor-planos/
+
+      - uses: actions/configure-pages@v5
+        with:
+          # deja Pages encendido con origen "GitHub Actions" la primera vez,
+          # para no tener que entrar a la configuracion del repositorio
+          enablement: true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  publicar:
+    needs: construir
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.desplegar.outputs.page_url }}
+    steps:
+      - id: desplegar
+        uses: actions/deploy-pages@v4
+
+      - name: Decir donde quedo
+        run: echo "La pagina quedo en ${{ steps.desplegar.outputs.page_url }}"

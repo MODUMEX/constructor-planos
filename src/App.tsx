@@ -28,7 +28,7 @@ import Usuarios from './components/Usuarios'
 import Solicitudes from './components/Solicitudes'
 import { contarSolicitudes } from './solicitudes'
 import { coloresMxAgrupados, eligeColorMx, slugRenderMx } from './coloresMx'
-import { fotoDe, fotosHerraje, faltanFotosHerraje, SIN_FOTO_PROPIA, terminacionesDe } from './renders'
+import { fotoDe, fotosHerraje, faltanFotosHerraje, SIN_FOTO_PROPIA, terminacionesDe, urlDeFoto } from './renders'
 import {
   anchoAccesibleDe, anchoTotal, bom, claroDeOrinales, compensarPilastra, crearTramos, esEspacioLibre,
   frenteAccesible, invertirTramo, modularConCatalogo, nuevoId, pedidoDeModulacion,
@@ -2406,7 +2406,7 @@ export default function App() {
                           type="button"
                         >
                           <span className={`foto ${foto ? '' : 'sin'}`}>
-                            {foto ? <img src={foto.archivo} alt={m.nombre} /> : 'sin render'}
+                            {foto ? <img src={urlDeFoto(foto.archivo)} alt={m.nombre} /> : 'sin render'}
                           </span>
                           <span className="pie">
                             <b>{m.nombre}</b>
@@ -2551,7 +2551,7 @@ export default function App() {
                     <div className="herrajes-tira" style={{ marginTop: 14 }}>
                       {fotosHerraje(config.linea, config.herrajeAcabado, config.terminacion).map((f) => (
                         <figure className="herraje-pieza" key={f.archivo}>
-                          <img src={f.archivo} alt={f.pieza} />
+                          <img src={urlDeFoto(f.archivo)} alt={f.pieza} />
                           <span>{f.pieza}{f.nota ? ` · ${f.nota}` : ''}</span>
                         </figure>
                       ))}

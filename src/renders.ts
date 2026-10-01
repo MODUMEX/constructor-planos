@@ -123,6 +123,23 @@ export function fotoDe({ linea, modelo, acabado, color, cabina, slugColor }: Con
   return null
 }
 
+/**
+ * La dirección con la que se pide una foto.
+ *
+ * En escritorio la aplicación cuelga de la raíz, pero en la página web cuelga
+ * de /constructor-planos/, así que el archivo hay que pedirlo desde ahí. El
+ * try es para los scripts de Node, donde `import.meta.env` no existe.
+ */
+export function urlDeFoto(archivo: string): string {
+  let base = '/'
+  try {
+    base = import.meta.env.BASE_URL || '/'
+  } catch {
+    // fuera del navegador no hay base: se deja la raíz
+  }
+  return base + archivo
+}
+
 /** cuántas fotos hay, para poder decirlo en pantalla */
 export const TOTAL_RENDERS = Object.keys(RENDERS).length
 
