@@ -16,6 +16,8 @@ name: Publicar la pagina web
 on:
   push:
     tags: ['v*']
+  # para volver a publicar la pagina sin subir una version nueva:
+  # pestana Actions > Publicar la pagina web > Run workflow
   workflow_dispatch:
 
 permissions:
@@ -48,11 +50,11 @@ jobs:
         env:
           BASE_WEB: /constructor-planos/
 
+      # Pages se enciende UNA VEZ a mano, en Settings > Pages > Source:
+      # GitHub Actions. Se probo dejar que lo hiciera la accion con
+      # "enablement: true" y no puede: el token del flujo no tiene permiso para
+      # crear el sitio, asi que el paso falla antes de subir nada.
       - uses: actions/configure-pages@v5
-        with:
-          # deja Pages encendido con origen "GitHub Actions" la primera vez,
-          # para no tener que entrar a la configuracion del repositorio
-          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:
