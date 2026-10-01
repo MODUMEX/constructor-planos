@@ -104,8 +104,8 @@ console.log('\n3 · el plano FEDEX: variación panel con la accesible plantada')
   t.centrosCm = [null, 213, 308, 403]
 
   const corrida = corridaDeCentros(t, c)
-  revisar('la corrida deja afuera a la accesible', !('problema' in corrida) && corrida.desde === 1,
-    'problema' in corrida ? corrida.problema : `${corrida.desde}..${corrida.hasta}`)
+  revisar('la corrida deja afuera a la accesible', !('problema' in corrida) && corrida.banos?.desde === 1,
+    'problema' in corrida ? corrida.problema : `${corrida.banos?.desde}..${corrida.banos?.hasta}`)
 
   const r = tramoDesdeCentros(t, c)
   revisar('modula', r != null)
@@ -141,22 +141,73 @@ console.log('\n4 · una descarga mal puesta se avisa')
     avisosDeDescargas(t2, c).join(' · '))
 }
 
-console.log('\n5 · lo que todavía no se modula por centros lo dice')
+console.log('\n5 · los orinales también salen de sus descargas')
+{
+  // una tira de baños con el campo de orinales al final: las mamparas del campo
+  // tienen que quedar en el punto medio de cada par de descargas
+  const c = cfg('RECTA_ENTRE_MUROS', { orinales: 3, anchoOrinalCm: 60 })
+  const t = crearTramos('RECTA_ENTRE_MUROS', 500, 2, c)[0]
+  t.centrosCm = [50, 145, 250, 330, 420]
+
+  const corrida = corridaDeCentros(t, c)
+  revisar('ve los baños y el campo por separado',
+    !('problema' in corrida) && corrida.banos?.hasta === 2 && corrida.orinales?.desde === 2,
+    'problema' in corrida ? corrida.problema : JSON.stringify(corrida))
+
+  const r = tramoDesdeCentros(t, c)
+  revisar('modula', r != null)
+  if (r) {
+    const armado: Tramo = { ...t, cabinas: r.cabinas, pilastras: r.pilastras }
+    const fr = fronterasReales(armado)
+    revisar('la mampara entre los dos primeros orinales va al medio de 250 y 330',
+      Math.abs(fr[3] - 290) <= 2.5, String(fr[3]))
+    revisar('y la siguiente al medio de 330 y 420', Math.abs(fr[4] - 375) <= 2.5, String(fr[4]))
+    revisar('la tira sigue cerrando el claro', r.ajuste !== 'falta' && r.ajuste !== 'sobra', r.mensaje)
+    revisar('devuelve el ancho pedido de cada orinal', (r.anchosOrinal?.length ?? 0) === 3,
+      (r.anchosOrinal ?? []).join(' · '))
+    const d = descargasDe(armado, c)
+    revisar('los cinco sanitarios entran en su lugar', d.length === 5 && d.every((x) => x.izqCm > 0 && x.derCm > 0))
+  }
+}
+
+console.log('\n5b · un área de puros orinales')
 {
   const c = cfg('ORINALES_ENTRE_MUROS', { orinales: 3 })
-  const t = crearTramos('ORINALES_ENTRE_MUROS', 300, 3, c)[0]
-  t.centrosCm = [50, 150, 250]
+  const t = crearTramos('ORINALES_ENTRE_MUROS', 240, 3, c)[0]
+  t.centrosCm = [45, 120, 195]
   const corrida = corridaDeCentros(t, c)
-  revisar('con orinales avisa en vez de romper', 'problema' in corrida && corrida.problema.includes('orinales'),
-    'problema' in corrida ? corrida.problema : 'moduló')
-  revisar('y no devuelve tira', modularPorCentros(t, c) === null)
+  revisar('no hay corrida de baños y sí campo de orinales',
+    !('problema' in corrida) && corrida.banos === null && corrida.orinales?.hasta === 3,
+    'problema' in corrida ? corrida.problema : JSON.stringify(corrida))
 
-  // sin centros escritos tampoco
-  const c2 = cfg('RECTA_ENTRE_MUROS')
-  const t2 = crearTramos('RECTA_ENTRE_MUROS', 300, 3, c2)[0]
-  const sin = corridaDeCentros(t2, c2)
+  const r = tramoDesdeCentros(t, c)
+  revisar('modula', r != null)
+  if (r) {
+    const armado: Tramo = { ...t, cabinas: r.cabinas, pilastras: r.pilastras }
+    const fr = fronterasReales(armado)
+    revisar('la primera mampara va al medio de 45 y 120', Math.abs(fr[1] - 82.5) <= 2.5, String(fr[1]))
+    revisar('la segunda al medio de 120 y 195', Math.abs(fr[2] - 157.5) <= 2.5, String(fr[2]))
+    revisar('y el campo sigue midiendo lo mismo',
+      Math.abs(anchoTotal(r.cabinas) - anchoTotal(t.cabinas)) < 0.6,
+      `${anchoTotal(r.cabinas)} vs ${anchoTotal(t.cabinas)}`)
+  }
+}
+
+console.log('\n5c · lo que todavía no se puede')
+{
+  // sin centros escritos no hay nada que perseguir
+  const c = cfg('RECTA_ENTRE_MUROS')
+  const t = crearTramos('RECTA_ENTRE_MUROS', 300, 3, c)[0]
+  const sin = corridaDeCentros(t, c)
   revisar('sin centros pide los que faltan', 'problema' in sin && sin.problema.includes('Falta'),
     'problema' in sin ? sin.problema : 'moduló')
+
+  // dos descargas pegadas no dejan lugar para la mampara
+  const c2 = cfg('ORINALES_ENTRE_MUROS', { orinales: 3 })
+  const t2 = crearTramos('ORINALES_ENTRE_MUROS', 240, 3, c2)[0]
+  t2.centrosCm = [45, 120, 122]
+  const r2 = modularPorCentros(t2, c2)
+  revisar('avisa si un orinal queda aplastado', r2?.ajuste === 'falta', r2?.mensaje ?? 'sin resultado')
 }
 
 console.log(String.fromCharCode(10) + '6 · el panel queda en el medio y la descarga no se mueve')

@@ -59,9 +59,36 @@ const acomodado = (() => {
   return { ...parejo, cabinas: r.cabinas, pilastras: r.pilastras, ajuste: r.ajuste, mensaje: r.mensaje }
 })()
 
-function area(id: string, nombre: string, tramo: Tramo): Area {
-  return { id, nombre, piso: '1', config, tramos: [tramo] }
+function area(id: string, nombre: string, tramo: Tramo, cfg: Config = config): Area {
+  return { id, nombre, piso: '1', config: cfg, tramos: [tramo] }
 }
+
+// ------------------------------------------------------- baños con orinales
+// El campo de orinales no lleva puerta ni pilastra: entre dos va una mampara,
+// así que el ancho de cada lugar sale DIRECTO de las descargas.
+const CON_ORINALES: Config = {
+  ...config,
+  tipologia: 'RECTA_ENTRE_MUROS',
+  anchoAccesibleCm: 150,
+  profundidadAccesibleCm: undefined,
+  orinales: 3,
+  anchoOrinalCm: 60,
+  claroPedidoCm: 500,
+  cabinasPedidas: 2,
+  usaCentrosCarga: true,
+}
+
+const mixto = (() => {
+  const t = crearTramos('RECTA_ENTRE_MUROS', 500, 2, CON_ORINALES)[0]
+  return { ...t, centrosCm: [50, 145, 250, 330, 420] }
+})()
+
+const mixtoAcomodado = (() => {
+  const r = tramoDesdeCentros(mixto, CON_ORINALES)
+  if (!r) throw new Error('el área con orinales no moduló')
+  console.log('  orinales pedidos:', (r.anchosOrinal ?? []).join(' · '))
+  return { ...mixto, cabinas: r.cabinas, pilastras: r.pilastras, ajuste: r.ajuste, mensaje: r.mensaje }
+})()
 
 const proyecto: Proyecto = {
   numero: '9002',
@@ -74,6 +101,7 @@ const proyecto: Proyecto = {
   areas: [
     area('a-parejo', 'Repartido parejo · las descargas no calzan', parejo),
     area('a-centros', 'Modulado desde los centros de carga', acomodado),
+    area('a-orinales', 'Baños + orinales, todo desde los centros', mixtoAcomodado, CON_ORINALES),
   ],
 }
 

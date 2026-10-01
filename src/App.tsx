@@ -1213,6 +1213,9 @@ export default function App() {
       return
     }
     setBloqueo(null)
+    // El ancho de cada orinal no es una pieza de la tira sino un dato del área:
+    // se guarda acá para que una modulación posterior no se los vuelva a repartir.
+    if (r.anchosOrinal) setConfig({ anchosOrinalCm: r.anchosOrinal })
     const fijas = Array.from(new Set([...(t.pilastrasFijas ?? []), ...r.fijas]))
     setArea({
       tramos: area.tramos.map((x) =>
@@ -2200,16 +2203,19 @@ export default function App() {
                         <h4>Centros de carga · {t.nombre}</h4>
                         <p className="vacio">
                           A cuántos centímetros del arranque del área está el eje de cada descarga,
-                          como viene en el plano. Las descargas NO se mueven: el inodoro se dibuja
-                          ahí y son las piezas las que se acomodan, con el panel divisor justo en el
-                          medio de cada par.
+                          como viene en el plano. Las descargas NO se mueven: el sanitario se dibuja
+                          ahí y son las piezas las que se acomodan, con el panel —o la mampara del
+                          orinal— justo en el medio de cada par.
                         </p>
                         {t.cabinas.map((c, i) => {
-                          if (c.tipo === 'orinal' || esEspacioLibre(c)) return null
+                          if (esEspacioLibre(c)) return null
                           const clave = `${t.id}:${i}`
                           return (
                             <div className="fila" key={c.id}>
-                              <span>Cabina {i + 1}{c.tipo === 'accesible' ? ' · accesible' : ''}</span>
+                              <span>
+                                {c.tipo === 'orinal' ? 'Orinal' : 'Cabina'} {i + 1}
+                                {c.tipo === 'accesible' ? ' · accesible' : ''}
+                              </span>
                               <input
                                 className="editable"
                                 inputMode="decimal"
