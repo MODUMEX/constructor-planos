@@ -110,6 +110,15 @@ export function modularConCatalogo(
     pilastras?: (number | null | undefined)[]
   },
   extra?: {
+    /**
+     * CUÁL punta topa contra pared, no cuántas.
+     *
+     * De acá sale el grupo de cada pilastra de punta: contra muro puede ser
+     * chica, de esquina no baja de 24. Sin esto, con un solo muro se asumía
+     * que estaba a la izquierda y un Tipo L invertido sacaba la esquina de 19.
+     */
+    muroInicio?: boolean
+    muroFin?: boolean
     accesible?: boolean
     anchoAccesibleMinCm?: number
     mingitorios?: number
@@ -190,6 +199,9 @@ export function modularConCatalogo(
       },
       {
         ...extra,
+        // el cuarto se plantó al arranque: del lado del cuarto la tira ya no
+        // topa contra la pared sino contra su divisor
+        muroInicio: false,
         accesible: false,
         anchoAccesibleMinCm: undefined,
         cuartoPmrCm: 0,
@@ -244,6 +256,8 @@ export function modularConCatalogo(
     cierreMingitorioInicio: extra?.cierreMingitorioInicio,
     sinPilastraInicio: extra?.sinPilastraInicio,
     catalogoPuertas: anchosPuerta(extra?.pais ?? 'CR', extra?.modelo),
+    muroInicio: extra?.muroInicio,
+    muroFin: extra?.muroFin,
     anchoAccesibleCm: extra?.anchoAccesibleMinCm,
     murosPilastra,
     extremoAbierto,
@@ -441,6 +455,8 @@ export function reajustarConPuertas(
    * el cuarto del Tipo C sí, la cabina accesible de las "variación panel" no.
    */
   cuartoComeMuro = true,
+  /** cuál punta topa contra pared; decide el grupo de cada pilastra de punta */
+  muros: { inicio?: boolean; fin?: boolean } = {},
 ): { cabinas: Cabina[]; pilastras: number[]; canaletaCm: number; ajusteCm: number; ajuste: Tramo['ajuste']; mensaje: string } | null {
   const n = cabinas.length
   if (n === 0) return null
@@ -459,6 +475,8 @@ export function reajustarConPuertas(
       0, fijas ? fijas.slice(1) : undefined,
       pilastrasActuales ? pilastrasActuales.slice(1) : undefined,
       orinalesPedidos ? orinalesPedidos.slice(1) : undefined,
+      // el cuarto arranca la tira: de ese lado ya no hay pared, hay divisor
+      cuartoComeMuro, { inicio: false, fin: muros.fin },
     )
     if (!resto) return null
     return {
@@ -503,6 +521,8 @@ export function reajustarConPuertas(
       0, fijas ? fijas.slice(0, n) : undefined,
       pilastrasActuales ? pilastrasActuales.slice(0, n) : undefined,
       orinalesPedidos ? orinalesPedidos.slice(0, n - 1) : undefined,
+      // el cuarto cierra la tira: de ese lado el divisor hace de pared
+      cuartoComeMuro, { inicio: muros.inicio, fin: false },
     )
     if (!resto) return null
     return {
@@ -526,6 +546,8 @@ export function reajustarConPuertas(
   }
 
   const r = ajustarPilastras({
+    muroInicio: muros.inicio,
+    muroFin: muros.fin,
     claroCm,
     cuerpos: [...cuerpos, grosorMG],
     conPuerta,
@@ -1250,6 +1272,8 @@ export function crearTramos(tipologiaId: TipologiaId, claroCm: number, cantidad:
     // Si el cliente pidió una medida de puerta, esa manda: el buscador solo
     // puede mover las pilastras. Es la regla del negocio, no una preferencia.
     const conCatalogo = modularConCatalogo(claroTramo, soloOrinales ? cant : total, murosConPilastra, pedido.extremoAbierto, { puerta: config.puertaCm, puertaAccesible: config.puertaAccesibleCm }, {
+      muroInicio: t.muroInicio,
+      muroFin: t.muroFin,
       modelo: config.modelo,
       profundidadCm: config.profundidadCm,
       accesible: conAccesible && esPrincipal,

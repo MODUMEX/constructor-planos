@@ -15,6 +15,7 @@
  *   npm run probar-pilastra-24
  */
 import { crearTramos, anchoTotal } from '../src/modulacion'
+import { tramoDesdeCentros } from '../src/descargas'
 import { anchoDeOrinal } from '../src/geometria'
 import { PILASTRA_MINIMA_CM } from '../src/modulador'
 import type { Config, TipologiaId, Tramo } from '../src/types'
@@ -117,6 +118,34 @@ console.log('\n— lo que falta hasta 1 cm se resuelve con el herraje, y el plan
 
   const { t: exacto } = ver(330, 4, 0, 'calza justo')
   ok((exacto.ajusteCm ?? 0) === 0, 'y cuando calza justo no hay nada que anotar')
+}
+
+console.log('\n— el caso de Guillermo: 879 con 9 cabinas, por los DOS caminos')
+{
+  // La regla vale igual al repartir parejo que al modular desde las descargas,
+  // y el muro puede estar de cualquiera de los dos lados. Antes la modulación
+  // por centros tenía su propia lista y sacaba centrales de 10; y con un solo
+  // muro se asumía que estaba a la izquierda, así que un Tipo L invertido
+  // sacaba la esquina de 19.
+  const centros = [50, 150, 250, 350, 450, 550, 650, 750, 835]
+  for (const tip of ['RECTA_MURO_DER', 'RECTA_MURO_IZQ', 'ISLA', 'RECTA_ENTRE_MUROS'] as TipologiaId[]) {
+    const c = cfg(879, 9, 0, tip)
+    const base = crearTramos(tip, 879, 9, c, 'CR')[0]
+    for (const t of [base, (() => {
+      const con = { ...base, centrosCm: centros }
+      const r = tramoDesdeCentros(con, c)
+      return r ? { ...con, cabinas: r.cabinas, pilastras: r.pilastras } : con
+    })()]) {
+      const n = t.cabinas.length
+      const p = t.pilastras ?? []
+      const malas = p.filter((x, k) => {
+        if (k === 0) return !t.muroInicio && x < PILASTRA_MINIMA_CM
+        if (k === n) return !t.muroFin && x < PILASTRA_MINIMA_CM
+        return x < PILASTRA_MINIMA_CM
+      })
+      ok(malas.length === 0, `${tip}: ninguna pilastra que cargue panel baja de ${PILASTRA_MINIMA_CM} · ${p.join(" · ")}`)
+    }
+  }
 }
 
 console.log(mal === 0 ? '\nTodo cuadra.' : `\n${mal} caso(s) mal.`)

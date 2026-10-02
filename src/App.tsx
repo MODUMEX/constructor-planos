@@ -946,7 +946,7 @@ export default function App() {
     const p = pedidoDeModulacion(t, config, llevaAccesible)
     const r = reajustarConPuertas(
       cabinas, t.claroCm, p.murosPilastra, p.extremoAbierto,
-      p.cuartoCm, undefined, t.pilastras, orinalesPedidosDe(t), p.cuartoComeMuro,
+      p.cuartoCm, undefined, t.pilastras, orinalesPedidosDe(t), p.cuartoComeMuro, { inicio: t.muroInicio, fin: t.muroFin },
     )
     setArea({
       tramos: area.tramos.map((x) =>
@@ -1018,7 +1018,7 @@ export default function App() {
     )
     const r = reajustarConPuertas(
       cabinas, t.claroCm, p.murosPilastra, p.extremoAbierto,
-      p.cuartoCm, fijas, t.pilastras, orinalesPedidosDe(t), p.cuartoComeMuro,
+      p.cuartoCm, fijas, t.pilastras, orinalesPedidosDe(t), p.cuartoComeMuro, { inicio: t.muroInicio, fin: t.muroFin },
     )
     if (!r) return false
     setArea({
@@ -1058,7 +1058,7 @@ export default function App() {
       hayHueco
         ? Array.from({ length: cabinas.length + 1 }, (_, k) => t.pilastras?.[k] ?? null)
         : undefined,
-      t.pilastras, orinalesPedidosDe(t), p.cuartoComeMuro,
+      t.pilastras, orinalesPedidosDe(t), p.cuartoComeMuro, { inicio: t.muroInicio, fin: t.muroFin },
     )
     setArea({
       tramos: area.tramos.map((x) =>
@@ -1150,6 +1150,8 @@ export default function App() {
           config.puertaAccesibleCm ?? t.cabinas.find((c) => c.tipo === 'accesible')?.puerta.anchoCm,
       },
       {
+        muroInicio: t.muroInicio,
+        muroFin: t.muroFin,
         accesible: llevaAccesible,
         profundidadCm: config.profundidadCm,
         anchoAccesibleMinCm: anchoAccesibleDe(config),
@@ -1334,6 +1336,8 @@ export default function App() {
           config.puertaAccesibleCm ?? t.cabinas.find((c) => c.tipo === 'accesible')?.puerta.anchoCm,
       },
       {
+        muroInicio: t.muroInicio,
+        muroFin: t.muroFin,
         accesible: llevaAccesible,
         profundidadCm: config.profundidadCm,
         anchoAccesibleMinCm: anchoAccesibleDe(config),

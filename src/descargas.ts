@@ -20,7 +20,9 @@
 import type { Cabina, Config, Pais, Tramo } from './types'
 import { anchosPuerta, CANALETA_MAX_CM, claroAjustado } from './catalog'
 import { anchoTotal, esEspacioLibre, ladoDelCuarto, ladosDeCabina, lugaresDe } from './modulacion'
-import { PILASTRAS_EXTREMO, PILASTRAS_INTERNAS, type TipoAjuste } from './modulador'
+import {
+  PILASTRA_MINIMA_CM, PILASTRAS_INTERNAS, pilastrasDePunta, type TipoAjuste,
+} from './modulador'
 
 /**
  * Cuánto tiene que quedarle libre al inodoro a cada lado de su eje, en cm.
@@ -46,17 +48,17 @@ const PESO_PUERTA = 0.02
 const PESO_INTERNA = 0.01
 
 /**
- * Las internas que el buscador puede usar.
+ * Las internas que el buscador puede usar: las MISMAS que la modulación
+ * normal, de 24 para arriba.
  *
- * Igual que en la modulación normal se prueba primero con las que pide
- * producción —de 24 para arriba— y solo si con esas el inodoro queda corrido se
- * vuelve a buscar con las delgadas, avisando.
+ * Una pilastra de menos de 24 no carga panel, y acá cargan: son las que
+ * separan dos cabinas. Antes esto tenía su propia lista con una segunda pasada
+ * que bajaba a 19 o a 10 para calzar mejor la descarga, y por ahí se colaban
+ * centrales angostas aunque el buscador normal ya no las usara.
  */
-const INTERNAS = PILASTRAS_INTERNAS.filter((a) => a <= 50)
-const INTERNAS_ANCHAS = INTERNAS.filter((a) => a >= INTERNA_PREFERIDA)
-/** de cuántos centímetros para arriba vale la pena bajar a una pilastra delgada */
-const DESVIO_QUE_MOLESTA_CM = 2.5
-const AVISO_ANGOSTA = ' · Para calzar las descargas hicieron falta pilastras de menos de 24 cm'
+const INTERNAS = PILASTRAS_INTERNAS.filter(
+  (a) => a >= PILASTRA_MINIMA_CM && a <= 50,
+)
 
 /** los centros de un tramo, siempre con una entrada por cabina */
 export function centrosDe(tramo: Tramo): (number | null)[] {
@@ -288,12 +290,7 @@ export interface Centrado {
  * pieza no se arrastra: la siguiente lo corrige sola.
  */
 export function modularPorCentros(tramo: Tramo, config: Config, pais: Pais = 'CR'): Centrado | null {
-  const anchas = mejorDe(tramo, config, pais, INTERNAS_ANCHAS)
-  if (anchas && sirve(anchas)) return anchas
-  const libre = mejorDe(tramo, config, pais, INTERNAS)
-  if (!libre) return anchas
-  if (!sirve(libre)) return libre
-  return { ...libre, mensaje: libre.mensaje + AVISO_ANGOSTA }
+  return mejorDe(tramo, config, pais, INTERNAS)
 }
 
 /**
@@ -311,9 +308,13 @@ function mejorDe(tramo: Tramo, config: Config, pais: Pais, internas: number[]): 
 
   const k = corrida.banos.desde
   const actual = tramo.pilastras?.[k] ?? config.anchoPilastraCm
+  // contra pared puede ser chica; de esquina no baja de 24, igual que en el
+  // buscador normal. Y si arranca después de algo plantado, no es punta.
   const candidatos = (tramo.pilastrasFijas ?? []).includes(k)
     ? [actual]
-    : Array.from(new Set([actual, ...PILASTRAS_EXTREMO]))
+    : k === 0
+      ? Array.from(new Set([actual, ...pilastrasDePunta(tramo.muroInicio)]))
+      : [actual]
 
   let mejor: Centrado | null = null
   let costo = Infinity
@@ -327,12 +328,6 @@ function mejorDe(tramo: Tramo, config: Config, pais: Pais, internas: number[]): 
     }
   }
   return mejor
-}
-
-/** si con esas piezas el sanitario queda donde tiene que quedar y la tira cierra */
-function sirve(c: Centrado): boolean {
-  if (c.ajuste === 'falta' || c.ajuste === 'sobra') return false
-  return c.desvios.every((d) => Math.abs(d) <= DESVIO_QUE_MOLESTA_CM)
 }
 
 function buscar(tramo: Tramo, config: Config, pais: Pais, internas: number[], pilInicio: number): Centrado | null {
@@ -476,14 +471,14 @@ function buscar(tramo: Tramo, config: Config, pais: Pais, internas: number[], pi
 /**
  * Las medidas que puede tomar la pilastra con la que cierra la corrida.
  *
- * Contra un muro sale del grupo delgado, como en cualquier tira; contra el
- * panel de la cabina accesible se queda con la que ya tenía, porque esa pieza
- * la eligió el vendedor.
+ * Contra un muro puede ser chica y de esquina no baja de 24, como en cualquier
+ * tira; contra el panel de la cabina accesible se queda con la que ya tenía,
+ * porque esa pieza la eligió el vendedor.
  */
 function pilastraDeCierre(tramo: Tramo, config: Config, k: number): number[] {
   const actual = tramo.pilastras?.[k] ?? config.anchoPilastraCm
   if (k !== tramo.cabinas.length) return [actual]
-  return PILASTRAS_EXTREMO
+  return pilastrasDePunta(tramo.muroFin)
 }
 
 /** el ancho libre más chico que puede quedarle a un orinal */
