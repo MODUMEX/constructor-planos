@@ -5,10 +5,9 @@ export type Acabado =
   | 'Laminado Compacto'
   | 'Esmaltada Antigrafiti'
   | 'Acero Inoxidable'
-  // los dos de la lista de México: como el antigrafiti y el inoxidable, el
-  // acabado ES el color, no hay lista aparte que elegir
+  // de la lista de México: como el antigrafiti y el inoxidable, el acabado ES
+  // el color. El ARTE estaba acá y se eliminó el 2-oct-2026: ya no se fabrica.
   | 'Fórmica'
-  | 'Arte'
 
 /**
  * Acabado del juego de herrajes. Va en juego completo: negro es todo negro,
@@ -21,7 +20,7 @@ export type HerrajeAcabado = 'INOX' | 'NEGRO'
  * El tier del color, que es lo que decide con qué $/m² se cobra.
  *
  * Costa Rica usa `linea` y `especial`; México parte el laminado compacto en
- * Grupo 1 (`linea`) y Grupo 2, y además tiene Fórmica y Arte. `aceroInox` y
+ * Grupo 1 (`linea`) y Grupo 2, y además tiene Fórmica. `aceroInox` y
  * `antigrafiti` son de la línea Superior 2.0 en los dos países.
  */
 export type TierColor =
@@ -29,7 +28,6 @@ export type TierColor =
   | 'grupo2'
   | 'especial'
   | 'formica'
-  | 'arte'
   | 'antigrafiti'
   | 'aceroInox'
 

@@ -869,7 +869,7 @@ export default function App() {
    */
   function colorInicial(linea: Config['linea'], acabado: Config['acabado']) {
     // En México la esmaltada y la fórmica SÍ tienen lista de colores, aunque el
-    // precio lo siga mandando el acabado. El acero y el Arte no.
+    // precio lo siga mandando el acabado. El acero no.
     if (proyecto.paisFabricacion === 'MX' && eligeColorMx(acabado)) {
       const primero = coloresMxAgrupados(linea, puedeColoresReservados(usuario), acabado)[0]
       if (primero) return { color: primero.nombre, colorCodigo: primero.codigoBase }
@@ -2458,11 +2458,15 @@ export default function App() {
                       <button key={a} className={`card ${config.acabado === a ? 'sel' : ''}`} onClick={() => cambiarAcabado(a)} type="button">
                         <b>{a}</b>
                         <small>
-                          {a === 'Acero Inoxidable' || a === 'Esmaltada Antigrafiti'
-                            ? 'Solo Superior 2.0, con su propio color'
-                            : proyecto.paisFabricacion === 'MX'
-                              ? `Los colores de línea de la planta, en ${espesorPorLinea(config.linea)} mm`
-                              : 'Los ocho colores de línea, en stock'}
+                          {a === 'Acero Inoxidable'
+                            ? 'Solo Superior 2.0: el acabado es su propio color'
+                            : a === 'Esmaltada Antigrafiti'
+                              ? 'Solo Superior 2.0, pintada: Blanco, Gris Claro o Beige'
+                              : a === 'Fórmica'
+                                ? 'Solo Superior 2.0: White o Folkstone'
+                                : proyecto.paisFabricacion === 'MX'
+                                    ? `Los colores de carta de la planta, en ${espesorPorLinea(config.linea)} mm`
+                                    : 'Los ocho colores de línea, en stock'}
                         </small>
                       </button>
                     ))}
@@ -3037,7 +3041,7 @@ export default function App() {
                                         proyecto.paisFabricacion === 'MX' && moneda !== 'MXN'
                                           ? 'Se fabrica en México pero se cotiza en otra moneda: los grupos de color de México solo tienen tarifa en pesos, así que este precio sale de la lista en ' +
                                             (moneda === 'CRC' ? 'colones' : 'dólares') +
-                                            ', donde Grupo 2, Especiales, Fórmica y Arte cuestan lo mismo.'
+                                            ', donde Grupo 2, Especiales y Fórmica cuestan lo mismo.'
                                           : 'Este precio no sale de tarifa_m2: es estimado'
                                       }
                                     >

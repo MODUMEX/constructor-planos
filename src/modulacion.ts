@@ -1383,7 +1383,7 @@ export function bom(
   /**
    * Un proyecto de la planta de MEXICO vendido en otra moneda no tiene tarifa
    * exacta: sus colores salen del catalogo mexicano, con Grupo 1, Grupo 2,
-   * Formica y Arte, y la lista en dolares o colones solo tiene linea y
+   * Formica, y la lista en dolares o colones solo tiene linea y
    * especiales. El precio sale igual —los cuatro caen en especiales— pero se
    * marca como estimado para que se vea en la cotizacion en vez de pasar
    * callado.

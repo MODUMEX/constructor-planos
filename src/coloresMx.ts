@@ -211,24 +211,24 @@ const FORMICA_MX = ['White', 'Folkstone']
 /**
  * Si ese acabado tiene lista de colores en México.
  *
- * El acero inoxidable y el Arte son su propio color: ahí no hay nada que
- * elegir. La esmaltada antigrafiti y la fórmica SÍ tienen lista —tres y dos
- * colores— aunque el acabado mande sobre el precio.
+ * El acero inoxidable es su propio color: ahí no hay nada que elegir. La
+ * esmaltada antigrafiti y la fórmica SÍ tienen lista —tres y dos colores—
+ * aunque el acabado mande sobre el precio.
  */
 export function eligeColorMx(acabado: Acabado): boolean {
-  return acabado !== 'Acero Inoxidable' && acabado !== 'Arte'
+  return acabado !== 'Acero Inoxidable'
 }
 
 /**
  * Los colores que se ofrecen, por línea y acabado, en el orden de la carta.
  *
- * En acero inoxidable y en Arte el acabado ES el color, así que no hay lista
+ * En acero inoxidable el acabado ES el color, así que no hay lista
  * que elegir.
  */
 export function ofrecidosMx(linea: Linea, acabado: Acabado): string[] {
   if (acabado === 'Esmaltada Antigrafiti') return ESMALTADA_MX
   if (acabado === 'Fórmica') return FORMICA_MX
-  if (acabado === 'Acero Inoxidable' || acabado === 'Arte') return []
+  if (acabado === 'Acero Inoxidable') return []
   return linea === 'SUPERIOR' ? LAMINADO_SUPERIOR_MX : LAMINADO_LEEDER_MX
 }
 

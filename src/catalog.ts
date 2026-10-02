@@ -204,27 +204,17 @@ export const ACABADOS: Record<Linea, Acabado[]> = {
 }
 
 /**
- * Los modelos que tienen precio de ARTE en la lista de México. Colgante y toda
- * la línea Superior 2.0 no lo traen, así que ahí no se ofrece: ofrecerlo sin
- * tarifa haría que el precio cayera en otro tier sin que se note.
- */
-const CON_ARTE = [
-  'ESTANDAR', 'ESTANDAR170', 'REFORZADO', 'REFORZADO170',
-  'IMPERIAL', 'KIDS', 'SCUDO', 'TL_S3',
-]
-
-/**
- * Los acabados que se pueden pedir de verdad, que dependen del país.
+ * Los acabados que se pueden pedir de verdad: dependen del país y de la línea.
  *
- * Fórmica y Arte son de la lista de México: en Costa Rica no existen y no se
- * ofrecen. El Arte además no lo tienen todos los modelos.
+ * La Fórmica es de la lista de México —en Costa Rica no existe— y es de
+ * **Superior 2.0**: LEEDER y Touchless no la llevan. El ARTE se eliminó el
+ * 2-oct-2026; su columna sigue en la lista de precios porque borrarla correría
+ * todas las demás, pero como acabado ya no se ofrece.
  */
-export function acabadosPara(linea: Linea, modelo: string, pais: Pais = 'CR'): Acabado[] {
+export function acabadosPara(linea: Linea, _modelo: string, pais: Pais = 'CR'): Acabado[] {
   const base = ACABADOS[linea]
-  if (pais !== 'MX') return base
-  const extra: Acabado[] = ['Fórmica']
-  if (CON_ARTE.includes((modelo || '').toUpperCase())) extra.push('Arte')
-  return [...base, ...extra]
+  if (pais !== 'MX' || linea !== 'SUPERIOR') return base
+  return [...base, 'Fórmica']
 }
 
 export interface Color {
@@ -299,7 +289,6 @@ export function acabadoEsElColor(acabado: Acabado): boolean {
   return acabado === 'Esmaltada Antigrafiti'
     || acabado === 'Acero Inoxidable'
     || acabado === 'Fórmica'
-    || acabado === 'Arte'
 }
 
 export function etiquetaTier(tier: TierColor): string {
@@ -308,7 +297,6 @@ export function etiquetaTier(tier: TierColor): string {
     grupo2: 'Grupo 2',
     especial: 'Especial',
     formica: 'Fórmica',
-    arte: 'Arte',
     aceroInox: 'Acero Inox',
     antigrafiti: 'Antigrafiti',
   }[tier]
@@ -353,12 +341,10 @@ export function tierDeColor(
   if (acabado === 'Esmaltada Antigrafiti') return 'antigrafiti'
   if (acabado === 'Acero Inoxidable') return 'aceroInox'
   if (acabado === 'Fórmica') return 'formica'
-  if (acabado === 'Arte') return 'arte'
-  // en Fórmica y Arte el acabado ES el color, así que el nombre del color es el
+  // en Fórmica el acabado ES el color, así que el nombre del color es el
   // del acabado y de ahí sale el tier
   const limpio = (nombre || '').trim().toUpperCase()
   if (limpio === 'FÓRMICA' || limpio === 'FORMICA') return 'formica'
-  if (limpio === 'ARTE') return 'arte'
   // México parte el laminado compacto en dos grupos de precio, y cuál le toca a
   // cada color depende también de la línea. Se mira ANTES que el catálogo de
   // Costa Rica porque hay nombres que están en los dos y no valen lo mismo.

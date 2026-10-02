@@ -97,7 +97,7 @@ console.log('\n4 · cada acabado tiene su lista y su tier')
     form.every((c) => tierDeColor(c.nombre, 'MX', 'SUPERIOR', 'Fórmica') === 'formica'))
 
   revisar('el acero inoxidable no tiene lista', !eligeColorMx('Acero Inoxidable'))
-  revisar('y el Arte tampoco', !eligeColorMx('Arte'))
+
   revisar('la esmaltada sí', eligeColorMx('Esmaltada Antigrafiti'))
 }
 console.log('\n5 · el nombre de la carta no cambia el precio ni la foto')

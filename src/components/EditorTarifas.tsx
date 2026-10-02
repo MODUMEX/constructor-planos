@@ -26,7 +26,9 @@ const NOMBRE_TIER: Record<string, string> = {
   especialesMenor: 'Especiales · menos de 10',
   formica: 'Fórmica · 10 o más',
   formicaMenor: 'Fórmica · menos de 10',
-  arte: 'Arte',
+  // el Arte ya no se fabrica, pero su columna sigue en la lista de precios:
+  // borrarla correría todas las demás
+  arte: 'Arte (no se fabrica)',
 }
 
 /** el nombre del modelo, buscándolo en las tres líneas */
