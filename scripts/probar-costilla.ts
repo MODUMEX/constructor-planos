@@ -54,9 +54,9 @@ console.log('\n1 · la costilla se puede cargar en la cotización')
   revisar('cada una con su cantidad', renglones[0]?.cantidad === 2 && renglones[1]?.cantidad === 1)
 }
 
-console.log('\n2 · el aviso salta pasados los 55 cm, y solo en las de PUNTA')
+console.log('\n2 · el aviso salta DESDE los 50 cm, y solo en las de PUNTA')
 {
-  revisar('el tope son 55 cm', PIEZA_PIDE_COSTILLA_CM === 55)
+  revisar('el tope son 50 cm', PIEZA_PIDE_COSTILLA_CM === 50)
   revisar('y la costilla mide 19 como mínimo', COSTILLA_MINIMA_CM === 19)
 
   // El buscador no llega solo a una pieza tan grande, pero el vendedor sí:
@@ -75,13 +75,16 @@ console.log('\n2 · el aviso salta pasados los 55 cm, y solo en las de PUNTA')
     avisos.join(' | '))
 }
 
-console.log('\n2b · una pilastra de punta chica no pide nada')
+console.log('\n2b · el límite justo: 50 pide, 45 no')
 {
   const config = cfg('RECTA_ENTRE_MUROS', { puertaCm: 60 })
   const base = crearTramos('RECTA_ENTRE_MUROS', 420, 4, config, 'CR')[0]
-  const t: Tramo = { ...base, pilastras: [55, 30, 30, 30, 24] }
-  revisar('55 justo no avisa: la regla es MÁS de 55', piezasQuePidenCostilla(t, config).length === 0,
+  const t: Tramo = { ...base, pilastras: [50, 30, 30, 30, 24] }
+  revisar('50 justo SÍ avisa: la regla es DESDE 50', piezasQuePidenCostilla(t, config).length === 1,
     piezasQuePidenCostilla(t, config).join(' · '))
+  const chica: Tramo = { ...base, pilastras: [45, 30, 30, 30, 24] }
+  revisar('y una de 45 no', piezasQuePidenCostilla(chica, config).length === 0,
+    piezasQuePidenCostilla(chica, config).join(' · '))
 }
 
 console.log('\n3 · una tira normal no avisa de nada')
@@ -91,7 +94,7 @@ console.log('\n3 · una tira normal no avisa de nada')
   console.log(`    pilastras: ${(t.pilastras ?? []).join(" | ")}`)
   revisar('sin piezas grandes no hay aviso', piezasQuePidenCostilla(t, config).length === 0,
     piezasQuePidenCostilla(t, config).join(' · '))
-  revisar('y el panel de la cabina, que es más hondo que 55, NO cuenta',
+  revisar('y el panel de la cabina, que es más hondo que el tope, NO cuenta',
     config.profundidadCm > PIEZA_PIDE_COSTILLA_CM && piezasQuePidenCostilla(t, config).length === 0,
     `panel de ${config.profundidadCm}`)
 }

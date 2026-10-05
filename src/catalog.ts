@@ -552,13 +552,15 @@ export function medidaQueCabe(opciones: number[], max: number): number | null {
  * decide el cliente, así que la app no lo pone solo: avisa que hace falta.
  *
  * Antes estaba en 100 cm, que era lo que se había entendido. La lámina de
- * capacitación lo deja en 55 y el dibujo lo confirma: una pilastra de 100 en
- * el cubículo de movilidad limitada lleva su costilla de 19.
+ * capacitación habla de "más de 55", pero Dayanna lo bajó a DESDE 50 el
+ * 5-oct-2026: la de 50 del cubículo de movilidad limitada ya lleva su costilla,
+ * que es el caso que ella misma había explicado —"una costilla de 10 para una
+ * pl de 50"—. O sea que la medida se compara con >=, no con >.
  *
  * Se mira la pieza del FRENTE —lo que cierra la cabina hacia el pasillo— y no
  * el panel divisor de una cabina normal, que va agarrado de sus dos pilastras.
  */
-export const PIEZA_PIDE_COSTILLA_CM = 55
+export const PIEZA_PIDE_COSTILLA_CM = 50
 
 /** lo que mide como mínimo una costilla */
 export const COSTILLA_MINIMA_CM = 19

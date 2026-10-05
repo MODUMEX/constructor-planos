@@ -342,24 +342,30 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
       const k = s.frontera
       const alFinal = k > 0
       const cortes = [0, ...acum.slice(1), largo]
-      const centroPil = centroPilastra(tramo, cortes, k, s.pilastraCm, cuarto)
+      // La lateral del frente del cuarto accesible vive en la linea de frente
+      // del CUARTO, que es mas honda, y su cara libre es el borde contra el muro.
+      const piezaMr = s.enFrenteMr ? cuarto?.frente.find((x) => x.tipo === 'pilastra') : undefined
+      const profS = piezaMr && cuarto ? cuarto.profCm : prof
+      const centroPil = piezaMr
+        ? (piezaMr.desdeCm + piezaMr.hastaCm) / 2
+        : centroPilastra(tramo, cortes, k, s.pilastraCm, cuarto)
       const cara = centroPil + (alFinal ? 1 : -1) * (s.pilastraCm / 2)
 
       if (s.tipo === 'refuerzo') {
         doc.setDrawColor(90, 90, 90)
         doc.setLineWidth(0.4)
-        const [ax, ay] = aHoja(e, pt(m, cara, prof - grueso))
-        const [bx, by] = aHoja(e, pt(m, cara + (alFinal ? 1 : -1) * 22, prof - 24))
+        const [ax, ay] = aHoja(e, pt(m, cara, profS - grueso))
+        const [bx, by] = aHoja(e, pt(m, cara + (alFinal ? 1 : -1) * 22, profS - 24))
         doc.line(ax, ay, bx, by)
-        const [tx, ty] = aHoja(e, pt(m, cara + (alFinal ? 1 : -1) * 13, prof - 16))
+        const [tx, ty] = aHoja(e, pt(m, cara + (alFinal ? 1 : -1) * 13, profS - 16))
         texto(doc, 'REF', tx, ty, { size: 5, align: 'center', color: GRIS })
         continue
       }
 
       const largoPieza = anchoDeSoporte(s.tipo)
       doc.setFillColor(TINTA, TINTA, TINTA)
-      const [ax, ay] = aHoja(e, pt(m, cara, prof - largoPieza))
-      const [bx, by] = aHoja(e, pt(m, cara + (alFinal ? -1 : 1) * grueso, prof))
+      const [ax, ay] = aHoja(e, pt(m, cara, profS - largoPieza))
+      const [bx, by] = aHoja(e, pt(m, cara + (alFinal ? -1 : 1) * grueso, profS))
       doc.rect(
         Math.min(ax, bx), Math.min(ay, by),
         Math.max(Math.abs(bx - ax), 0.5), Math.max(Math.abs(by - ay), 0.5), 'F',
@@ -368,11 +374,11 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
         // el herraje en T que amarra las dos pilastras
         doc.setDrawColor(MARCA[0], MARCA[1], MARCA[2])
         doc.setLineWidth(0.45)
-        const [t1x, t1y] = aHoja(e, pt(m, cara - grueso, prof - largoPieza))
-        const [t2x, t2y] = aHoja(e, pt(m, cara + grueso, prof - largoPieza))
+        const [t1x, t1y] = aHoja(e, pt(m, cara - grueso, profS - largoPieza))
+        const [t2x, t2y] = aHoja(e, pt(m, cara + grueso, profS - largoPieza))
         doc.line(t1x, t1y, t2x, t2y)
       }
-      const [rx, ry] = aHoja(e, pt(m, cara + (alFinal ? -1 : 1) * 9, prof - largoPieza - 3))
+      const [rx, ry] = aHoja(e, pt(m, cara + (alFinal ? -1 : 1) * 9, profS - largoPieza - 3))
       texto(doc, s.tipo === 'costilla' ? `CO ${largoPieza}` : `SW ${largoPieza}`, rx, ry, {
         size: 5, align: 'center', color: GRIS,
       })

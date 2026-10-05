@@ -12,7 +12,7 @@ import {
 } from '../geometria'
 import { ALTO_ORINAL_CM, ALTO_REGADERA_CM, ALTO_WC_CM, ORINAL, REGADERA, WC } from '../assets/sanitarios'
 import { descargasDe, escalaDeTramo, hayCentros } from '../descargas'
-import { anchoDeSoporte, soporteDe, soportesDe } from '../modulacion'
+import { anchoDeSoporte, compensarPilastra, soporteDe, soportesDe } from '../modulacion'
 
 /**
  * La zona invisible para agarrar una pilastra, EN PÍXELES DE PANTALLA.
@@ -254,6 +254,15 @@ export default function EditorPlano({
   }
 
   /**
+   * Si el último apretón sobre una pilastra la movió de verdad.
+   *
+   * Con clic izquierdo se arrastra, pero un clic SIN mover tiene que abrir el
+   * menú de medidas, igual que en las pilastras del frente de la accesible. Sin
+   * esta bandera el menú se abría también al soltar un arrastre.
+   */
+  const arrastroPil = useRef(false)
+
+  /**
    * Arrastre de la pilastra del divisor del cuarto PMR.
    *
    * Va a lo HONDO, no a lo largo de la tira, así que el desplazamiento se mide
@@ -313,6 +322,7 @@ export default function EditorPlano({
       ancho0,
       extremo,
     }
+    arrastroPil.current = false
     setArrastrando(`pil:${tramo.id}:${indice}`)
     try {
       (e.target as Element).setPointerCapture(e.pointerId)
@@ -367,6 +377,7 @@ export default function EditorPlano({
       // entran los PANELES: son el relleno de frente cuando el claro se pasa.
       // Como abajo de 120 las pilastras están mucho más juntas, arrastrar de a
       // poco sigue cayendo en pilastra; solo estirando de verdad llega a panel.
+      if (Math.abs(deseado - p.ancho0) > 0.5) arrastroPil.current = true
       const opciones = [
         ...anchosPilastra(config.modelo).filter(
           (a) => p.extremo || PILASTRAS_INTERNAS.includes(a) || esEspecial('PL', a, config.modelo),
@@ -987,6 +998,11 @@ export default function EditorPlano({
                             width={Math.max(Math.abs(g1.x - g0.x), 8)} height={Math.max(Math.abs(g1.y - g0.y), 8)}
                             fill="transparent" pointerEvents="auto" style={{ cursor }}
                             onPointerDown={(e) => empezarArrastrePilastra(e, tramo, k, m, ancho, extremo)}
+                            onClick={(e) => {
+                              if (arrastroPil.current) return
+                              e.preventDefault(); e.stopPropagation()
+                              setMenu({ tipo: 'pilastra', tramoId: tramo.id, indice: k, x: e.clientX, y: e.clientY })
+                            }}
                             onPointerEnter={() => setSobre(clave)}
                             onPointerLeave={() => setSobre((x) => (x === clave ? null : x))}
                             onContextMenu={(e) => {
@@ -994,7 +1010,7 @@ export default function EditorPlano({
                               setMenu({ tipo: 'pilastra', tramoId: tramo.id, indice: k, x: e.clientX, y: e.clientY })
                             }}
                           >
-                            <title>{`Pilastra ${ancho} cm — arrastrala, o clic derecho para elegir la medida`}</title>
+                            <title>{`Pilastra ${ancho} cm — arrastrala, o tocala para elegir la medida`}</title>
                           </rect>
                           {verCotas && (
                             <text
@@ -1026,7 +1042,14 @@ export default function EditorPlano({
                 const k = s.frontera
                 const alFinal = k > 0
                 const cortes = [0, ...acum.slice(1), largo]
-                const centro = centroPilastra(tramo, cortes, k, s.pilastraCm, cuarto)
+                // La lateral del frente del cuarto accesible no está en la línea
+                // de frente de la tira sino en la del cuarto, que es más honda, y
+                // su cara libre es el borde de la pieza contra el muro.
+                const piezaMr = s.enFrenteMr ? cuarto?.frente.find((x) => x.tipo === 'pilastra') : undefined
+                const profS = piezaMr && cuarto ? cuarto.profCm : prof
+                const centro = piezaMr
+                  ? (piezaMr.desdeCm + piezaMr.hastaCm) / 2
+                  : centroPilastra(tramo, cortes, k, s.pilastraCm, cuarto)
                 // la cara LIBRE de la pilastra: la que da al muro o a la esquina
                 const cara = centro + (alFinal ? 1 : -1) * (s.pilastraCm / 2)
                 const largoPieza = anchoDeSoporte(s.tipo)
@@ -1039,9 +1062,9 @@ export default function EditorPlano({
 
                 // el refuerzo no es una pieza sino una diagonal de la pilastra al muro
                 if (s.tipo === 'refuerzo') {
-                  const a = pt(m, cara, prof - grueso)
-                  const b = pt(m, cara + (alFinal ? 1 : -1) * 22, prof - 24)
-                  const medio = pt(m, cara + (alFinal ? 1 : -1) * 13, prof - 15)
+                  const a = pt(m, cara, profS - grueso)
+                  const b = pt(m, cara + (alFinal ? 1 : -1) * 22, profS - 24)
+                  const medio = pt(m, cara + (alFinal ? 1 : -1) * 13, profS - 15)
                   return (
                     <g key={clave} style={{ cursor: 'pointer' }} onClick={abrir} onContextMenu={abrir}
                       onPointerEnter={() => setSobre(clave)}
@@ -1059,9 +1082,9 @@ export default function EditorPlano({
 
                 // la costilla y el sándwich SÍ son pieza: van de canto, metidas
                 // hacia adentro de la cabina desde la cara de la pilastra
-                const a = pt(m, cara, prof - largoPieza)
-                const b = pt(m, cara + (alFinal ? -1 : 1) * grueso, prof)
-                const rotulo = pt(m, cara + (alFinal ? -1 : 1) * 9, prof - largoPieza - 5)
+                const a = pt(m, cara, profS - largoPieza)
+                const b = pt(m, cara + (alFinal ? -1 : 1) * grueso, profS)
+                const rotulo = pt(m, cara + (alFinal ? -1 : 1) * 9, profS - largoPieza - 5)
                 return (
                   <g key={clave} style={{ cursor: 'pointer' }} onClick={abrir} onContextMenu={abrir}
                     onPointerEnter={() => setSobre(clave)}
@@ -1655,6 +1678,24 @@ export default function EditorPlano({
         const cuarto = tramos.map((t) => cuartoPmr(t, config)).find((c) => c?.entrada === 'frente')
         const pieza = cuarto?.frente.find((p) => p.tipo === (menu.cual === 'lateral' ? 'pilastra' : 'cierre'))
         const actual = pieza ? Math.round((pieza.hastaCm - pieza.desdeCm) * 10) / 10 : (pedida ?? 0)
+        /**
+         * Lo máximo que puede medir esta pilastra.
+         *
+         * El frente de la cabina es pilastra + puerta + cierre y lo que sobra
+         * es la pieza del frente, así que el tope es lo que queda después de
+         * la puerta y de la otra pilastra. Si la de cierre todavía no se
+         * eligió sale igual que la lateral, o sea que mover una mueve las dos
+         * y el tope se parte a la mitad.
+         */
+        const anchoDe = (tipo: 'pilastra' | 'cierre' | 'puerta') => {
+          const p = cuarto?.frente.find((x) => x.tipo === tipo)
+          return p ? p.hastaCm - p.desdeCm : 0
+        }
+        const vanAJuntas = menu.cual === 'lateral' && config.pilastraCierreMrCm == null
+        const libre = (cuarto?.anchoCm ?? 0) - anchoDe('puerta')
+        const tope = vanAJuntas
+          ? libre / 2
+          : libre - anchoDe(menu.cual === 'lateral' ? 'cierre' : 'pilastra')
         const medidas = anchosPilastra(config.modelo).filter((a) => a <= 60)
         return (
           <Menu
@@ -1669,6 +1710,10 @@ export default function EditorPlano({
                 <button
                   key={a}
                   className={pedida === a ? 'on' : ''}
+                  disabled={a > tope + 0.05 && a !== actual}
+                  title={a > tope + 0.05 && a !== actual
+                    ? `${a} cm no entra: en el frente quedan ${Math.round(tope * 10) / 10} cm`
+                    : `Pilastra de ${a} cm`}
                   onClick={() => { onLateralMr(menu.cual, a); cerrar() }}
                   type="button"
                 >
@@ -1707,12 +1752,31 @@ export default function EditorPlano({
              esEspecial('PL', m.anchoCm, config.modelo) || m.anchoCm === actual),
         )
         const paneles = medidas.filter((m) => m.familia === 'PN')
+        /**
+         * Qué medidas entran en el claro.
+         *
+         * Es la MISMA cuenta que hace el arrastre: la vecina absorbe la
+         * diferencia. Si no puede —no le quedan centímetros de catálogo que
+         * dar— esa medida no se ofrece. Antes salían todas y elegir una que no
+         * cabía remodulaba la tira entera, moviendo cosas que nadie tocó.
+         *
+         * En las tiras con orinal o espacio libre la diferencia se la lleva el
+         * hueco y no la vecina, así que ahí no se filtra nada.
+         */
+        const seCompensa = !t.cabinas.some((c) => c.tipo === 'orinal' || esEspacioLibre(c))
+        const fijasSinEsta = (t.pilastrasFijas ?? []).filter((x) => x !== k)
+        const cabe = (ancho: number) =>
+          ancho === actual || !seCompensa ||
+          compensarPilastra(t, config, k, ancho, fijasSinEsta) !== null
         const donde = k === 0 ? 'de arranque' : k === n ? 'de cierre' : `entre ${k} y ${k + 1}`
         const boton = (m: { anchoCm: number; familia: 'PL' | 'PN' }) => (
           <button
             key={m.familia + m.anchoCm}
             className={actual === m.anchoCm ? 'on' : ''}
-            title={m.familia === 'PN' ? `Panel de relleno de ${m.anchoCm} cm` : `Pilastra de ${m.anchoCm} cm`}
+            disabled={!cabe(m.anchoCm)}
+            title={!cabe(m.anchoCm)
+              ? `${m.anchoCm} cm no entra: la cabina de al lado no tiene de dónde dar la diferencia`
+              : m.familia === 'PN' ? `Panel de relleno de ${m.anchoCm} cm` : `Pilastra de ${m.anchoCm} cm`}
             onClick={() => { onPilastra(menu.tramoId, k, m.anchoCm); cerrar() }}
             type="button"
           >

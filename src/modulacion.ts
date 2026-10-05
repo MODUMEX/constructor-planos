@@ -864,9 +864,33 @@ function anchosConPilastras(tramo: Tramo, pilastras: number[]): Cabina[] {
 export function soporteDe(tramo: Tramo, config: Config, k: number): Soporte | null {
   const n = tramo.cabinas.length
   if (k !== 0 && k !== n) return null
-  const ancho = tramo.pilastras?.[k] ?? config.anchoPilastraCm
-  if (!ancho || ancho <= PIEZA_PIDE_COSTILLA_CM) return null
+  const { anchoCm } = pilastraDePunta(tramo, config, k)
+  if (!anchoCm || anchoCm < PIEZA_PIDE_COSTILLA_CM) return null
   return tramo.soportes?.[k] ?? 'costilla'
+}
+
+/**
+ * La pilastra que de verdad va en esa punta, y si vive en el frente del cuarto
+ * accesible.
+ *
+ * En las "variación panel" la punta donde está plantado el cuarto NO tiene
+ * pilastra de tira —vale 0, porque ahí la tira todavía no empezó—: la que topa
+ * contra el muro es la pilastra LATERAL del frente del cuarto, que se guarda
+ * aparte. Sin esto, una lateral de 50 o de 70 nunca pedía soporte, que es lo
+ * que reportó Dayanna el 5-oct-2026.
+ */
+export function pilastraDePunta(
+  tramo: Tramo,
+  config: Config,
+  k: number,
+): { anchoCm: number; enFrenteMr: boolean } {
+  const n = tramo.cabinas.length
+  const i = tramo.cabinas.findIndex((c) => c.tipo === 'accesible')
+  const plantadoAcá = i >= 0 && ((k === 0 && i === 0) || (k === n && i === n - 1))
+  if (esVariacionPanel(config.tipologia) && plantadoAcá) {
+    return { anchoCm: frenteAccesible(tramo.cabinas[i], config).pilastra, enFrenteMr: true }
+  }
+  return { anchoCm: tramo.pilastras?.[k] ?? config.anchoPilastraCm, enFrenteMr: false }
 }
 
 /** de cuánto es la pieza de ese soporte; el refuerzo no lleva pieza */
@@ -884,6 +908,8 @@ export interface SoporteDePunta {
   anchoCm: number
   /** la pilastra a la que da soporte */
   pilastraCm: number
+  /** si esa pilastra es la lateral del frente del cuarto accesible */
+  enFrenteMr: boolean
 }
 
 /** todos los soportes de un tramo, para dibujarlos y para el despiece */
@@ -892,11 +918,13 @@ export function soportesDe(tramo: Tramo, config: Config): SoporteDePunta[] {
   for (const k of [0, tramo.cabinas.length]) {
     const tipo = soporteDe(tramo, config, k)
     if (!tipo) continue
+    const { anchoCm, enFrenteMr } = pilastraDePunta(tramo, config, k)
     salida.push({
       frontera: k,
       tipo,
       anchoCm: anchoDeSoporte(tipo),
-      pilastraCm: tramo.pilastras?.[k] ?? config.anchoPilastraCm,
+      pilastraCm: anchoCm,
+      enFrenteMr,
     })
   }
   return salida
@@ -915,14 +943,17 @@ export function piezasQuePidenCostilla(tramo: Tramo, config: Config): string[] {
   const n = tramo.cabinas.length
 
   // Las pilastras de PUNTA: son las de esquina y las que apoyan contra muro, y
-  // son las que la regla manda reforzar pasados los 55 cm. Las centrales no:
+  // son las que la regla manda reforzar desde los 50 cm. Las centrales no:
   // esas trabajan agarradas de los paneles de las dos cabinas.
-  ;(tramo.pilastras ?? []).forEach((ancho, k) => {
-    if (!ancho || ancho <= PIEZA_PIDE_COSTILLA_CM) return
+  ;(tramo.pilastras ?? []).forEach((_a, k) => {
     if (k !== 0 && k !== n) return
+    const { anchoCm: ancho, enFrenteMr } = pilastraDePunta(tramo, config, k)
+    if (!ancho || ancho < PIEZA_PIDE_COSTILLA_CM) return
     const familia = familiaDelFrente(ancho, config.modelo)
     const contraMuro = k === 0 ? tramo.muroInicio : tramo.muroFin
-    const donde = `${k === 0 ? 'de arranque' : 'de cierre'}${contraMuro ? ' (a muro)' : ' (de esquina)'}`
+    const donde = enFrenteMr
+      ? 'lateral del frente de la accesible'
+      : `${k === 0 ? 'de arranque' : 'de cierre'}${contraMuro ? ' (a muro)' : ' (de esquina)'}`
     avisos.push(`${familia === 'PN' ? 'El panel' : 'La pilastra'} ${donde}, de ${ancho} cm`)
   })
 
@@ -931,7 +962,7 @@ export function piezasQuePidenCostilla(tramo: Tramo, config: Config): string[] {
     const acc = tramo.cabinas.find((c) => c.tipo === 'accesible')
     if (acc) {
       const f = frenteAccesible(acc, config)
-      if (f.frente > PIEZA_PIDE_COSTILLA_CM) {
+      if (f.frente >= PIEZA_PIDE_COSTILLA_CM) {
         const familia = familiaDelFrente(f.frente, config.modelo)
         avisos.push(`${familia === 'PN' ? 'El panel' : 'La pilastra'} del frente de la accesible, de ${f.frente} cm`)
       }
