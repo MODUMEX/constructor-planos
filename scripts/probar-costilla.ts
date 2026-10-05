@@ -17,7 +17,7 @@
  */
 import { COSTILLA_MINIMA_CM, PIEZA_PIDE_COSTILLA_CM } from '../src/catalog'
 import { esPorM2, etiquetaExtra, FAMILIAS_EXTRA, renglonesDeExtras } from '../src/extras'
-import { anchoDeSoporte, crearTramos, piezasQuePidenCostilla, soporteDe } from '../src/modulacion'
+import { anchoDeSoporte, haySandwich, crearTramos, piezasQuePidenCostilla, soporteDe } from '../src/modulacion'
 import { piezasDeArea } from '../src/exportar/piezas'
 import type { Area, Config, Extra, TipologiaId, Tramo } from '../src/types'
 
@@ -146,9 +146,17 @@ console.log('\n5 · los tres refuerzos: costilla, refuerzo y sándwich')
     pls(t).join(' · '))
   revisar('el refuerzo no agrega pieza', pls(conRef).filter((a) => a === 19).length === 1,
     pls(conRef).join(' · '))
+  // El sándwich es panel + pilastra, así que SOLO existe en el Tipo C: en una
+  // tira normal, elegirlo cae de vuelta en la costilla.
   const conSw: Tramo = { ...t, soportes: ['sandwich', null, null, null] }
-  revisar('el sándwich agrega una pilastra de 24', pls(conSw).filter((a) => a === 24).length === 3,
-    pls(conSw).join(' · '))
+  revisar('fuera del Tipo C el sándwich no existe y cae en costilla',
+    soporteDe(conSw, c, 0) === 'costilla', String(soporteDe(conSw, c, 0)))
+  revisar('y el despiece no trae la segunda pilastra de 24',
+    pls(conSw).filter((a) => a === 24).length === 2, pls(conSw).join(' · '))
+
+  const tipoC = cfg('PMR', { puertaCm: 60 })
+  revisar('en el Tipo C sí se puede', haySandwich(tipoC))
+  revisar('y en una tira normal no', !haySandwich(c))
 }
 
 console.log(fallos ? `\n${fallos} revisiones mal.\n` : '\nTodo cuadra.\n')

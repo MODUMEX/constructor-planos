@@ -18,7 +18,7 @@ import {
   acabadoEsElColor, acabadosPara, alturasDe, anchosPanel, claroAjustado, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, mgMedidas, MODELOS,
   type PiezaEspecial,
   PAISES, etiquetaTier, nombreHerraje, nombreModelo, tierDeColor, TIPOLOGIAS, tipologia, tipologiaEspejo,
-  ANCHOS_PILASTRA, CUBICULO_MR, esEspecial, esSoloOrinales, esVariacionPanel, ICONO_MR,
+  ANCHOS_PILASTRA, CUBICULO_MR, esEspecial, esSoloOrinales, esVariacionPanel, ICONO_MR, PIEZA_PIDE_COSTILLA_CM,
 } from './catalog'
 import { medidaCercana } from './modulador'
 import VistaRender from './components/VistaRender'
@@ -2135,11 +2135,12 @@ export default function App() {
                 <div className="aviso-caja" style={{ margin: '0 0 12px' }}>
                   <b>Hay pilastras reforzadas</b>
                   <span>
-                    {piezasSinSoporte.join(' · ')}. De 55 cm para arriba una pilastra de punta no
-                    trabaja sola, así que la app le pone una <b>costilla de 19</b> y ya entra en el
-                    despiece. Si en obra va de otra forma, tocá la pieza en el plano y cambiala por
-                    <b> refuerzo</b> —la diagonal a la pared, que va en los herrajes— o por
-                    <b> sándwich</b>, que es una segunda pilastra de 24 con herraje en T.
+                    {piezasSinSoporte.join(' · ')}. De {PIEZA_PIDE_COSTILLA_CM} cm para arriba una
+                    pilastra de punta no trabaja sola, así que la app le pone una <b>costilla de 19</b>
+                    —del lado de la puerta, a unos centímetros del canto— y ya entra en el despiece.
+                    Si en obra va de otra forma, tocá la pieza en el plano y cambiala por
+                    <b> refuerzo</b>, que es la diagonal del muro a la pieza del frente y va en el
+                    juego de herrajes.
                   </span>
                 </div>
               )}

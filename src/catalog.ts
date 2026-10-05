@@ -565,6 +565,17 @@ export const PIEZA_PIDE_COSTILLA_CM = 50
 /** lo que mide como mínimo una costilla */
 export const COSTILLA_MINIMA_CM = 19
 
+/**
+ * Cuántos centímetros se deja entre la costilla y el canto de la pilastra que
+ * da a la puerta.
+ *
+ * La costilla NO va contra el muro sino del lado de la puerta —así lo dibuja el
+ * Módulo 6—, pero no pegada al canto: queda una tolerancia para el herraje de
+ * la hoja. Dayanna, 5-oct-2026: "iría cerca de la puerta, pero dejando unos cm
+ * de tolerancia".
+ */
+export const COSTILLA_TOLERANCIA_CM = 3
+
 /** una puerta necesita este margen contra el ancho de la cabina */
 export const MARGEN_PUERTA_CM = 8
 

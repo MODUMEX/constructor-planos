@@ -866,7 +866,16 @@ export function soporteDe(tramo: Tramo, config: Config, k: number): Soporte | nu
   if (k !== 0 && k !== n) return null
   const { anchoCm } = pilastraDePunta(tramo, config, k)
   if (!anchoCm || anchoCm < PIEZA_PIDE_COSTILLA_CM) return null
-  return tramo.soportes?.[k] ?? 'costilla'
+  const elegido = tramo.soportes?.[k] ?? 'costilla'
+  // El sándwich es panel + pilastra, así que solo existe en el Tipo C. Si un
+  // plano viejo lo trae en otra tipología, cae en la costilla.
+  if (elegido === 'sandwich' && !haySandwich(config)) return 'costilla'
+  return elegido
+}
+
+/** si esta tipología admite sándwich: solo el Tipo C, que es el que lleva panel */
+export function haySandwich(config: Config): boolean {
+  return config.tipologia === 'PMR'
 }
 
 /**

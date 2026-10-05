@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Cabina, Config, Pais, Soporte, Tramo } from '../types'
-import { anchosPanelFabrica, anchosPilastra, COSTILLA_MINIMA_CM, esEspecial, esVariacionPanel, familiaDelFrente, ICONO_MR, medidasDeFrente, puertasPosibles, tipologia } from '../catalog'
+import { anchosPanelFabrica, anchosPilastra, COSTILLA_MINIMA_CM, COSTILLA_TOLERANCIA_CM, esEspecial, esVariacionPanel, familiaDelFrente, ICONO_MR, medidasDeFrente, PIEZA_PIDE_COSTILLA_CM, puertasPosibles, tipologia } from '../catalog'
 import { anchoTotal, arrancaElCuartoPmr, esEspacioLibre, minimoDe, nuevaCabina, pilastrasParaAncho, profundidadAccesible, puertaSugerida, snap, cierraConMingitorio, ladosDeCabina, lugaresDe, mamparaEn } from '../modulacion'
 import { medidaCercana, PILASTRA_MINIMA_CM, PILASTRAS_INTERNAS, PUERTA_ACCESIBLE_MIN } from '../modulador'
 import { Grupo, Item, Menu, Raya } from './Menu'
@@ -12,7 +12,7 @@ import {
 } from '../geometria'
 import { ALTO_ORINAL_CM, ALTO_REGADERA_CM, ALTO_WC_CM, ORINAL, REGADERA, WC } from '../assets/sanitarios'
 import { descargasDe, escalaDeTramo, hayCentros } from '../descargas'
-import { anchoDeSoporte, compensarPilastra, soporteDe, soportesDe } from '../modulacion'
+import { anchoDeSoporte, compensarPilastra, haySandwich, soporteDe, soportesDe } from '../modulacion'
 
 /**
  * La zona invisible para agarrar una pilastra, EN PÍXELES DE PANTALLA.
@@ -1050,8 +1050,13 @@ export default function EditorPlano({
                 const centro = piezaMr
                   ? (piezaMr.desdeCm + piezaMr.hastaCm) / 2
                   : centroPilastra(tramo, cortes, k, s.pilastraCm, cuarto)
-                // la cara LIBRE de la pilastra: la que da al muro o a la esquina
-                const cara = centro + (alFinal ? 1 : -1) * (s.pilastraCm / 2)
+                // Las dos caras de la pilastra. El REFUERZO cruza la esquina
+                // contra el muro; la COSTILLA va del lado de la PUERTA, unos
+                // centímetros adentro del canto para dejarle sitio al herraje.
+                const dentro = alFinal ? -1 : 1
+                const caraMuro = centro - dentro * (s.pilastraCm / 2)
+                const caraPuerta = centro + dentro * (s.pilastraCm / 2)
+                const cara = caraPuerta - dentro * COSTILLA_TOLERANCIA_CM
                 const largoPieza = anchoDeSoporte(s.tipo)
                 const clave = `sop:${k}`
                 const activo = sobre === clave
@@ -1062,9 +1067,12 @@ export default function EditorPlano({
 
                 // el refuerzo no es una pieza sino una diagonal de la pilastra al muro
                 if (s.tipo === 'refuerzo') {
-                  const a = pt(m, cara, profS - grueso)
-                  const b = pt(m, cara + (alFinal ? 1 : -1) * 22, profS - 24)
-                  const medio = pt(m, cara + (alFinal ? 1 : -1) * 13, profS - 15)
+                  // Arranca EN el muro y baja hasta la pieza del frente, así que
+                  // la diagonal queda dentro de la cabina. Antes apuntaba al
+                  // revés y se dibujaba encima del muro, fuera del baño.
+                  const a = pt(m, caraMuro, profS - 24)
+                  const b = pt(m, caraMuro + dentro * 22, profS - grueso)
+                  const medio = pt(m, caraMuro + dentro * 13, profS - 16)
                   return (
                     <g key={clave} style={{ cursor: 'pointer' }} onClick={abrir} onContextMenu={abrir}
                       onPointerEnter={() => setSobre(clave)}
@@ -1083,8 +1091,8 @@ export default function EditorPlano({
                 // la costilla y el sándwich SÍ son pieza: van de canto, metidas
                 // hacia adentro de la cabina desde la cara de la pilastra
                 const a = pt(m, cara, profS - largoPieza)
-                const b = pt(m, cara + (alFinal ? -1 : 1) * grueso, profS)
-                const rotulo = pt(m, cara + (alFinal ? -1 : 1) * 9, profS - largoPieza - 5)
+                const b = pt(m, cara - dentro * grueso, profS)
+                const rotulo = pt(m, cara - dentro * 9, profS - largoPieza - 5)
                 return (
                   <g key={clave} style={{ cursor: 'pointer' }} onClick={abrir} onContextMenu={abrir}
                     onPointerEnter={() => setSobre(clave)}
@@ -1647,15 +1655,18 @@ export default function EditorPlano({
         const actual = soporteDe(t, config, k)
         const pilastra = t.pilastras?.[k] ?? config.anchoPilastraCm
         const opciones: { id: Soporte; nombre: string; nota: string }[] = [
-          { id: 'costilla', nombre: `Costilla de ${COSTILLA_MINIMA_CM} cm`, nota: 'Una pieza de canto pegada a la pilastra' },
-          { id: 'refuerzo', nombre: 'Refuerzo', nota: 'Diagonal de la pilastra a la pared; va en el juego de herrajes' },
-          { id: 'sandwich', nombre: 'Sándwich', nota: `Segunda pilastra de ${PILASTRA_MINIMA_CM} cm con herraje en T` },
+          { id: 'costilla', nombre: `Costilla de ${COSTILLA_MINIMA_CM} cm`, nota: 'Del lado de la puerta, a unos centímetros del canto' },
+          { id: 'refuerzo', nombre: 'Refuerzo', nota: 'Diagonal del muro a la pieza del frente; va en el juego de herrajes' },
+          // El sándwich es panel + pilastra: solo el Tipo C lo lleva.
+          ...(haySandwich(config)
+            ? [{ id: 'sandwich' as Soporte, nombre: 'Sándwich', nota: `Segunda pilastra de ${PILASTRA_MINIMA_CM} cm con herraje en T` }]
+            : []),
         ]
         return (
           <Menu
             pos={{ x: menu.x, y: menu.y }}
             titulo={`Refuerzo de la pilastra de ${pilastra} cm`}
-            detalle="Toda pilastra de punta de más de 55 cm lleva uno"
+            detalle={`Toda pilastra de punta desde ${PIEZA_PIDE_COSTILLA_CM} cm lleva uno`}
             onCerrar={cerrar}
           >
             {opciones.map((o) => (

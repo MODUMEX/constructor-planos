@@ -10,6 +10,7 @@ import {
 } from '../geometria'
 import { alturasDe, alzadoDe, mamparaDe, nombreHerraje, tipologia } from '../catalog'
 import { anchoDeSoporte, anchoTotal, arrancaElCuartoPmr, esEspacioLibre, ladosDeCabina, lugaresDe, mamparaEn, soportesDe } from '../modulacion'
+import { COSTILLA_TOLERANCIA_CM } from '../catalog'
 import type { CuartoPmr } from '../geometria'
 import { agrupar, modeloParaCsv, nombreLinea, nombreSistema, piezasDeArea } from './piezas'
 import { ALTO_ORINAL_CM, ALTO_REGADERA_CM, ALTO_WC_CM, ORINAL, REGADERA, WC } from '../assets/sanitarios'
@@ -349,15 +350,20 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
       const centroPil = piezaMr
         ? (piezaMr.desdeCm + piezaMr.hastaCm) / 2
         : centroPilastra(tramo, cortes, k, s.pilastraCm, cuarto)
-      const cara = centroPil + (alFinal ? 1 : -1) * (s.pilastraCm / 2)
+      // La COSTILLA va del lado de la puerta, unos cm adentro del canto; el
+      // REFUERZO cruza la esquina contra el muro. Mismo criterio que la pantalla.
+      const dentro = alFinal ? -1 : 1
+      const caraMuro = centroPil - dentro * (s.pilastraCm / 2)
+      const caraPuerta = centroPil + dentro * (s.pilastraCm / 2)
+      const cara = caraPuerta - dentro * COSTILLA_TOLERANCIA_CM
 
       if (s.tipo === 'refuerzo') {
         doc.setDrawColor(90, 90, 90)
         doc.setLineWidth(0.4)
-        const [ax, ay] = aHoja(e, pt(m, cara, profS - grueso))
-        const [bx, by] = aHoja(e, pt(m, cara + (alFinal ? 1 : -1) * 22, profS - 24))
+        const [ax, ay] = aHoja(e, pt(m, caraMuro, profS - 24))
+        const [bx, by] = aHoja(e, pt(m, caraMuro + dentro * 22, profS - grueso))
         doc.line(ax, ay, bx, by)
-        const [tx, ty] = aHoja(e, pt(m, cara + (alFinal ? 1 : -1) * 13, profS - 16))
+        const [tx, ty] = aHoja(e, pt(m, caraMuro + dentro * 13, profS - 17))
         texto(doc, 'REF', tx, ty, { size: 5, align: 'center', color: GRIS })
         continue
       }
@@ -365,7 +371,7 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
       const largoPieza = anchoDeSoporte(s.tipo)
       doc.setFillColor(TINTA, TINTA, TINTA)
       const [ax, ay] = aHoja(e, pt(m, cara, profS - largoPieza))
-      const [bx, by] = aHoja(e, pt(m, cara + (alFinal ? -1 : 1) * grueso, profS))
+      const [bx, by] = aHoja(e, pt(m, cara - dentro * grueso, profS))
       doc.rect(
         Math.min(ax, bx), Math.min(ay, by),
         Math.max(Math.abs(bx - ax), 0.5), Math.max(Math.abs(by - ay), 0.5), 'F',
@@ -378,7 +384,7 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
         const [t2x, t2y] = aHoja(e, pt(m, cara + grueso, profS - largoPieza))
         doc.line(t1x, t1y, t2x, t2y)
       }
-      const [rx, ry] = aHoja(e, pt(m, cara + (alFinal ? -1 : 1) * 9, profS - largoPieza - 3))
+      const [rx, ry] = aHoja(e, pt(m, cara - dentro * 9, profS - largoPieza - 3))
       texto(doc, s.tipo === 'costilla' ? `CO ${largoPieza}` : `SW ${largoPieza}`, rx, ry, {
         size: 5, align: 'center', color: GRIS,
       })
