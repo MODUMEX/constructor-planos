@@ -940,6 +940,97 @@ export function soportesDe(tramo: Tramo, config: Config): SoporteDePunta[] {
 }
 
 /**
+ * Volver a modular la tira entera con una o varias pilastras puestas a mano.
+ *
+ * Es el plan B de `compensarPilastra`: cuando la vecina no puede absorber la
+ * diferencia, el buscador reparte de nuevo respetando lo que el cliente ya
+ * eligió. Vive acá y no en la pantalla porque lo necesitan DOS: el que aplica
+ * el cambio y el menú de medidas, que tiene que saber de antemano si una
+ * medida va a entrar para no ofrecerla en falso.
+ */
+export function remodularTira(
+  tramo: Tramo,
+  config: Config,
+  llevaAccesible: boolean,
+  indice: number,
+  anchoCm: number,
+  /** el ancho de cada frontera, o null donde el buscador puede decidir */
+  clavadas: (number | null)[],
+  pais: Pais,
+) {
+  const n = tramo.cabinas.length
+  const extremo = indice === 0 || indice === n
+  const pedido = pedidoDeModulacion(tramo, config, llevaAccesible)
+  const muros = pedido.murosPilastra
+  return modularConCatalogo(
+    tramo.claroCm,
+    n,
+    muros,
+    muros < 2,
+    {
+      pilInterna: extremo ? undefined : anchoCm,
+      pilExtremo: extremo ? anchoCm : undefined,
+      pilastraIndice: indice,
+      pilastras: clavadas,
+      // las puertas ya elegidas NO se tocan: mover una pilastra mueve pilastras
+      puerta: config.puertaCm ?? tramo.cabinas.find((c) => c.tipo === 'normal')?.puerta.anchoCm,
+      puertaAccesible:
+        config.puertaAccesibleCm ?? tramo.cabinas.find((c) => c.tipo === 'accesible')?.puerta.anchoCm,
+    },
+    {
+      muroInicio: tramo.muroInicio,
+      muroFin: tramo.muroFin,
+      accesible: llevaAccesible,
+      profundidadCm: config.profundidadCm,
+      anchoAccesibleMinCm: anchoAccesibleDe(config),
+      // el cuarto PMR, o la cabina accesible de una "variación panel", no
+      // negocian su ancho tampoco al volver a modular
+      cuartoPmrCm: pedido.cuartoCm,
+      cuartoComeMuro: pedido.cuartoComeMuro,
+      // los orinales de la tira: sin esto el buscador los trata como baños con puerta
+      mingitorios: tramo.cabinas.filter((c) => c.tipo === 'orinal').length,
+      anchoOrinalCm: config.anchoOrinalCm,
+      anchosOrinalCm: config.anchosOrinalCm,
+      cierreMingitorio: !tramo.muroFin && tramo.cabinas[n - 1]?.tipo === 'orinal',
+      pais,
+    },
+  )
+}
+
+/**
+ * Si esa medida se puede poner en esa frontera.
+ *
+ * Pregunta lo MISMO que va a pasar al elegirla: primero si la vecina absorbe
+ * la diferencia y, si no, si el buscador logra repartir la tira de nuevo. El
+ * menú apagaba medidas que sí entraban porque solo miraba lo primero.
+ */
+export function cabeLaPilastra(
+  tramo: Tramo,
+  config: Config,
+  indice: number,
+  anchoCm: number,
+  pais: Pais,
+): boolean {
+  // la misma cuenta que hace App: si no, el menu diria una cosa y la pantalla otra
+  const llevaAccesible = config.tipologia === 'PMR' || config.llevaAccesible === true
+  const actual = tramo.pilastras?.[indice]
+  if (actual === anchoCm) return true
+  const fijas = (tramo.pilastrasFijas ?? []).filter((k) => k !== indice)
+  if (compensarPilastra(tramo, config, indice, anchoCm, fijas)) return true
+
+  const n = tramo.cabinas.length
+  const elegidas = [...new Set([...fijas, indice])]
+  const clavadas = Array.from({ length: n + 1 }, (_, i) =>
+    i === indice ? anchoCm : elegidas.includes(i) ? (tramo.pilastras?.[i] ?? null) : null,
+  )
+  const r = remodularTira(tramo, config, llevaAccesible, indice, anchoCm, clavadas, pais)
+  if (!r) return false
+  // Una tira que ya venía corta se puede seguir tocando para arreglarla; la que
+  // cerraba bien no se deja romper. Es la misma regla que aplica App al guardar.
+  return r.ajuste !== 'falta' || tramo.ajuste === 'falta'
+}
+
+/**
  * Las piezas de FRENTE de un tramo que pasan de la medida en la que hay que
  * darles soporte.
  *

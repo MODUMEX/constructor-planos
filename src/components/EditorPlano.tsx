@@ -12,7 +12,7 @@ import {
 } from '../geometria'
 import { ALTO_ORINAL_CM, ALTO_REGADERA_CM, ALTO_WC_CM, ORINAL, REGADERA, WC } from '../assets/sanitarios'
 import { descargasDe, escalaDeTramo, hayCentros } from '../descargas'
-import { anchoDeSoporte, compensarPilastra, haySandwich, soporteDe, soportesDe } from '../modulacion'
+import { anchoDeSoporte, cabeLaPilastra, haySandwich, soporteDe, soportesDe } from '../modulacion'
 
 /**
  * La zona invisible para agarrar una pilastra, EN PÍXELES DE PANTALLA.
@@ -1766,19 +1766,18 @@ export default function EditorPlano({
         /**
          * Qué medidas entran en el claro.
          *
-         * Es la MISMA cuenta que hace el arrastre: la vecina absorbe la
-         * diferencia. Si no puede —no le quedan centímetros de catálogo que
-         * dar— esa medida no se ofrece. Antes salían todas y elegir una que no
-         * cabía remodulaba la tira entera, moviendo cosas que nadie tocó.
+         * Pregunta lo mismo que va a pasar al elegirlas: si la vecina puede
+         * absorber la diferencia o, si no, si el buscador logra repartir la
+         * tira de nuevo. La primera versión de esto solo miraba a la vecina y
+         * apagaba medidas que sí entraban: en un claro de 449 no dejaba subir
+         * una central de 24 a 30 aunque la tira se pudiera rearmar.
          *
          * En las tiras con orinal o espacio libre la diferencia se la lleva el
-         * hueco y no la vecina, así que ahí no se filtra nada.
+         * hueco, así que ahí no se filtra nada.
          */
-        const seCompensa = !t.cabinas.some((c) => c.tipo === 'orinal' || esEspacioLibre(c))
-        const fijasSinEsta = (t.pilastrasFijas ?? []).filter((x) => x !== k)
+        const seFiltra = !t.cabinas.some((c) => c.tipo === 'orinal' || esEspacioLibre(c))
         const cabe = (ancho: number) =>
-          ancho === actual || !seCompensa ||
-          compensarPilastra(t, config, k, ancho, fijasSinEsta) !== null
+          !seFiltra || cabeLaPilastra(t, config, k, ancho, pais)
         const donde = k === 0 ? 'de arranque' : k === n ? 'de cierre' : `entre ${k} y ${k + 1}`
         const boton = (m: { anchoCm: number; familia: 'PL' | 'PN' }) => (
           <button
@@ -1786,7 +1785,7 @@ export default function EditorPlano({
             className={actual === m.anchoCm ? 'on' : ''}
             disabled={!cabe(m.anchoCm)}
             title={!cabe(m.anchoCm)
-              ? `${m.anchoCm} cm no entra: la cabina de al lado no tiene de dónde dar la diferencia`
+              ? `${m.anchoCm} cm no entra en el claro: con esa medida las piezas no cierran`
               : m.familia === 'PN' ? `Panel de relleno de ${m.anchoCm} cm` : `Pilastra de ${m.anchoCm} cm`}
             onClick={() => { onPilastra(menu.tramoId, k, m.anchoCm); cerrar() }}
             type="button"

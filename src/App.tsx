@@ -32,7 +32,7 @@ import { fotoDe, fotosHerraje, faltanFotosHerraje, SIN_FOTO_PROPIA, terminacione
 import {
   anchoAccesibleDe, anchoTotal, bom, claroDeOrinales, compensarPilastra, crearTramos, esEspacioLibre,
   frenteAccesible, invertirTramo, modularConCatalogo, nuevoId, pedidoDeModulacion,
-  piezasQuePidenCostilla, profundidadAccesible, reajustarConPuertas, recesoDe,
+  piezasQuePidenCostilla, profundidadAccesible, reajustarConPuertas, recesoDe, remodularTira,
 } from './modulacion'
 import { anchoDeOrinal } from './geometria'
 import { avisosDeDescargas, centrosDe, corridaDeCentros, tramoDesdeCentros } from './descargas'
@@ -1281,8 +1281,6 @@ export default function App() {
     const indice = ultimo.indice
     const anchoCm = ultimo.anchoCm
     const nuevo = new Map(cambios.map((c) => [c.indice, c.anchoCm]))
-    const extremo = indice === 0 || indice === t.cabinas.length
-    const muros = pedidoDeModulacion(t, config, llevaAccesible).murosPilastra
 
     // Las medidas las decide el cliente, así que lo que ya eligió se queda:
     // estas pilastras se suman a la lista y solo se reacomodan las que no tocó.
@@ -1320,39 +1318,7 @@ export default function App() {
         return
       }
     }
-    const r = modularConCatalogo(
-      t.claroCm,
-      t.cabinas.length,
-      muros,
-      muros < 2,
-      {
-        pilInterna: extremo ? undefined : anchoCm,
-        pilExtremo: extremo ? anchoCm : undefined,
-        pilastraIndice: indice,
-        pilastras: clavadas,
-        // las puertas ya elegidas NO se tocan: mover una pilastra mueve pilastras
-        puerta: config.puertaCm ?? t.cabinas.find((c) => c.tipo === 'normal')?.puerta.anchoCm,
-        puertaAccesible:
-          config.puertaAccesibleCm ?? t.cabinas.find((c) => c.tipo === 'accesible')?.puerta.anchoCm,
-      },
-      {
-        muroInicio: t.muroInicio,
-        muroFin: t.muroFin,
-        accesible: llevaAccesible,
-        profundidadCm: config.profundidadCm,
-        anchoAccesibleMinCm: anchoAccesibleDe(config),
-        // el cuarto PMR, o la cabina accesible de una "variación panel", no
-        // negocian su ancho tampoco al volver a modular
-        cuartoPmrCm: pedidoDeModulacion(t, config, llevaAccesible).cuartoCm,
-        cuartoComeMuro: pedidoDeModulacion(t, config, llevaAccesible).cuartoComeMuro,
-        // los orinales de la tira: sin esto el buscador los trata como baños con puerta
-        mingitorios: t.cabinas.filter((c) => c.tipo === 'orinal').length,
-        anchoOrinalCm: config.anchoOrinalCm,
-        anchosOrinalCm: config.anchosOrinalCm,
-        cierreMingitorio: !t.muroFin && t.cabinas[t.cabinas.length - 1]?.tipo === 'orinal',
-        pais: proyecto.paisFabricacion,
-      },
-    )
+    const r = remodularTira(t, config, llevaAccesible, indice, anchoCm, clavadas, proyecto.paisFabricacion)
     if (!r) return
 
     // El claro no se mueve: es la medida del sanitario y la modulación se le
