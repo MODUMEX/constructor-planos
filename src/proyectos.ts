@@ -52,6 +52,8 @@ export interface ProyectoEnLista {
   ubicacion: string
   estado: string
   actualizadoEl: string
+  /** de qué distribuidor es; null en los viejos que se guardaron sin dueño */
+  distribuidorId: number | null
 }
 
 export interface Resultado<T> {
@@ -70,6 +72,7 @@ interface FilaLista {
   ubicacion: string | null
   estado: string | null
   actualizado_el: string
+  distribuidor_id: number | null
 }
 
 function sinNube<T>(): Resultado<T> {
@@ -131,7 +134,7 @@ export async function listarProyectos(usuario: Usuario | null): Promise<Resultad
   const falta = sesionValida(usuario)
   if (falta) return { ok: false, mensaje: falta }
 
-  const campos = 'proyecto_id,codigo,numero_plano,revision,nombre,cliente,ubicacion,estado,actualizado_el'
+  const campos = 'proyecto_id,codigo,numero_plano,revision,nombre,cliente,ubicacion,estado,actualizado_el,distribuidor_id'
   try {
     const r = await conSesion(usuario!, (token) =>
       fetch(
@@ -151,6 +154,7 @@ export async function listarProyectos(usuario: Usuario | null): Promise<Resultad
       ubicacion: f.ubicacion ?? '',
       estado: f.estado ?? 'borrador',
       actualizadoEl: f.actualizado_el,
+      distribuidorId: f.distribuidor_id ?? null,
     }))
     return { ok: true, dato: lista, mensaje: `${lista.length} proyecto(s).` }
   } catch (e) {
@@ -280,6 +284,7 @@ export async function guardarProyecto(
         ubicacion: f.ubicacion ?? '',
         estado: f.estado ?? 'borrador',
         actualizadoEl: f.actualizado_el,
+        distribuidorId: f.distribuidor_id ?? null,
       },
       mensaje: `Guardado como ${fila.codigo}.`,
     }

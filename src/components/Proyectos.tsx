@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { puedeAutorizar, type Usuario } from '../auth'
+import { puedeAutorizar, puedeDistribuidores, type Usuario } from '../auth'
+import { listarDistribuidores } from '../distribuidores'
 import type { Proyecto } from '../types'
 import {
   abrirProyecto, borrarProyecto, codigoDe, listarProyectos, revisionAGuardar,
@@ -58,7 +59,15 @@ export default function Proyectos({
   const [confirmarEnvio, setConfirmarEnvio] = useState<number | null>(null)
   const [rechazando, setRechazando] = useState<number | null>(null)
   const [motivo, setMotivo] = useState('')
+  const [nombresDist, setNombresDist] = useState<Map<number, string>>(new Map())
+  const [filtroDist, setFiltroDist] = useState('')
   const autoriza = puedeAutorizar(usuario)
+  /**
+   * Quién ve de qué distribuidor es cada proyecto. Al distribuidor no se lo
+   * mostramos: la RLS ya le deja ver solo los suyos, así que la columna sería
+   * la misma empresa repetida en todas las filas.
+   */
+  const veDistribuidor = puedeDistribuidores(usuario)
 
   const recargar = useCallback(async () => {
     setCargando(true)
@@ -79,6 +88,28 @@ export default function Proyectos({
     void recargar()
   }, [recargar])
 
+  // Los nombres van aparte de la lista: si esto falla, los proyectos igual se
+  // ven (la columna cae en el número de distribuidor).
+  useEffect(() => {
+    if (!veDistribuidor) return
+    void (async () => {
+      const r = await listarDistribuidores(usuario)
+      setNombresDist(new Map((r.dato ?? []).map((d) => [d.distribuidorId, d.nombre])))
+    })()
+  }, [usuario, veDistribuidor])
+
+  const nombreDist = useCallback(
+    (id: number | null): string => (id === null ? '—' : nombresDist.get(id) ?? '#' + id),
+    [nombresDist],
+  )
+
+  /** los distribuidores que de verdad aparecen en la lista, para el filtro */
+  const distEnLista = useMemo(() => {
+    const ids = new Set<number>()
+    for (const p of lista) if (p.distribuidorId !== null) ids.add(p.distribuidorId)
+    return [...ids].map((id) => ({ id, nombre: nombreDist(id) })).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+  }, [lista, nombreDist])
+
   /** las revisiones que ya existen para el plano que está abierto */
   const revisionesDelPlano = useMemo(() => {
     const n = proyecto.numero.trim()
@@ -87,11 +118,14 @@ export default function Proyectos({
 
   const filtrada = useMemo(() => {
     const q = busqueda.trim().toLowerCase()
-    if (!q) return lista
-    return lista.filter((p) =>
-      [p.numeroPlano, p.revision, p.obra, p.cliente, p.ubicacion].join(' ').toLowerCase().includes(q),
-    )
-  }, [lista, busqueda])
+    return lista.filter((p) => {
+      if (filtroDist && String(p.distribuidorId ?? '') !== filtroDist) return false
+      if (!q) return true
+      const campos = [p.numeroPlano, p.revision, p.obra, p.cliente, p.ubicacion]
+      if (veDistribuidor) campos.push(nombreDist(p.distribuidorId))
+      return campos.join(' ').toLowerCase().includes(q)
+    })
+  }, [lista, busqueda, filtroDist, veDistribuidor, nombreDist])
 
   async function guardar() {
     setTrabajando(true)
@@ -203,9 +237,20 @@ export default function Proyectos({
                   <input
                     value={busqueda}
                     onChange={(e) => setBusqueda(e.target.value)}
-                    placeholder="Plano, obra, cliente o ubicación"
+                    placeholder={veDistribuidor ? 'Plano, obra, cliente, ubicación o distribuidor' : 'Plano, obra, cliente o ubicación'}
                   />
                 </div>
+                {veDistribuidor && (
+                  <div className="campo">
+                    <label>Distribuidor</label>
+                    <select value={filtroDist} onChange={(e) => setFiltroDist(e.target.value)}>
+                      <option value="">Todos</option>
+                      {distEnLista.map((d) => (
+                        <option key={d.id} value={String(d.id)}>{d.nombre}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
 
               {cargando ? (
@@ -225,6 +270,7 @@ export default function Proyectos({
                         <th>Rev.</th>
                         <th>Obra</th>
                         <th>Cliente</th>
+                        {veDistribuidor && <th>Distribuidor</th>}
                         <th>Estado</th>
                         <th>Cotización</th>
                         <th>Actualizado</th>
@@ -241,6 +287,7 @@ export default function Proyectos({
                           <td className="num">{p.revision}</td>
                           <td style={{ fontWeight: 600 }}>{p.obra}</td>
                           <td>{p.cliente}</td>
+                          {veDistribuidor && <td>{nombreDist(p.distribuidorId)}</td>}
                           <td>{p.estado}</td>
                           <td>
                             {cot ? (
