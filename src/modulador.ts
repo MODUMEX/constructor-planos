@@ -18,7 +18,9 @@ import {
   ANCHOS_PILASTRA,
   ANCHOS_PUERTA,
   CANALETA_MAX_CM,
+  anchosPilastra,
   claroAjustado as calcularClaroAjustado,
+  esEspecial,
 } from './catalog'
 
 /**
@@ -93,6 +95,31 @@ export const INTERNA_PREFERIDA_CM = PILASTRA_MINIMA_CM
  * entra la canaleta, hasta 5 cm. Más que eso, se corrige la modulación.
  */
 export const AJUSTE_INSTALACION_CM = 1
+
+/**
+ * Las medidas que se pueden poner A MANO en esa frontera.
+ *
+ * Es la misma regla que ya respetaba el buscador automático: una pilastra
+ * CENTRAL no baja de 24 cm, porque más angosta no carga el panel de las dos
+ * cabinas que tiene a los lados. En las puntas manda el catálogo completo: hay
+ * planos que cierran con una ancha de relleno y contra muro no hay mínimo.
+ *
+ * Vive acá porque la usan los CUATRO caminos manuales —arrastrar la pilastra,
+ * arrastrar el panel, el menú de medidas y escribir el ancho de una cabina— y
+ * cuando la cuenta estaba repetida en cada uno, el mínimo se quedó solo en el
+ * automático: a mano se podía dejar una central de 10.
+ *
+ * `actual` se ofrece siempre aunque no cumpla: un plano viejo guardado con una
+ * central angosta tiene que poder abrirse y mostrar su medida.
+ */
+export function anchosPilastraEn(extremo: boolean, modelo?: string, actual?: number): number[] {
+  return anchosPilastra(modelo).filter((a) => {
+    if (a === actual) return true
+    if (extremo) return true
+    if (a < PILASTRA_MINIMA_CM) return false
+    return PILASTRAS_INTERNAS.includes(a) || esEspecial('PL', a, modelo)
+  })
+}
 
 /** la puerta que se prefiere cuando varias combinaciones empatan */
 const PUERTA_PREFERIDA = 60

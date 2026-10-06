@@ -20,7 +20,7 @@ import {
   PAISES, etiquetaTier, nombreHerraje, nombreModelo, tierDeColor, TIPOLOGIAS, tipologia, tipologiaEspejo,
   ANCHOS_PILASTRA, CUBICULO_MR, esEspecial, esSoloOrinales, esVariacionPanel, ICONO_MR, PIEZA_PIDE_COSTILLA_CM,
 } from './catalog'
-import { medidaCercana } from './modulador'
+import { anchosPilastraEn, medidaCercana } from './modulador'
 import VistaRender from './components/VistaRender'
 import ColoresMexico from './components/ColoresMexico'
 import CampoNumero from './components/CampoNumero'
@@ -1281,6 +1281,17 @@ export default function App() {
     const indice = ultimo.indice
     const anchoCm = ultimo.anchoCm
     const nuevo = new Map(cambios.map((c) => [c.indice, c.anchoCm]))
+    // El portón de la regla: una pilastra CENTRAL no baja de 24 cm. Los menús y
+    // los arrastres ya solo ofrecen lo permitido, pero el filtro vive acá para
+    // que ningún camino nuevo se la salte sin darse cuenta.
+    for (const c of cambios) {
+      const permitidas = anchosPilastraEn(
+        c.indice === 0 || c.indice === t.cabinas.length,
+        config.modelo,
+        t.pilastras?.[c.indice],
+      )
+      if (!permitidas.includes(c.anchoCm)) return
+    }
 
     // Las medidas las decide el cliente, así que lo que ya eligió se queda:
     // estas pilastras se suman a la lista y solo se reacomodan las que no tocó.

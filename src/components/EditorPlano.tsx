@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Cabina, Config, Pais, Soporte, Tramo } from '../types'
-import { anchosPanelFabrica, anchosPilastra, COSTILLA_MINIMA_CM, COSTILLA_TOLERANCIA_CM, esEspecial, esVariacionPanel, familiaDelFrente, ICONO_MR, medidasDeFrente, PIEZA_PIDE_COSTILLA_CM, puertasPosibles, tipologia } from '../catalog'
+import { anchosPanelFabrica, anchosPilastra, COSTILLA_MINIMA_CM, COSTILLA_TOLERANCIA_CM, esVariacionPanel, familiaDelFrente, ICONO_MR, medidasDeFrente, PIEZA_PIDE_COSTILLA_CM, puertasPosibles, tipologia } from '../catalog'
 import { anchoTotal, arrancaElCuartoPmr, esEspacioLibre, minimoDe, nuevaCabina, pilastrasParaAncho, profundidadAccesible, puertaSugerida, snap, cierraConMingitorio, ladosDeCabina, lugaresDe, mamparaEn } from '../modulacion'
-import { medidaCercana, PILASTRA_MINIMA_CM, PILASTRAS_INTERNAS, PUERTA_ACCESIBLE_MIN } from '../modulador'
+import { anchosPilastraEn, medidaCercana, PILASTRA_MINIMA_CM, PUERTA_ACCESIBLE_MIN } from '../modulador'
 import { Grupo, Item, Menu, Raya } from './Menu'
 import {
   anchoDeOrinal, cajaDelPlano, centroPilastra, cuartoPmr, ESPESOR_MURO, esMingitorio, marcosDe, profundidadDeDivisor,
@@ -379,9 +379,7 @@ export default function EditorPlano({
       // poco sigue cayendo en pilastra; solo estirando de verdad llega a panel.
       if (Math.abs(deseado - p.ancho0) > 0.5) arrastroPil.current = true
       const opciones = [
-        ...anchosPilastra(config.modelo).filter(
-          (a) => p.extremo || PILASTRAS_INTERNAS.includes(a) || esEspecial('PL', a, config.modelo),
-        ),
+        ...anchosPilastraEn(p.extremo, config.modelo, p.ancho0),
         ...medidasDeFrente(config.modelo).filter((m) => m.familia === 'PN').map((m) => m.anchoCm),
       ]
       onPilastra(p.tramoId, p.indice, medidaCercana(opciones, deseado))
@@ -418,7 +416,8 @@ export default function EditorPlano({
     }
 
     const actual = t.pilastras?.[a.indice + 1] ?? config.anchoPilastraCm
-    const elegida = medidaCercana(PILASTRAS_INTERNAS, actual + deltaCm * 2)
+    // el panel mueve la pilastra CENTRAL que tiene a la derecha: mismo mínimo
+    const elegida = medidaCercana(anchosPilastraEn(false, config.modelo, actual), actual + deltaCm * 2)
     if (elegida !== actual) onPilastra(a.tramoId, a.indice + 1, elegida)
   }
 
@@ -471,9 +470,7 @@ export default function EditorPlano({
     const anchoPil = (j: number) => t.pilastras?.[j] ?? config.anchoPilastraCm
     // La cuenta vive en modulación: es la que decide la medida de la cabina y
     // tiene que dar igual acá que en las pruebas.
-    const medidas = anchosPilastra(config.modelo).filter(
-      (a) => PILASTRAS_INTERNAS.includes(a) || esEspecial('PL', a, config.modelo),
-    )
+    const medidas = anchosPilastraEn(false, config.modelo)
     const cambios = pilastrasParaAncho(t, indice, pedido, medidas, anchoPil, arrancaElCuartoPmr(t, config))
     if (cambios.length) onPilastras(tramoId, cambios)
   }
@@ -485,7 +482,7 @@ export default function EditorPlano({
     if (!izq || !der) return
     // el panel siempre va centrado en su pilastra: centrar es repartir el claro
     // parejo entre las dos cabinas, dándole a la pilastra la medida que cuadre
-    const media = medidaCercana(PILASTRAS_INTERNAS, (izq.anchoCm + der.anchoCm) / 2 - izq.puerta.anchoCm)
+    const media = medidaCercana(anchosPilastraEn(false, config.modelo), (izq.anchoCm + der.anchoCm) / 2 - izq.puerta.anchoCm)
     onPilastra(tramoId, indice + 1, media)
   }
 
@@ -1596,7 +1593,8 @@ export default function EditorPlano({
               const k = menu.indice + 1
               const actual = t.pilastras?.[k] ?? config.anchoPilastraCm
               const medidas = medidasDeFrente(config.modelo)
-              const pilastras = medidas.filter((m) => m.familia === 'PL' && (PILASTRAS_INTERNAS.includes(m.anchoCm) || m.anchoCm === actual))
+              const permitidas = anchosPilastraEn(false, config.modelo, actual)
+              const pilastras = medidas.filter((m) => m.familia === 'PL' && permitidas.includes(m.anchoCm))
               const paneles = medidas.filter((m) => m.familia === 'PN')
               const boton = (m: { anchoCm: number; familia: 'PL' | 'PN' }) => (
                 <button
@@ -1757,11 +1755,8 @@ export default function EditorPlano({
         const medidas = medidasDeFrente(config.modelo)
         // En las puntas entra CUALQUIER pilastra del catálogo: hay planos que
         // cierran con una ancha de relleno. Adentro, las de siempre.
-        const pilastras = medidas.filter(
-          (m) => m.familia === 'PL' &&
-            (extremo || PILASTRAS_INTERNAS.includes(m.anchoCm) ||
-             esEspecial('PL', m.anchoCm, config.modelo) || m.anchoCm === actual),
-        )
+        const permitidas = anchosPilastraEn(extremo, config.modelo, actual)
+        const pilastras = medidas.filter((m) => m.familia === 'PL' && permitidas.includes(m.anchoCm))
         const paneles = medidas.filter((m) => m.familia === 'PN')
         /**
          * Qué medidas entran en el claro.

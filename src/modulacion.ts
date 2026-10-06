@@ -4,11 +4,11 @@ import {
 } from './catalog'
 import type { Cabina, Config, Moneda, Pais, Soporte, Tramo, TipologiaId, RenglonBOM } from './types'
 import {
-  alturasDe, ANCHOS_PILASTRA, anchosPilastra, esEspecial, esSoloOrinales, esVariacionPanel, familiaDelFrente,
+  alturasDe, ANCHOS_PILASTRA, esSoloOrinales, esVariacionPanel, familiaDelFrente,
   llevaAccesibleSiempre, mamparaDe, tipologia, tierDeColor, type MedidaMG,
 } from './catalog'
 import {
-  ajustarPilastras, GRUESO_MG_PIEZA, medidaCercana, modularTira, PILASTRA_MINIMA_CM, PILASTRAS_INTERNAS,
+  ajustarPilastras, anchosPilastraEn, GRUESO_MG_PIEZA, medidaCercana, modularTira, PILASTRA_MINIMA_CM,
 } from './modulador'
 import { precioPieza, type TablaTarifas } from './tarifas'
 
@@ -807,12 +807,8 @@ export function compensarPilastra(
   if (delta === 0) return null
 
   /** las medidas de catálogo que se pueden poner en esa frontera */
-  const posibles = (k: number): number[] => {
-    const extremo = k === 0 || k === n
-    return anchosPilastra(config.modelo).filter(
-      (a) => extremo || PILASTRAS_INTERNAS.includes(a) || esEspecial('PL', a, config.modelo),
-    )
-  }
+  const posibles = (k: number): number[] =>
+    anchosPilastraEn(k === 0 || k === n, config.modelo, actual[k])
 
   // de adentro hacia afuera: la de al lado primero
   const orden: number[] = []
@@ -1015,6 +1011,8 @@ export function cabeLaPilastra(
   const llevaAccesible = config.tipologia === 'PMR' || config.llevaAccesible === true
   const actual = tramo.pilastras?.[indice]
   if (actual === anchoCm) return true
+  // una central no baja de 24, entre y todo: primero se mira si está PERMITIDA
+  if (!anchosPilastraEn(indice === 0 || indice === tramo.cabinas.length, config.modelo, actual).includes(anchoCm)) return false
   const fijas = (tramo.pilastrasFijas ?? []).filter((k) => k !== indice)
   if (compensarPilastra(tramo, config, indice, anchoCm, fijas)) return true
 
