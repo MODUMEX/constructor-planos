@@ -2,6 +2,28 @@ import { COLORES_MX, type ColorMX } from './datos/colores-mx'
 import type { Acabado, Linea } from './types'
 
 /**
+ * El color que se elige cuando todavia NO esta definido.
+ *
+ * Vive en este modulo y no en catalog.ts porque catalog ya importa de aca:
+ * al reves habria un ciclo entre los dos. catalog lo vuelve a exportar, asi
+ * que el resto de la app lo pide donde pide los demas colores.
+ */
+export const COLOR_DE_LINEA = 'De línea'
+
+/**
+ * Si ese nombre es el comodin de color sin definir.
+ *
+ * Se compara sin tildes y sin mayusculas porque el campo "Color especial" es
+ * texto libre: alguien que escribe "de linea" a mano quiere decir lo mismo, y
+ * si no se reconoce se le cobra la tarifa de ESPECIAL por un color que ni
+ * siquiera eligio.
+ */
+export function esDeLinea(nombre: string): boolean {
+  const plano = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase()
+  return plano(nombre || '') === plano(COLOR_DE_LINEA)
+}
+
+/**
  * La lista de colores depende del país donde se fabrica: Costa Rica trabaja con
  * los diez del catálogo (`COLORES` en catalog.ts) y México con la lista de
  * materia prima de la planta, que es la que trae el código.
@@ -340,6 +362,20 @@ export function coloresMxAgrupados(
   const esLaminado = acabado === 'Laminado Compacto'
 
   const salida: ColorMxAgrupado[] = []
+  // El comodín va primero y solo en el laminado: en la esmaltada, el acero y la
+  // fórmica el acabado ES el color y no hay nada que dejar sin definir. No
+  // lleva código de materia prima, igual que un color de carta sin lámina
+  // cargada: con cuál se fabrica lo pregunta el CIP.
+  if (esLaminado) {
+    salida.push({
+      color: COLOR_DE_LINEA,
+      espesor: '',
+      espesorMm: espesorDeLinea(linea),
+      codigoBase: '',
+      nombre: COLOR_DE_LINEA,
+      tambien: [],
+    })
+  }
   for (const nombre of ofrecidosMx(linea, acabado)) {
     const todas = esLaminado ? (porFamilia.get(nombre) ?? []) : []
     const delMismo = todas.filter((c) => conReservados || !c.reservado)

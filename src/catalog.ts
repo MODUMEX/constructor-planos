@@ -1,5 +1,6 @@
 import type { Acabado, HerrajeAcabado, Linea, Pais, TierColor, TipologiaId, Montaje } from './types'
-import { esColorMx, grupoMx } from './coloresMx'
+import { COLOR_DE_LINEA, esColorMx, esDeLinea, grupoMx } from './coloresMx'
+export { COLOR_DE_LINEA, esDeLinea }
 
 /** grueso real de la pilastra en laminado compacto, en cm (12.7 mm) */
 export const GRUESO_PILASTRA = 1.27
@@ -313,7 +314,17 @@ export function coloresPara(linea: Linea, acabado: Acabado): Color[] {
     if (acabado === 'Acero Inoxidable') return deLaLinea.filter((c) => c.tier === 'aceroInox')
     if (acabado === 'Esmaltada Antigrafiti') return deLaLinea.filter((c) => c.tier === 'antigrafiti')
   }
-  return deLaLinea.filter((c) => c.tier === 'linea')
+  // En los acabados donde el acabado ES el color no hay nada que decidir, así
+  // que el comodín solo aparece en el laminado.
+  return [SIN_DEFINIR, ...deLaLinea.filter((c) => c.tier === 'linea')]
+}
+
+/** el comodín, con pinta de muestra vacía para que se note que falta elegir */
+const SIN_DEFINIR: Color = {
+  nombre: COLOR_DE_LINEA,
+  tier: 'linea',
+  hex: '#8b98a8',
+  slug: 'de-linea',
 }
 
 /** busca el color por su nombre, por el viejo o por cualquiera de sus alias */
@@ -334,6 +345,10 @@ export function tierDeColor(
   linea: Linea = 'LEEDER',
   acabado?: Acabado,
 ): TierColor {
+  // El comodín de color sin definir va con la tarifa base, antes que cualquier
+  // otra regla: si no, al no estar en ninguna lista caía en "especial" y la
+  // cotización salía con el sobreprecio de un color que ni siquiera se eligió.
+  if (esDeLinea(nombre)) return 'linea'
   // Cuando el acabado ES el color, el precio lo manda ÉL y no el nombre que se
   // haya elegido. En México la esmaltada y la fórmica tienen lista de colores
   // —Beige, Gris, Negro y White, Folkstone—, y sin esto un "Negro" esmaltado se
@@ -547,9 +562,9 @@ export function medidaQueCabe(opciones: number[], max: number): number | null {
  * De qué medida para arriba una pieza de FRENTE pide soporte.
  *
  * Regla de modulación de Modumex (Módulo 6): **una pilastra de ESQUINA o A
- * MURO de más de 55 cm lleva refuerzo**. Puede ser una COSTILLA de canto —19
- * cm como mínimo—, un refuerzo superior o un sándwich; cuál de los tres lo
- * decide el cliente, así que la app no lo pone solo: avisa que hace falta.
+ * MURO lleva refuerzo**. Puede ser una COSTILLA de canto —19 cm como mínimo—,
+ * un refuerzo superior o un sándwich; el vendedor cambia cuál sobre el plano,
+ * y sin elegir nada sale la costilla.
  *
  * Antes estaba en 100 cm, que era lo que se había entendido. La lámina de
  * capacitación habla de "más de 55", pero Dayanna lo bajó a DESDE 50 el

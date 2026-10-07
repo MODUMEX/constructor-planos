@@ -18,7 +18,7 @@ import {
   acabadoEsElColor, acabadosPara, alturasDe, anchosPanel, claroAjustado, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, mgMedidas, MODELOS,
   type PiezaEspecial,
   PAISES, etiquetaTier, nombreHerraje, nombreModelo, tierDeColor, TIPOLOGIAS, tipologia, tipologiaEspejo,
-  ANCHOS_PILASTRA, CUBICULO_MR, esEspecial, esSoloOrinales, esVariacionPanel, ICONO_MR, PIEZA_PIDE_COSTILLA_CM,
+  ANCHOS_PILASTRA, COLOR_DE_LINEA, CUBICULO_MR, esDeLinea, esEspecial, esSoloOrinales, esVariacionPanel, ICONO_MR, PIEZA_PIDE_COSTILLA_CM,
 } from './catalog'
 import { anchosPilastraEn, medidaCercana } from './modulador'
 import VistaRender from './components/VistaRender'
@@ -2104,6 +2104,17 @@ export default function App() {
                     El inodoro se instala en la descarga, así que si queda montado sobre un panel o
                     una pilastra hay que correr la pieza. Con <b>Modular desde los centros</b> la app
                     acomoda las piezas sola.
+                  </span>
+                </div>
+              )}
+
+              {esDeLinea(config.color) && (
+                <div className="aviso-caja" style={{ margin: '0 0 12px' }}>
+                  <b>El color todavía no está definido</b>
+                  <span>
+                    El área va con <b>{COLOR_DE_LINEA}</b>, que cotiza con la tarifa de línea.
+                    Sirve para mandar la cotización, pero <b>no para fabricar</b>: antes de que el
+                    plano se vaya a producción hay que volver al paso de color y elegir cuál es.
                   </span>
                 </div>
               )}

@@ -18,7 +18,7 @@ import {
   COLORES_MX, coloresMxAgrupados, coloresMxPara, eligeColorMx, esColorMx, grupoMx,
   ofrecidosMx, slugRenderMx,
 } from '../src/coloresMx'
-import { etiquetaTier, tierDeColor } from '../src/catalog'
+import { COLOR_DE_LINEA, etiquetaTier, tierDeColor } from '../src/catalog'
 import { fotoDe, SIN_FOTO_PROPIA } from '../src/renders'
 import type { Acabado, Linea } from '../src/types'
 
@@ -52,8 +52,10 @@ console.log('\n2 · se ofrece la CARTA, no la materia prima')
   ]
   for (const [linea, carta] of [['LEEDER', leeder], ['SUPERIOR', superior]] as [Linea, string[]][]) {
     const nombres = coloresMxAgrupados(linea, true, 'Laminado Compacto').map((c) => c.nombre)
+    // el comodin de color sin definir va primero, antes de la carta
+    revisar(`${linea}: arranca con "${COLOR_DE_LINEA}"`, nombres[0] === COLOR_DE_LINEA, nombres[0])
     revisar(`${linea}: la carta completa y en ese orden`,
-      JSON.stringify(nombres) === JSON.stringify(carta), nombres.join(" · "))
+      JSON.stringify(nombres.slice(1)) === JSON.stringify(carta), nombres.slice(1).join(" · "))
   }
   // lo que la planta compra pero no está en la carta NO se ofrece: eso se pide
   // como color especial, escrito a mano
@@ -197,5 +199,19 @@ console.log('\n9 · cada color con SU foto')
   }
 }
 
+console.log('\n5 · el color sin definir')
+{
+  revisar('cotiza con la tarifa de LINEA, no de especial',
+    tierDeColor(COLOR_DE_LINEA, 'MX', 'LEEDER', 'Laminado Compacto') === 'linea',
+    tierDeColor(COLOR_DE_LINEA, 'MX', 'LEEDER', 'Laminado Compacto'))
+  revisar('y tambien escrito sin tilde ni mayusculas',
+    tierDeColor('de linea', 'MX', 'SUPERIOR', 'Laminado Compacto') === 'linea')
+  revisar('no viaja codigo de materia prima',
+    coloresMxAgrupados('LEEDER', true, 'Laminado Compacto')[0].codigoBase === '')
+  for (const a of ['Esmaltada Antigrafiti', 'Fórmica'] as const) {
+    revisar(`no se ofrece en ${a}: ahi el acabado ES el color`,
+      !coloresMxAgrupados('SUPERIOR', true, a).some((c) => c.nombre === COLOR_DE_LINEA))
+  }
+}
 console.log(fallos ? `\n${fallos} revisiones mal.\n` : '\nTodo cuadra.\n')
 process.exit(fallos ? 1 : 0)
