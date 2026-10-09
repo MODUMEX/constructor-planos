@@ -83,18 +83,22 @@ function sesionValida(u: Usuario | null): string | null {
 /**
  * Las cuentas de los DISTRIBUIDORES, con la empresa a la que están ligadas.
  *
- * Hasta ahora no se veían en ningún lado: la pantalla de Usuarios las dejaba
- * fuera a propósito —son de la empresa, no del equipo— y la de Distribuidores
- * muestra la ficha, no quién entra con ella. Así que no había forma de
- * responder "¿quién tiene acceso a nombre de esta empresa?".
+ * No se veían en ningún lado: la pantalla de Usuarios las deja fuera a
+ * propósito —son de la empresa, no del equipo— y la de Distribuidores muestra
+ * la ficha, no quién entra con ella. Así que no había forma de responder
+ * "¿quién tiene acceso a nombre de esta empresa?".
  *
- * Lee `profiles` directo, igual que la lista de internos, así que vale para
- * Super Admin: es lo que la RLS permite sin pasar por la Edge Function.
+ * Va por la Edge Function y no contra la tabla porque `profiles` por RLS es
+ * solo del Super Admin, y esto lo tiene que ver también el **Administrador**.
+ * El Vendedor no: la función lo rechaza, no solo la pantalla.
  */
 export async function listarCuentasDistribuidor(
   usuario: Usuario | null,
 ): Promise<Resultado<UsuarioInterno[]>> {
-  return consultarProfiles(usuario, 'rol=eq.Distribuidor')
+  const r = await llamarGestion(usuario, { accion: 'listar_cuentas' })
+  if (!r.ok) return { ok: false, mensaje: r.mensaje }
+  const filas = ((r.dato as unknown as { cuentas?: Fila[] })?.cuentas ?? [])
+  return { ok: true, dato: filas.map(deFila), mensaje: `${filas.length} cuenta(s)` }
 }
 
 /** los internos: el equipo de Modumex. Los distribuidores van en su propia lista. */

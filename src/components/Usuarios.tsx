@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
-  crearUsuario, eliminarUsuario, guardarUsuario, listarCuentasDistribuidor, listarUsuarios,
-  ROLES_INTERNOS, type DatosUsuario, type UsuarioInterno,
+  crearUsuario, eliminarUsuario, guardarUsuario, listarUsuarios, ROLES_INTERNOS,
+  type DatosUsuario, type UsuarioInterno,
 } from '../usuarios'
-import { listarDistribuidores } from '../distribuidores'
 import type { Rol, Usuario } from '../auth'
 import Ojo from './Ojo'
 
@@ -43,9 +42,6 @@ export default function Usuarios({ usuario, onCerrar }: Props) {
   const [guardando, setGuardando] = useState(false)
   const [borrar, setBorrar] = useState<string | null>(null)
   const [aviso, setAviso] = useState<{ ok: boolean; mensaje: string } | null>(null)
-  const [cuentas, setCuentas] = useState<UsuarioInterno[]>([])
-  const [empresas, setEmpresas] = useState<Map<number, string>>(new Map())
-  const [busca, setBusca] = useState('')
 
   const esNuevo = edita !== null && edita.id === undefined
 
@@ -59,44 +55,6 @@ export default function Usuarios({ usuario, onCerrar }: Props) {
     })
     return () => { vivo = false }
   }, [usuario])
-
-  // Las cuentas de distribuidor y los nombres de las empresas van aparte: si
-  // esto falla, la lista de internos igual se ve.
-  useEffect(() => {
-    let vivo = true
-    void (async () => {
-      const [c, d] = await Promise.all([
-        listarCuentasDistribuidor(usuario),
-        listarDistribuidores(usuario),
-      ])
-      if (!vivo) return
-      setCuentas(c.dato ?? [])
-      setEmpresas(new Map((d.dato ?? []).map((x) => [x.distribuidorId, x.nombre])))
-    })()
-    return () => { vivo = false }
-  }, [usuario])
-
-  const nombreEmpresa = (id: number | null) =>
-    id === null ? 'sin asignar' : empresas.get(id) ?? '#' + id
-
-  /** las cuentas agrupadas por empresa, que es como se quieren leer */
-  const porEmpresa = useMemo(() => {
-    const q = busca.trim().toLowerCase()
-    const filtradas = cuentas.filter((c) =>
-      !q || [c.nombre, c.email, nombreEmpresa(c.distribuidorId)].join(' ').toLowerCase().includes(q),
-    )
-    const mapa = new Map<string, UsuarioInterno[]>()
-    for (const c of filtradas) {
-      const e = nombreEmpresa(c.distribuidorId)
-      const ya = mapa.get(e)
-      if (ya) ya.push(c)
-      else mapa.set(e, [c])
-    }
-    // las que no tienen empresa van al final: son las que hay que atender
-    return [...mapa.entries()].sort((a, b) =>
-      a[0] === 'sin asignar' ? 1 : b[0] === 'sin asignar' ? -1 : a[0].localeCompare(b[0], 'es'),
-    )
-  }, [cuentas, empresas, busca])
 
   function campo(k: keyof DatosUsuario, v: string | boolean | Rol) {
     setEdita((d) => (d ? { ...d, [k]: v } : d))
@@ -256,60 +214,6 @@ export default function Usuarios({ usuario, onCerrar }: Props) {
                 </tbody>
               </table>
 
-              {/* ----------------------------------------------------------
-                  Quién entra a nombre de cada empresa.
-
-                  Las cuentas de distribuidor no se editan acá —se aprueban en
-                  Solicitudes y la empresa se administra en su ficha—, pero sí
-                  hacía falta poder VERLAS: antes no había ninguna pantalla que
-                  dijera qué usuario está ligado a qué distribuidor.
-                  ---------------------------------------------------------- */}
-              <h3 style={{ margin: '28px 0 6px' }}>
-                Cuentas de distribuidor <span className="cuenta">{cuentas.length}</span>
-              </h3>
-              <p className="sub" style={{ marginTop: 0 }}>
-                Solo para consultar. Se aprueban en Solicitudes y la empresa se cambia desde ahí.
-              </p>
-              <div className="campo" style={{ maxWidth: 320, marginBottom: 12 }}>
-                <input
-                  value={busca}
-                  onChange={(e) => setBusca(e.target.value)}
-                  placeholder="Buscar por persona, correo o empresa"
-                />
-              </div>
-              {porEmpresa.length === 0 ? (
-                <p className="sub">
-                  {cuentas.length === 0
-                    ? 'Todavía no hay cuentas de distribuidor.'
-                    : 'Ninguna cuenta calza con esa búsqueda.'}
-                </p>
-              ) : (
-                porEmpresa.map(([empresa, gente]) => (
-                  <div key={empresa} style={{ marginBottom: 16 }}>
-                    <h4 style={{ margin: '0 0 6px', color: 'var(--text-2)' }}>
-                      {empresa} <span className="cuenta">{gente.length}</span>
-                    </h4>
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Nombre</th>
-                          <th>Correo</th>
-                          <th>Estado</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {gente.map((c) => (
-                          <tr key={c.id}>
-                            <td style={{ fontWeight: 600 }}>{c.nombre || '—'}</td>
-                            <td>{c.email || '—'}</td>
-                            <td>{c.activo ? 'Activo' : 'Inactivo'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ))
-              )}
             </div>
           )}
 

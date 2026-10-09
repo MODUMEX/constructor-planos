@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   crearDistribuidor, guardarDistribuidor, listarDistribuidores, PAISES_DISTRIBUIDOR, REGIONES,
   type DatosDistribuidor, type Distribuidor, type Region,
 } from '../distribuidores'
-import type { Usuario } from '../auth'
+import { listarCuentasDistribuidor, type UsuarioInterno } from '../usuarios'
+import { esAdmin, type Usuario } from '../auth'
 import Ojo from './Ojo'
 import CampoNumero from './CampoNumero'
 
@@ -42,6 +43,47 @@ interface Props {
 }
 
 export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Props) {
+  /**
+   * Quién entra a nombre de cada empresa.
+   *
+   * Lo ven el Super Admin y el Administrador, no el Vendedor: son cuentas de
+   * acceso, no datos comerciales. El filtro de verdad está en la Edge Function
+   * —acá solo se esconde la sección— así que a un Vendedor curioso tampoco le
+   * sirve mirar la respuesta de la red.
+   */
+  const puedeVerCuentas = esAdmin(usuario)
+  const [cuentas, setCuentas] = useState<UsuarioInterno[]>([])
+  const [buscaCuenta, setBuscaCuenta] = useState('')
+
+  useEffect(() => {
+    if (!puedeVerCuentas) return
+    let vivo = true
+    // va aparte de la lista de empresas: si falla, las fichas igual se ven
+    void listarCuentasDistribuidor(usuario).then((r) => {
+      if (vivo) setCuentas(r.dato ?? [])
+    })
+    return () => { vivo = false }
+  }, [usuario, puedeVerCuentas])
+
+  /** las cuentas agrupadas por empresa, que es como se quieren leer */
+  const cuentasPorEmpresa = useMemo(() => {
+    const nombreDe = (id: number | null) =>
+      id === null ? 'sin asignar' : lista.find((d) => d.distribuidorId === id)?.nombre ?? '#' + id
+    const q = buscaCuenta.trim().toLowerCase()
+    const mapa = new Map<string, UsuarioInterno[]>()
+    for (const c of cuentas) {
+      const empresa = nombreDe(c.distribuidorId)
+      if (q && ![c.nombre, c.email, empresa].join(' ').toLowerCase().includes(q)) continue
+      const ya = mapa.get(empresa)
+      if (ya) ya.push(c)
+      else mapa.set(empresa, [c])
+    }
+    // las que quedaron sin empresa van al final: son las que hay que atender
+    return [...mapa.entries()].sort((a, b) =>
+      a[0] === 'sin asignar' ? 1 : b[0] === 'sin asignar' ? -1 : a[0].localeCompare(b[0], 'es'),
+    )
+  }, [cuentas, lista, buscaCuenta])
+
   const [edita, setEdita] = useState<DatosDistribuidor | null>(null)
   const [guardando, setGuardando] = useState(false)
   const [verClave, setVerClave] = useState(false)
@@ -319,6 +361,54 @@ export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Pr
                 </tbody>
               </table>
             </div>
+          )}
+
+          {!edita && puedeVerCuentas && (
+            <>
+              <h3 style={{ margin: '28px 0 6px' }}>
+                Cuentas de distribuidor <span className="cuenta">{cuentas.length}</span>
+              </h3>
+              <p className="sub" style={{ marginTop: 0 }}>
+                Quién entra a nombre de cada empresa. Es solo para consultar: las cuentas se
+                aprueban en Solicitudes y ahí se les asigna la empresa.
+              </p>
+              <div className="campo" style={{ maxWidth: 320, marginBottom: 12 }}>
+                <input
+                  value={buscaCuenta}
+                  onChange={(e) => setBuscaCuenta(e.target.value)}
+                  placeholder="Buscar por persona, correo o empresa"
+                />
+              </div>
+              {cuentasPorEmpresa.length === 0 ? (
+                <p className="sub">
+                  {cuentas.length === 0
+                    ? 'Todavía no hay cuentas de distribuidor.'
+                    : 'Ninguna cuenta calza con esa búsqueda.'}
+                </p>
+              ) : (
+                cuentasPorEmpresa.map(([empresa, gente]) => (
+                  <div key={empresa} style={{ marginBottom: 16 }}>
+                    <h4 style={{ margin: '0 0 6px', color: 'var(--text-2)' }}>
+                      {empresa} <span className="cuenta">{gente.length}</span>
+                    </h4>
+                    <table>
+                      <thead>
+                        <tr><th>Nombre</th><th>Correo</th><th>Estado</th></tr>
+                      </thead>
+                      <tbody>
+                        {gente.map((c) => (
+                          <tr key={c.id}>
+                            <td style={{ fontWeight: 600 }}>{c.nombre || '—'}</td>
+                            <td>{c.email || '—'}</td>
+                            <td>{c.activo ? 'Activo' : 'Inactivo'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))
+              )}
+            </>
           )}
         </div>
 
