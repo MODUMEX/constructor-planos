@@ -22,6 +22,8 @@ export interface UsuarioInterno {
   email: string
   rol: Rol
   activo: boolean
+  /** de qué empresa es la cuenta; solo lo llevan las de rol Distribuidor */
+  distribuidorId: number | null
 }
 
 /** lo que se manda al dar de alta o editar */
@@ -44,9 +46,10 @@ interface Fila {
   email: string | null
   rol: string | null
   activo: boolean | null
+  distribuidor_id: number | null
 }
 
-const COLUMNAS = 'id,nombre,email,rol,activo'
+const COLUMNAS = 'id,nombre,email,rol,activo,distribuidor_id'
 
 function deFila(f: Fila): UsuarioInterno {
   return {
@@ -55,6 +58,7 @@ function deFila(f: Fila): UsuarioInterno {
     email: f.email ?? '',
     rol: (f.rol ?? 'Distribuidor') as Rol,
     activo: f.activo !== false,
+    distribuidorId: f.distribuidor_id ?? null,
   }
 }
 
@@ -76,16 +80,41 @@ function sesionValida(u: Usuario | null): string | null {
   return null
 }
 
+/**
+ * Las cuentas de los DISTRIBUIDORES, con la empresa a la que están ligadas.
+ *
+ * Hasta ahora no se veían en ningún lado: la pantalla de Usuarios las dejaba
+ * fuera a propósito —son de la empresa, no del equipo— y la de Distribuidores
+ * muestra la ficha, no quién entra con ella. Así que no había forma de
+ * responder "¿quién tiene acceso a nombre de esta empresa?".
+ *
+ * Lee `profiles` directo, igual que la lista de internos, así que vale para
+ * Super Admin: es lo que la RLS permite sin pasar por la Edge Function.
+ */
+export async function listarCuentasDistribuidor(
+  usuario: Usuario | null,
+): Promise<Resultado<UsuarioInterno[]>> {
+  return consultarProfiles(usuario, 'rol=eq.Distribuidor')
+}
+
+/** los internos: el equipo de Modumex. Los distribuidores van en su propia lista. */
 export async function listarUsuarios(usuario: Usuario | null): Promise<Resultado<UsuarioInterno[]>> {
+  return consultarProfiles(usuario, 'rol=neq.Distribuidor')
+}
+
+/** una consulta a profiles con el filtro que sea; la RLS la deja solo al Super Admin */
+async function consultarProfiles(
+  usuario: Usuario | null,
+  filtro: string,
+): Promise<Resultado<UsuarioInterno[]>> {
   if (!URL_SUPABASE || !LLAVE_SUPABASE) {
     return { ok: false, mensaje: 'Sin Supabase configurado: no hay lista de usuarios.' }
   }
   const falta = sesionValida(usuario)
   if (falta) return { ok: false, mensaje: falta }
   try {
-    // los distribuidores se quedan fuera: se gestionan en su propia pantalla
     const r = await fetch(
-      `${URL_SUPABASE}/rest/v1/profiles?select=${COLUMNAS}&rol=neq.Distribuidor&order=nombre.asc`,
+      `${URL_SUPABASE}/rest/v1/profiles?select=${COLUMNAS}&${filtro}&order=nombre.asc`,
       { headers: cabeceras(usuario!.token!) },
     )
     if (!r.ok) {
@@ -154,6 +183,8 @@ export async function crearUsuario(usuario: Usuario | null, d: DatosUsuario): Pr
       email: (d.email ?? '').trim(),
       rol: (d.rol ?? 'Vendedor') as Rol,
       activo: d.activo !== false,
+      // los que se dan de alta acá son internos: no cuelgan de ninguna empresa
+      distribuidorId: null,
     },
     mensaje: 'Usuario dado de alta con su cuenta de acceso.',
   }
@@ -182,6 +213,7 @@ export async function guardarUsuario(
     ok: true,
     dato: {
       id: d.id,
+      distribuidorId: d.distribuidorId ?? null,
       nombre: (d.nombre ?? '').trim(),
       email: d.email ?? '',
       rol: (d.rol ?? 'Vendedor') as Rol,
