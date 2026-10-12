@@ -167,16 +167,23 @@ export function generarSyclick(proyecto: Proyecto, _pais: Pais = 'MX'): Uint8Arr
       fijo ? config.color.slice(0, 60) : '',
     ])
 
+    /**
+     * Para Syclick dos renglones son el mismo cuando coinciden SKU, medida y
+     * remate. El despiece los trae separados porque distingue cosas que acá no
+     * viajan —una puerta izquierda de una derecha, una pilastra central de una
+     * lateral—, y sin juntarlos la hoja salía con dos filas idénticas que la
+     * plataforma suma igual pero que al leerlas parecen un error.
+     */
+    const juntos = new Map<string, (string | number)[]>()
     for (const r of agrupar(piezasDeArea(area), config)) {
-      captura.filas.push([
-        nombres[i],
-        skuSyclick(r.familia, config, cabinas),
-        r.anchoCm,
-        r.altoCm,
-        remate(r.familia, config),
-        r.cantidad,
-      ])
+      const sku = skuSyclick(r.familia, config, cabinas)
+      const rem = remate(r.familia, config)
+      const clave = `${sku}|${r.anchoCm}|${r.altoCm}|${rem}`
+      const ya = juntos.get(clave)
+      if (ya) ya[5] = Number(ya[5]) + r.cantidad
+      else juntos.set(clave, [nombres[i], sku, r.anchoCm, r.altoCm, rem, r.cantidad])
     }
+    for (const fila of juntos.values()) captura.filas.push(fila)
   })
 
   const otros: HojaXlsx = { nombre: 'Otros productos', filas: [['SKU', 'Cantidad']] }
