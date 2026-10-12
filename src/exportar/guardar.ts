@@ -59,6 +59,8 @@ export async function guardarArchivo(
 
 export const FILTRO_PDF: Filtro[] = [{ nombre: 'Plano en PDF', extensiones: ['pdf'] }]
 export const FILTRO_CSV: Filtro[] = [{ nombre: 'Orden de compra para el CIP', extensiones: ['csv'] }]
+export const FILTRO_XLSX: Filtro[] = [{ nombre: 'Excel para Syclick', extensiones: ['xlsx'] }]
+export const TIPO_XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
 /** el CIP y Excel leen el CSV con el BOM adelante */
 export function csvABytes(texto: string): Uint8Array {

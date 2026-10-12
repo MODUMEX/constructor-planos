@@ -72,10 +72,21 @@ const GRUPOS_LEEDER: [RegExp, 1 | 2][] = [
   [/^walnut(\s|$)|walnut\s*(heights|premium|std)/i, 2],
 ]
 
+/**
+ * Los grupos de SUPERIOR salen de Syclick, que es donde se cotiza de verdad.
+ *
+ * Tres no coincidian y el Constructor cobraba distinto que la plataforma
+ * (12-oct-2026): Ebano y Fashion White caian en ESPECIAL porque no hay
+ * materia prima de 3 mm cargada, y el Gris Metalizado estaba en el grupo 1
+ * cuando en Syclick es del 2. El grupo es de PRECIO, no de existencias: que
+ * todavia no haya lamina no vuelve especial a un color de carta.
+ */
 const GRUPOS_SUPERIOR: [RegExp, 1 | 2][] = [
   [/alumina|aluminak|alumink|aluminav/i, 1],
+  [/ebano/i, 1],
+  [/fashion\s*white/i, 1],
   [/grafito\s*nocturno/i, 1],
-  [/gris\s*metali[cz]/i, 1],
+  [/gris\s*metali[cz]/i, 2],
   // el antiguo va ANTES que el blanco pelado, si no se lo come la otra regla
   [/blanco\s*antiguo/i, 2],
   [/^blanco|blanco\s*157|whitec/i, 2],

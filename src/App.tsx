@@ -3,11 +3,12 @@ import Login from './components/Login'
 import PreviewTipologia from './components/PreviewTipologia'
 import EditorPlano, { formatear } from './components/EditorPlano'
 import { generarCSV, nombreArchivoCSV } from './exportar/csv'
+import { generarSyclick, nombreArchivoSyclick } from './exportar/syclick'
 import { generarPDF, nombreArchivoPDF } from './exportar/pdf'
 import {
   descuentosDelDistribuidor, generarCotizacionPDF, nombreArchivoCotizacion, resumenDePiezas, totalesDe,
 } from './exportar/cotizacion'
-import { csvABytes, FILTRO_CSV, FILTRO_PDF, guardarArchivo } from './exportar/guardar'
+import { csvABytes, FILTRO_CSV, FILTRO_PDF, FILTRO_XLSX, guardarArchivo, TIPO_XLSX } from './exportar/guardar'
 import { abrirProyecto, armarNumero, numeroTomado, partirNumero, siguienteNumeroPlano } from './proyectos'
 import {
   autorizar as autorizarEnOdoo, cuadran, guardarCotizacion, lineasParaOdoo, rechazar as rechazarCotizacion,
@@ -1715,6 +1716,12 @@ export default function App() {
     setGuardado(ruta ? `Orden de compra guardada en ${ruta}` : null)
   }
 
+  async function bajarSyclick() {
+    const bytes = generarSyclick(proyectoConAutor, proyecto.paisFabricacion)
+    const ruta = await guardarArchivo(nombreArchivoSyclick(proyecto), bytes, TIPO_XLSX, FILTRO_XLSX)
+    setGuardado(ruta ? `Excel de Syclick guardado en ${ruta}` : null)
+  }
+
   /**
    * La cotización en PDF. Son dos hojas distintas:
    *
@@ -2046,6 +2053,7 @@ export default function App() {
                 <div className="div" />
                 <button className="btn chico" onClick={bajarPDF}>Plano en PDF</button>
                 <button className="btn chico" onClick={bajarCSV}>CSV para el CIP</button>
+                <button className="btn chico" onClick={bajarSyclick}>Excel para Syclick</button>
                 <div className="div" />
                 <span className="chip on">Arrastrá los paneles · clic derecho en una pieza</span>
                 {pilastrasElegidas > 0 && (
@@ -3324,6 +3332,7 @@ export default function App() {
                     </button>
                     <button className="btn" onClick={bajarPDF}>Plano en PDF</button>
                     <button className="btn" onClick={bajarCSV}>CSV para el CIP</button>
+                    <button className="btn" onClick={() => void bajarSyclick()}>Excel para Syclick</button>
                   </div>
 
                   {avisoProyecto && (

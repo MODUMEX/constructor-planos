@@ -1,7 +1,7 @@
 {
   "name": "constructor-de-planos",
   "private": true,
-  "version": "2.83.1",
+  "version": "2.84.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -47,7 +47,8 @@
     "probar-arrastre": "esbuild scripts/probar-arrastre.ts --bundle --platform=node --format=esm --outfile=.arr.mjs --log-level=warning --define:import.meta.env={} && node .arr.mjs",
     "probar-colores-mx": "esbuild scripts/probar-colores-mx.ts --bundle --platform=node --format=esm --outfile=.cmx.mjs --log-level=warning --define:import.meta.env={} && node .cmx.mjs",
     "probar-centros": "esbuild scripts/probar-centros.ts --bundle --platform=node --format=esm --outfile=.cen.mjs --log-level=warning --define:import.meta.env={} && node .cen.mjs",
-    "probar-costilla": "esbuild scripts/probar-costilla.ts --bundle --platform=node --format=esm --outfile=.cos.mjs --log-level=warning --define:import.meta.env={} && node .cos.mjs"
+    "probar-costilla": "esbuild scripts/probar-costilla.ts --bundle --platform=node --format=esm --outfile=.cos.mjs --log-level=warning --define:import.meta.env={} && node .cos.mjs",
+    "probar-syclick": "esbuild scripts/probar-syclick.ts --bundle --platform=node --format=esm --outfile=.syclick.mjs --log-level=warning && node .syclick.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",
