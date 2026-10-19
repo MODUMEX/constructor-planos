@@ -13,6 +13,7 @@ import { abrirProyecto, armarNumero, numeroTomado, partirNumero, siguienteNumero
 import {
   autorizar as autorizarEnOdoo, cuadran, guardarCotizacion, lineasParaOdoo, rechazar as rechazarCotizacion,
 } from './odoo/enviar'
+import { destinoOdoo } from './odoo/region'
 import { esAdmin, faltaParaVencer, IVA_CR, puedeCatalogos, puedeColoresReservados, puedeDistribuidores, puedePiezas, puedeUsuarios, renovarSesion, type Usuario } from './auth'
 import type { Area, Cabina, Config, Soporte, Moneda, Pais, Proyecto, TipoCabina, TipologiaId, Tramo } from './types'
 import {
@@ -1662,19 +1663,27 @@ export default function App() {
    * las guarda como cotización y recién entonces las manda. Si la plata de las
    * piezas no coincide con la de la cotización de pantalla, frena.
    */
-  async function autorizarProyecto(p: { proyectoId: number; codigo: string }) {
+  async function autorizarProyecto(p: { proyectoId: number; codigo: string; distribuidorId?: number | null }) {
     const abierto = await abrirProyecto(usuario, p.proyectoId)
     if (!abierto.ok || !abierto.dato) return { ok: false, mensaje: abierto.mensaje }
     const suyo = abierto.dato
 
-    const region = distribuidores.find((d) => d.nombre === suyo.distribuidor)?.region ?? null
-    if (region !== 'Costa Rica') {
-      return {
-        ok: false,
-        mensaje: `A Odoo solo va lo de Costa Rica. "${suyo.distribuidor || 'sin distribuidor'}" es de ${region ?? 'región sin definir'}.`,
-      }
-    }
-    const moneda: Moneda = 'CRC'
+    /**
+     * De qué distribuidor es, para saber su región.
+     *
+     * Manda el ID de la fila, no el nombre guardado en el proyecto. El nombre
+     * es texto libre que quedó congelado el día que se guardó, y la ficha pudo
+     * cambiar desde entonces: "DICOMA" se abrió en "DICOMA CR" y "DICOMA
+     * LATAM", y entonces buscar por nombre no encontraba nada y hasta los
+     * proyectos de Costa Rica quedaban fuera. El nombre queda de respaldo para
+     * los proyectos viejos que se guardaron sin dueño.
+     */
+    const ficha = distribuidores.find((d) => Number(d.distribuidorId) === Number(p.distribuidorId))
+      ?? distribuidores.find((d) => d.nombre === suyo.distribuidor)
+
+    const destino = destinoOdoo(ficha, suyo.distribuidor)
+    if (!destino.ok) return { ok: false, mensaje: destino.mensaje }
+    const moneda: Moneda = destino.moneda
     const precios = { moneda, tipoCambio: TC, tarifas: tarifas?.tabla, pais: suyo.paisFabricacion }
 
     const { lineas, faltan } = lineasParaOdoo(suyo, precios)
@@ -1690,11 +1699,13 @@ export default function App() {
     const guardada = await guardarCotizacion(usuario, {
       proyectoId: p.proyectoId,
       numero: suyo.numero,
-      distribuidorId: Number(distribuidores.find((d) => d.nombre === suyo.distribuidor)?.distribuidorId) || null,
+      distribuidorId: Number(ficha?.distribuidorId) || null,
       moneda,
       tipoCambio: TC,
-      descuentoPct: descuentoDelDistribuidor(suyo.distribuidor),
-      ivaPct: ivaDelDistribuidor(suyo.distribuidor),
+      // por la ficha, no por el nombre: el descuento y el IVA salen de ella, y
+      // si el nombre no calza se cobraba el del usuario en vez del del cliente
+      descuentoPct: descuentoDeDistribuidor(ficha, usuario?.descuento ?? 0),
+      ivaPct: ivaDeDistribuidor(ficha, usuario?.ivaPorcentaje ?? IVA_CR),
       pais: suyo.paisFabricacion,
       modelo: config?.modelo ?? '',
       tier: tierDeColor(config?.color ?? '', suyo.paisFabricacion, config?.linea, config?.acabado),

@@ -1,7 +1,7 @@
 {
   "name": "constructor-de-planos",
   "private": true,
-  "version": "2.84.1",
+  "version": "2.85.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -49,7 +49,9 @@
     "probar-centros": "esbuild scripts/probar-centros.ts --bundle --platform=node --format=esm --outfile=.cen.mjs --log-level=warning --define:import.meta.env={} && node .cen.mjs",
     "probar-costilla": "esbuild scripts/probar-costilla.ts --bundle --platform=node --format=esm --outfile=.cos.mjs --log-level=warning --define:import.meta.env={} && node .cos.mjs",
     "probar-syclick": "esbuild scripts/probar-syclick.ts --bundle --platform=node --format=esm --outfile=.syclick.mjs --log-level=warning && node .syclick.mjs",
-    "ejemplo-syclick": "esbuild scripts/ejemplo-syclick.ts --bundle --platform=node --format=esm --outfile=.ejsy.mjs --log-level=warning && node .ejsy.mjs"
+    "ejemplo-syclick": "esbuild scripts/ejemplo-syclick.ts --bundle --platform=node --format=esm --outfile=.ejsy.mjs --log-level=warning && node .ejsy.mjs",
+    "reglas": "esbuild scripts/reglas.ts --bundle --platform=node --format=esm --outfile=.reglas.mjs --log-level=warning && node .reglas.mjs",
+    "probar-odoo-region": "esbuild scripts/probar-odoo-region.ts --bundle --platform=node --format=esm --outfile=.pregion.mjs --log-level=warning --define:import.meta.env={} && node .pregion.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",
