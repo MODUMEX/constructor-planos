@@ -3,6 +3,7 @@ import type { Usuario } from '../auth'
 import { tierDeColor } from '../catalog'
 import { precioPieza, type TablaTarifas } from '../tarifas'
 import { agrupar, piezasDeArea } from '../exportar/piezas'
+import { renglonesDeExtras } from '../extras'
 import { esSku, skuOdoo } from './sku'
 
 /**
@@ -47,12 +48,50 @@ export interface Precios {
  * Las piezas del proyecto con su código de Odoo y su precio. `faltan` trae las
  * que Odoo no puede recibir, con el motivo, para poder decirlo en pantalla.
  */
+/**
+ * Con qué tarifa se cobran los extras del proyecto: la del área uno, que es el
+ * color y el modelo del proyecto.
+ *
+ * Vive acá y la usan los DOS lados —lo que se manda a Odoo y la cotización
+ * contra la que se compara— para que no puedan diferir.
+ */
+export function opcionesDeExtras(proyecto: Proyecto, precios: Precios) {
+  const cfg = proyecto.areas[0]?.config
+  return {
+    modeloCodigo: cfg?.modelo ?? 'ESTANDAR',
+    tier: tierDeColor(cfg?.color ?? '', precios.pais, cfg?.linea, cfg?.acabado),
+    moneda: precios.moneda,
+    tipoCambio: precios.tipoCambio,
+    tarifas: precios.tarifas,
+  }
+}
+
 export function lineasParaOdoo(
   proyecto: Proyecto,
   precios: Precios,
 ): { lineas: LineaOdoo[]; faltan: string[] } {
   const lineas: LineaOdoo[] = []
   const faltan = new Set<string>()
+
+  /**
+   * Los extras —herraje suelto, grabado láser— se cotizan y se facturan igual
+   * que cualquier pieza, así que también van a Odoo. Antes se quedaban en la
+   * pantalla: el cliente los veía en su cotización y la orden salía sin ellos.
+   */
+  for (const r of renglonesDeExtras(proyecto.extras ?? [], opcionesDeExtras(proyecto, precios))) {
+    const codigo = (r.sku || '').trim()
+    if (!codigo || codigo.startsWith('EXTRA-')) {
+      faltan.add(`el extra "${r.descripcion}" no tiene código de artículo`)
+      continue
+    }
+    lineas.push({
+      codigo,
+      sku: codigo,
+      descripcion: r.descripcion,
+      cantidad: r.cantidad,
+      precioUnit: r.precioUnit,
+    })
+  }
 
   for (const area of proyecto.areas) {
     const config = area.config
@@ -94,11 +133,29 @@ export function cuadran(lineas: LineaOdoo[], renglones: RenglonBOM[]): { ok: boo
   const pantalla = renglones.reduce((s, r) => s + r.cantidad * r.precioUnit, 0)
   const dif = Math.abs(piezas - pantalla)
   if (dif <= 1) return { ok: true, mensaje: '' }
+
+  // Decir CUÁNTO sobra no alcanza para arreglarlo: hay que saber EN QUÉ. Se
+  // comparan los dos lados renglón por renglón y se nombran los que no calzan.
+  const porCodigo = new Map<string, { piezas: number; pantalla: number }>()
+  const sumar = (clave: string, lado: 'piezas' | 'pantalla', monto: number) => {
+    const v = porCodigo.get(clave) ?? { piezas: 0, pantalla: 0 }
+    v[lado] += monto
+    porCodigo.set(clave, v)
+  }
+  for (const l of lineas) sumar(l.codigo || l.sku, 'piezas', l.cantidad * l.precioUnit)
+  for (const r of renglones) sumar(r.sku || r.descripcion, 'pantalla', r.cantidad * r.precioUnit)
+  const culpables = [...porCodigo]
+    .filter(([, v]) => Math.abs(v.piezas - v.pantalla) > 0.5)
+    .sort((a, b) => Math.abs(b[1].piezas - b[1].pantalla) - Math.abs(a[1].piezas - a[1].pantalla))
+    .slice(0, 5)
+    .map(([k, v]) => `${k}: piezas ${v.piezas.toFixed(2)} vs pantalla ${v.pantalla.toFixed(2)}`)
+
   return {
     ok: false,
     mensaje:
       `El detalle por piezas suma ${piezas.toFixed(2)} y la cotización de pantalla ${pantalla.toFixed(2)}: `
-      + `sobran ${dif.toFixed(2)}. No se manda hasta saber cuál está bien.`,
+      + `sobran ${dif.toFixed(2)}. No se manda hasta saber cuál está bien.`
+      + (culpables.length ? ` Donde no calzan: ${culpables.join(' · ')}.` : ''),
   }
 }
 

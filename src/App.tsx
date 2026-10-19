@@ -11,7 +11,8 @@ import {
 import { csvABytes, FILTRO_CSV, FILTRO_PDF, FILTRO_XLSX, guardarArchivo, TIPO_XLSX } from './exportar/guardar'
 import { abrirProyecto, armarNumero, numeroTomado, partirNumero, siguienteNumeroPlano } from './proyectos'
 import {
-  autorizar as autorizarEnOdoo, cuadran, guardarCotizacion, lineasParaOdoo, rechazar as rechazarCotizacion,
+  autorizar as autorizarEnOdoo, cuadran, guardarCotizacion, lineasParaOdoo, opcionesDeExtras,
+  rechazar as rechazarCotizacion,
 } from './odoo/enviar'
 import { destinoOdoo } from './odoo/region'
 import { esAdmin, faltaParaVencer, IVA_CR, puedeCatalogos, puedeColoresReservados, puedeDistribuidores, puedePiezas, puedeUsuarios, renovarSesion, type Usuario } from './auth'
@@ -1690,8 +1691,13 @@ export default function App() {
     if (faltan.length) return { ok: false, mensaje: `No se puede mandar: ${faltan.join(' · ')}` }
     if (!lineas.length) return { ok: false, mensaje: 'El proyecto no tiene piezas que cotizar.' }
 
-    // el mismo cálculo que ve el vendedor en la pantalla de cotización
-    const dePantalla = suyo.areas.flatMap((a) => bom(a.tramos, a.config, precios))
+    // El mismo cálculo que ve el vendedor en la pantalla de cotización, con
+    // los extras incluidos: desde que los extras también van a Odoo, los dos
+    // lados tienen que contarlos o ninguno.
+    const dePantalla = [
+      ...suyo.areas.flatMap((a) => bom(a.tramos, a.config, precios)),
+      ...renglonesDeExtras(suyo.extras ?? [], opcionesDeExtras(suyo, precios)),
+    ]
     const cuadra = cuadran(lineas, dePantalla)
     if (!cuadra.ok) return { ok: false, mensaje: cuadra.mensaje }
 

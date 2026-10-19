@@ -1492,10 +1492,59 @@ export function bom(
 
   for (const tramo of tramos) {
     const n = pilastrasDe(tramo)
+    /**
+     * En "variación panel" la cabina accesible se entra por el frente, y ese
+     * frente tiene sus propias piezas —lateral, frente y cierre—. La pilastra
+     * que la tira pone en esa punta NO se fabrica: la reemplazan esas tres. El
+     * despiece ya lo hacía así; la cotización la seguía cobrando.
+     */
+    const iAcc = esVariacionPanel(config.tipologia)
+      ? tramo.cabinas.findIndex((c) => c.tipo === 'accesible')
+      : -1
+    const saltar = iAcc === 0 ? 0 : iAcc >= 0 && iAcc === tramo.cabinas.length - 1 ? n - 1 : -1
+
     for (let i = 0; i < n; i++) {
+      if (i === saltar) continue
       const ancho = tramo.pilastras?.[i] ?? config.anchoPilastraCm
+      // Una pieza de ancho cero no existe. El despiece ya la saltaba; acá no, y
+      // en el cuarto PMR se colaba una "pilastra de 0 cm" que además se cobraba
+      // al precio de la más angosta.
+      if (ancho <= 0) continue
       const donde = familiaDelFrente(ancho, config.modelo) === 'PN' ? panelesDeFrentePorAncho : pilastrasPorAncho
       donde.set(ancho, (donde.get(ancho) ?? 0) + 1)
+    }
+
+    /**
+     * El FRENTE de la cabina accesible en las tipologías "variación panel".
+     *
+     * Sus piezas no son fronteras de la tira, así que el recorrido de arriba no
+     * las ve y la cotización las perdía: se cobraban las pilastras de la tira y
+     * no las del cuarto. Salen de `frenteAccesible`, la misma función que usan
+     * el plano y el despiece, que para eso vive acá.
+     */
+    if (esVariacionPanel(config.tipologia)) {
+      const acc = tramo.cabinas.find((c) => c.tipo === 'accesible')
+      if (acc) {
+        const f = frenteAccesible(acc, config)
+        for (const ancho of [f.pilastra, f.cierre]) {
+          if (ancho > 0) pilastrasPorAncho.set(ancho, (pilastrasPorAncho.get(ancho) ?? 0) + 1)
+        }
+        // la pieza del frente es pilastra si entra en el catálogo, y panel si se pasa
+        if (f.frente > 0) {
+          const donde = familiaDelFrente(f.frente, config.modelo) === 'PN'
+            ? panelesDeFrentePorAncho
+            : pilastrasPorAncho
+          donde.set(f.frente, (donde.get(f.frente) ?? 0) + 1)
+        }
+      }
+    }
+
+    // La costilla y el sándwich son piezas de verdad: se cortan, se empacan y
+    // se instalan, así que se cobran. Iban en el despiece y en lo que se manda
+    // a Odoo, pero no en la cotización, y por eso los dos no cuadraban.
+    for (const s of soportesDe(tramo, config)) {
+      if (s.anchoCm <= 0) continue
+      pilastrasPorAncho.set(s.anchoCm, (pilastrasPorAncho.get(s.anchoCm) ?? 0) + 1)
     }
     // El panel del cuarto PMR es más largo que los otros, así que se cuenta
     // aparte: cobrarlo con el fondo de las demás cabinas sería cobrar de menos.
