@@ -21,6 +21,15 @@ export interface Pieza {
   altoCm: number
   subTipo: string
   area: string
+  /**
+   * La pieza es de un cubículo de REGADERA.
+   *
+   * No alcanza con mirar la medida: en Reforzado la pilastra que comparte con
+   * el inodoro de al lado se queda en 210 y aun así es pieza de regadera. Y
+   * Syclick la pide con su propio modelo en el SKU —`RG` en vez de `ST`—,
+   * así que hay que saberlo pieza por pieza y no por área.
+   */
+  regadera?: boolean
 }
 
 const COLOR_ABREV: Record<string, string> = {
@@ -107,6 +116,8 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
    * de las dos que cargan.
    */
   const tipoDe = (i: number) => tramo.cabinas[i]?.tipo
+  /** la pieza es de un cubículo de regadera si toca uno, de cualquiera de sus dos lados */
+  const esRegadera = (...is: number[]) => is.some((i) => tipoDe(i) === 'regadera')
   const altoPuertaDe = (i: number) => alturasDeCabina(config.modelo, tipoDe(i)).puerta
   const altoPanelEntre = (i: number) => altoEntre(config.modelo, 'panel', tipoDe(i), tipoDe(i + 1))
   const altoPilEntre = (i: number) => altoEntre(config.modelo, 'pilastra', tipoDe(i - 1), tipoDe(i))
@@ -128,6 +139,7 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
         altoCm: altoPuertaDe(i),
         subTipo: subTipoPuerta(cab, contraMuro),
         area,
+        regadera: esRegadera(i),
       })
     }
 
@@ -178,6 +190,7 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
           altoCm: altoPanelEntre(i),
           subTipo: esUltima || esDelCuarto ? 'PNLAT' : 'PNCEN',
           area,
+          regadera: esRegadera(i, i + 1),
         })
       }
     }
@@ -205,7 +218,10 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
   const arrancaLaAccesible =
     llevaAccesibleSiempre(config.tipologia) && tramo.cabinas[0]?.tipo === 'accesible'
   if (n > 0 && !tramo.muroInicio && !arrancaLaAccesible) {
-    piezas.push({ familia: 'PN', anchoCm: config.profundidadCm, altoCm: altoPanelEntre(-1), subTipo: 'PNLAT', area })
+    piezas.push({
+      familia: 'PN', anchoCm: config.profundidadCm, altoCm: altoPanelEntre(-1),
+      subTipo: 'PNLAT', area, regadera: esRegadera(0),
+    })
   }
 
   // pilastras: una en cada extremo y una por divisor interno.
@@ -241,6 +257,7 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
         familia: familiaDe(0),
         anchoCm: anchoDe(0),
         altoCm: altoPilEntre(0),
+        regadera: esRegadera(0),
         // contra el muro la pilastra tiene su propio subtipo; un panel no
         subTipo: familiaDe(0) === 'PN' ? 'PNLAT' : tramo.muroInicio ? 'PLLATMUR' : 'PLLAT',
         area,
@@ -262,6 +279,7 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
         familia: familiaDe(i + 1),
         anchoCm: anchoDe(i + 1),
         altoCm: altoPilEntre(i + 1),
+        regadera: esRegadera(i, i + 1),
         subTipo: subTipoDe(i + 1, cierraLaTira || salaDelCuarto),
         area,
       })
@@ -273,6 +291,7 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
         familia: familiaDe(n),
         anchoCm: anchoDe(n),
         altoCm: altoPilEntre(n),
+        regadera: esRegadera(n - 1),
         subTipo: familiaDe(n) === 'PN' ? 'PNLAT' : tramo.muroFin ? 'PLLATMUR' : 'PLLAT',
         area,
       })
@@ -428,6 +447,8 @@ export interface RenglonAgrupado {
   familia: Familia
   anchoCm: number
   altoCm: number
+  /** la pieza es de un cubículo de regadera; Syclick la pide con otro SKU */
+  regadera?: boolean
 }
 
 /** junta piezas iguales, igual que hace la OC del Constructor actual */
@@ -435,7 +456,9 @@ export function agrupar(piezas: Pieza[], config: Config): RenglonAgrupado[] {
   const mapa = new Map<string, RenglonAgrupado>()
   for (const p of piezas) {
     const codigo = sku(p, config)
-    const clave = `${codigo}|${p.subTipo}|${p.area}`
+    // la de regadera no se junta con la normal aunque midan igual: Syclick las
+    // pide con SKU distinto
+    const clave = `${codigo}|${p.subTipo}|${p.area}|${p.regadera ? 'RG' : ''}`
     const previo = mapa.get(clave)
     if (previo) previo.cantidad += 1
     else
@@ -448,6 +471,7 @@ export function agrupar(piezas: Pieza[], config: Config): RenglonAgrupado[] {
         familia: p.familia,
         anchoCm: p.anchoCm,
         altoCm: p.altoCm,
+        regadera: p.regadera,
       })
   }
   return [...mapa.values()]

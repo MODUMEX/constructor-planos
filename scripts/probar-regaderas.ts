@@ -14,7 +14,8 @@
  *   npm run probar-regaderas
  */
 import { crearTramos, bom } from '../src/modulacion'
-import { piezasDeArea } from '../src/exportar/piezas'
+import { agrupar, piezasDeArea } from '../src/exportar/piezas'
+import { skuSyclick } from '../src/exportar/syclick'
 import { precioPieza } from '../src/tarifas'
 import { tierDeColor, alturasDe } from '../src/catalog'
 import type { Config, Tramo } from '../src/types'
@@ -27,7 +28,7 @@ function cfg(modelo: string): Config {
     tipologia: 'RECTA_ENTRE_MUROS', modelo, linea: 'LEEDER',
     claroCm: 270, profundidadCm: 150, cantidad: 3, alturaCm: 180,
     puertaCm: 60, anchoPilastraCm: 24, orinales: 0, anchoOrinalCm: 60,
-    montaje: 'PISO_HEADRAIL', color: 'BLANCO', acabado: 'Laminado Compacto',
+    montaje: 'PISO_HEADRAIL', color: 'ALUMINA 2103', acabado: 'Laminado Compacto',
     terminacion: 'ZOCLO', espesorMm: 12, mgAnchoCm: 45, mgAlturaCm: 120, mamparasMG: [],
   } as unknown as Config
 }
@@ -88,6 +89,34 @@ for (const modelo of ['ESTANDAR', 'REFORZADO']) {
   const sinReg = crearTramos('RECTA_ENTRE_MUROS', 270, 3, config, 'MX')
   const base = bom(sinReg, config, precios).reduce((s, r) => s + r.cantidad * r.precioUnit, 0)
   ok(pantalla > base, `cobra más que sin regadera (${base.toFixed(2)} → ${pantalla.toFixed(2)})`)
+}
+
+console.log('\n— el SKU de Syclick: una pieza de regadera lleva RG, no ST')
+{
+  // De la cotización 103451 de Sanimax (Bodega Pitic), que trae las dos cosas
+  // en el mismo presupuesto:
+  //   L-M1-LC-ST-PL-G1   pilastra del área Estándar
+  //   L-M1-LC-RG-PL-G1   pilastra del cubículo de regadera
+  const { tramos, config } = conRegadera('ESTANDAR')
+  const piezas = piezasDeArea({ nombre: 'A', tramos, config } as never)
+  const filas = agrupar(piezas, config).map((r) => ({
+    sku: skuSyclick(r.familia, config, 3, r.regadera),
+    medida: `${r.anchoCm}x${r.altoCm}`,
+    cant: r.cantidad,
+  }))
+  for (const f of filas) console.log(`   ${f.sku.padEnd(16)} ${f.medida.padEnd(9)} ×${f.cant}`)
+
+  const rg = filas.filter((f) => f.sku.includes('-RG-'))
+  const st = filas.filter((f) => f.sku.includes('-ST-'))
+  ok(rg.length > 0, 'las piezas de la regadera salen con RG')
+  ok(st.length > 0, 'las de los inodoros siguen con ST')
+  ok(rg.some((f) => f.sku === 'L-M1-LC-RG-PT-G1'), 'la puerta de la regadera: L-M1-LC-RG-PT-G1')
+  ok(rg.some((f) => f.sku === 'L-M1-LC-RG-PN-G1'), 'su panel: L-M1-LC-RG-PN-G1')
+  ok(rg.some((f) => f.sku === 'L-M1-LC-RG-PL-G1'), 'sus pilastras: L-M1-LC-RG-PL-G1')
+  ok(
+    st.every((f) => !f.sku.includes('-RG-')),
+    'y ninguna pieza de inodoro se fue con el SKU de regadera',
+  )
 }
 
 console.log(mal === 0 ? '\nTodo cuadra.' : `\n${mal} caso(s) mal.`)

@@ -92,14 +92,15 @@ export function grupoSyclick(config: Config, cabinas: number): string {
 }
 
 /** el SKU de Syclick para esa familia de pieza */
-export function skuSyclick(familia: string, config: Config, cabinas: number): string {
+export function skuSyclick(familia: string, config: Config, cabinas: number, regadera = false): string {
   const acabado =
     config.acabado === 'Acero Inoxidable' ? 'A' : config.acabado === 'Esmaltada Antigrafiti' ? 'E' : 'LC'
   return [
     LINEA[config.linea],
     MODELO[config.linea],
     acabado,
-    COMERCIAL[config.modelo] ?? 'ST',
+    // una pieza de regadera lleva SU modelo, aunque el área sea Estándar
+    regadera ? COMERCIAL.REGADERAS : COMERCIAL[config.modelo] ?? 'ST',
     FAMILIA[familia] ?? familia,
     grupoSyclick(config, cabinas),
   ].join('-')
@@ -176,7 +177,7 @@ export function generarSyclick(proyecto: Proyecto, _pais: Pais = 'MX'): Uint8Arr
      */
     const juntos = new Map<string, (string | number)[]>()
     for (const r of agrupar(piezasDeArea(area), config)) {
-      const sku = skuSyclick(r.familia, config, cabinas)
+      const sku = skuSyclick(r.familia, config, cabinas, r.regadera)
       const rem = remate(r.familia, config)
       const clave = `${sku}|${r.anchoCm}|${r.altoCm}|${rem}`
       const ya = juntos.get(clave)
