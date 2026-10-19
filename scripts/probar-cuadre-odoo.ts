@@ -105,7 +105,11 @@ console.log('\n— barrido: todas las tipologías × claros × cabinas × modelo
       for (const cant of [2, 3, 4, 5, 6]) {
         for (const claro of [250, 300, 350, 400, 450, 500, 600]) {
           for (const moneda of ['USD', 'CRC'] as Moneda[]) {
-            const config = { ...cfg(claro, cant, tip), modelo } as Config
+            // La pilastra del divisor del cuarto PMR solo aparece cuando el
+            // vendedor la pone sobre el plano; sin ella el caso que falló en
+            // producción no se reproducía.
+            for (const pilastraPmrCm of [0, 24, 30]) {
+            const config = { ...cfg(claro, cant, tip), modelo, pilastraPmrCm } as Config
             let tramos
             try {
               tramos = crearTramos(tip, claro, cant, config, moneda === 'CRC' ? 'CR' : 'MX')
@@ -131,10 +135,11 @@ console.log('\n— barrido: todas las tipologías × claros × cabinas × modelo
               malos++
               if (malos <= 8) {
                 console.log(
-                  `  ✕ ${tip} ${modelo} claro ${claro} ×${cant} ${moneda}: ` +
+                  `  ✕ ${tip} ${modelo} claro ${claro} ×${cant} ${moneda} pilPMR ${pilastraPmrCm}: ` +
                   `pantalla ${pantalla.toFixed(2)} piezas ${piezas.toFixed(2)} dif ${(piezas - pantalla).toFixed(2)}`,
                 )
               }
+            }
             }
           }
         }

@@ -1556,6 +1556,13 @@ export function bom(
     } else {
       paneles += panelesDe(tramo)
     }
+    // El divisor del cuarto es panel + puerta + ESTA pilastra, la que cierra
+    // contra el muro del fondo. El despiece la emite y la cotización no la
+    // cobraba: por eso en los proyectos con cuarto PMR faltaba justo una
+    // pilastra. Sale 0 cuando el fondo no deja lugar para ella, y ahí no va.
+    if (delCuarto && delCuarto.pilastra > 0) {
+      pilastrasPorAncho.set(delCuarto.pilastra, (pilastrasPorAncho.get(delCuarto.pilastra) ?? 0) + 1)
+    }
     let nMg = 0
     tramo.cabinas.forEach((cab, i) => {
       if (cab.puerta.tipo === 'puerta' && cab.tipo !== 'orinal') {
@@ -1600,6 +1607,7 @@ export function bom(
   for (const [ancho, cantidad] of [...puertas.entries()].sort((a, b) => a[0] - b[0])) {
     renglones.push({
       sku: `${codigoLinea}-PT${ancho}`,
+      clave: `PT${ancho}x${alturas.puerta}`,
       descripcion: `Puerta ${ancho} × ${alturas.puerta} cm`,
       tipo: 'Puerta',
       cantidad,
@@ -1610,6 +1618,7 @@ export function bom(
   if (paneles > 0) {
     renglones.push({
       sku: `${codigoLinea}-PN${config.profundidadCm}`,
+      clave: `PN${config.profundidadCm}x${alturas.panel}`,
       descripcion: `Panel divisor ${config.profundidadCm} × ${alturas.panel} cm`,
       tipo: 'Panel',
       cantidad: paneles,
@@ -1625,6 +1634,7 @@ export function bom(
   for (const [ancho, cantidad] of [...panelesDeFrentePorAncho.entries()].sort((a, b) => a[0] - b[0])) {
     renglones.push({
       sku: `${codigoLinea}-PN${ancho}`,
+      clave: `PN${ancho}x${altoPil}`,
       descripcion: `Panel de frente ${ancho} × ${altoPil} cm`,
       tipo: 'Panel',
       cantidad,
@@ -1635,6 +1645,7 @@ export function bom(
   for (const [ancho, cantidad] of [...panelesDelCuarto.entries()].sort((a, b) => a[0] - b[0])) {
     renglones.push({
       sku: `${codigoLinea}-PN${ancho}`,
+      clave: `PN${ancho}x${alturas.panel}`,
       descripcion: `Panel del cuarto accesible ${ancho} × ${alturas.panel} cm`,
       tipo: 'Panel',
       cantidad,
@@ -1646,6 +1657,7 @@ export function bom(
   for (const [ancho, cantidad] of [...pilastrasPorAncho.entries()].sort((a, b) => a[0] - b[0])) {
     renglones.push({
       sku: `${codigoLinea}-PI${sufijoPil}${ancho}`,
+      clave: `PL${ancho}x${altoPil}`,
       descripcion: `Pilastra ${ancho} × ${altoPil} cm`,
       tipo: 'Pilastra',
       cantidad,
@@ -1666,6 +1678,7 @@ export function bom(
     const [ancho, alto] = clave.split('x').map(Number)
     renglones.push({
       sku: `${codigoLinea}-MG${ancho}${alto}`,
+      clave: `MG${ancho}x${alto}`,
       descripcion: `Mingitorio ${ancho} × ${alto} cm`,
       tipo: 'Mingitorio',
       cantidad,

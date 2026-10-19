@@ -414,6 +414,11 @@ export interface Proyecto {
 
 export interface RenglonBOM {
   sku: string
+  /**
+   * Familia y medida, para poder comparar este renglón contra el mismo
+   * renglón del despiece. El SKU no sirve de llave: cada camino arma el suyo.
+   */
+  clave?: string
   descripcion: string
   tipo: string
   cantidad: number

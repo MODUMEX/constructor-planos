@@ -100,6 +100,7 @@ export function renglonesDeExtras(extras: Extra[], o: OpcionesPrecio): RenglonBO
       const medidas = esPorM2(x.tipo) && x.anchoCm && x.altoCm ? ` ${x.anchoCm} × ${x.altoCm} cm` : ''
       return {
         sku: (x.codigo || '').trim() || `EXTRA-${x.tipo.toUpperCase()}`,
+        clave: `EXTRA:${(x.codigo || '').trim() || x.tipo.toUpperCase()}`,
         descripcion: (x.descripcion || '').trim() || `${etiquetaExtra(x.tipo)}${medidas}`,
         tipo: etiquetaExtra(x.tipo),
         cantidad: Number(x.cantidad) || 0,

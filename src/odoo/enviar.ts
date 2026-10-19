@@ -30,6 +30,8 @@ export interface Resultado<T> {
 export interface LineaOdoo {
   /** el código que se guarda en cotizacion_linea */
   codigo: string
+  /** familia y medida, para poder comparar contra la cotización de pantalla */
+  clave?: string
   /** el código del producto en Odoo */
   sku: string
   descripcion: string
@@ -86,6 +88,7 @@ export function lineasParaOdoo(
     }
     lineas.push({
       codigo,
+      clave: `EXTRA:${codigo}`,
       sku: codigo,
       descripcion: r.descripcion,
       cantidad: r.cantidad,
@@ -110,6 +113,7 @@ export function lineasParaOdoo(
       if (!esSku(traduccion)) { faltan.add(traduccion.falta); continue }
       lineas.push({
         codigo: r.sku,
+        clave: `${r.familia}${r.anchoCm}x${r.altoCm}`,
         sku: traduccion.sku,
         descripcion: `${r.subTipo} ${r.anchoCm} x ${r.altoCm} cm · ${area.nombre}`,
         cantidad: r.cantidad,
@@ -134,17 +138,23 @@ export function cuadran(lineas: LineaOdoo[], renglones: RenglonBOM[]): { ok: boo
   const dif = Math.abs(piezas - pantalla)
   if (dif <= 1) return { ok: true, mensaje: '' }
 
-  // Decir CUÁNTO sobra no alcanza para arreglarlo: hay que saber EN QUÉ. Se
-  // comparan los dos lados renglón por renglón y se nombran los que no calzan.
-  const porCodigo = new Map<string, { piezas: number; pantalla: number }>()
+  /**
+   * Decir CUÁNTO sobra no alcanza para arreglarlo: hay que saber EN QUÉ.
+   *
+   * Se comparan por FAMILIA Y MEDIDA, que es el único idioma que hablan los
+   * dos lados: los SKU no sirven de llave porque cada camino arma el suyo
+   * —`LDR-PN150` contra `LM1LCRFPN150150ISZ`— y entonces todos los renglones
+   * salían marcados aunque la plata fuera la misma.
+   */
+  const porClave = new Map<string, { piezas: number; pantalla: number }>()
   const sumar = (clave: string, lado: 'piezas' | 'pantalla', monto: number) => {
-    const v = porCodigo.get(clave) ?? { piezas: 0, pantalla: 0 }
+    const v = porClave.get(clave) ?? { piezas: 0, pantalla: 0 }
     v[lado] += monto
-    porCodigo.set(clave, v)
+    porClave.set(clave, v)
   }
-  for (const l of lineas) sumar(l.codigo || l.sku, 'piezas', l.cantidad * l.precioUnit)
-  for (const r of renglones) sumar(r.sku || r.descripcion, 'pantalla', r.cantidad * r.precioUnit)
-  const culpables = [...porCodigo]
+  for (const l of lineas) sumar(l.clave ?? l.codigo ?? l.sku, 'piezas', l.cantidad * l.precioUnit)
+  for (const r of renglones) sumar(r.clave ?? r.sku ?? r.descripcion, 'pantalla', r.cantidad * r.precioUnit)
+  const culpables = [...porClave]
     .filter(([, v]) => Math.abs(v.piezas - v.pantalla) > 0.5)
     .sort((a, b) => Math.abs(b[1].piezas - b[1].pantalla) - Math.abs(a[1].piezas - a[1].pantalla))
     .slice(0, 5)
