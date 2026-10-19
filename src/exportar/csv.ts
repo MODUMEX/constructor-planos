@@ -40,7 +40,7 @@ export function generarCSV(proyecto: Proyecto): string {
           celda(r.subTipo),
           celda(r.orientacion),
           celda(r.area),
-          celda(modeloParaCsv(config)),
+          celda(modeloParaCsv(config, area.tramos)),
           celda(nombreSistema(config)),
           celda(config.color),
           config.kap ? 'SI' : 'NO',

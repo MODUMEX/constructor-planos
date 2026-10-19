@@ -8,8 +8,8 @@ import {
   profundidadDelLugar, pt, SOBRA_MURO_CM,
   type Marco,
 } from '../geometria'
-import { alturasDe, alzadoDe, mamparaDe, nombreHerraje, tipologia } from '../catalog'
-import { anchoDeSoporte, anchoTotal, arrancaElCuartoPmr, esEspacioLibre, ladosDeCabina, lugaresDe, mamparaEn, soportesDe } from '../modulacion'
+import { MODELO_REGADERA, alturasDe, alzadoDe, mamparaDe, nombreHerraje, tipologia } from '../catalog'
+import { altoPilEntre, anchoDeSoporte, anchoTotal, arrancaElCuartoPmr, esEspacioLibre, ladosDeCabina, lugaresDe, mamparaEn, soportesDe } from '../modulacion'
 import { COSTILLA_TOLERANCIA_CM } from '../catalog'
 import type { CuartoPmr } from '../geometria'
 import { agrupar, modeloParaCsv, nombreLinea, nombreSistema, piezasDeArea } from './piezas'
@@ -920,7 +920,9 @@ function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) 
     if (esMingitorio(tramo, k)) return
     const ancho = anchoPil(k)
     const centro = centroPilastra(tramo, cortes, k, ancho, cuarto)
-    doc.rect(aX(centro - ancho / 2), aY(hPilastra), ancho * e.k, hPilastra * e.k, 'FD')
+    // cada pilastra con SU alto: la que toca una regadera sube con ella
+    const hPil = altoPilEntre(tramo, k, area.config)
+    doc.rect(aX(centro - ancho / 2), aY(hPil), ancho * e.k, hPil * e.k, 'FD')
     // el zoclo o la pata al pie, los 10 cm que acota la ficha
     const conZoclo = area.config.terminacion === 'ZOCLO'
     const anchoBase = conZoclo ? ancho : Math.min(ancho, 6)
@@ -960,13 +962,17 @@ function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) 
     doc.setLineWidth(0.35)
     const x = aX(u0 + izq)
     const w = (u1 - der - (u0 + izq)) * e.k
-    // la puerta se apoya en su hueco del piso, no en el tope de la pilastra:
-    // en Reforzado quedan 30 abajo y otros 30 arriba, no 60 abajo
-    doc.rect(x, aY(hueco + hPuerta), w, hPuerta * e.k, 'FD')
+    // La puerta se apoya en su hueco del piso, no en el tope de la pilastra:
+    // en Reforzado quedan 30 abajo y otros 30 arriba, no 60 abajo. Y la de una
+    // regadera es más alta y arranca del piso, aunque el área sea Estándar.
+    const esReg = cab.tipo === 'regadera'
+    const hPt = esReg ? alturasDe(MODELO_REGADERA).puerta : hPuerta
+    const huecoPt = esReg ? alzadoDe(MODELO_REGADERA).pisoCm : hueco
+    doc.rect(x, aY(huecoPt + hPt), w, hPt * e.k, 'FD')
     // la manija, del lado que abre
     const lado = cab.puerta.mano === 'der' ? x + 3 : x + w - 3
     doc.setFillColor(MARCA[0], MARCA[1], MARCA[2])
-    doc.circle(lado, aY(hueco + hPuerta / 2), 0.7, 'F')
+    doc.circle(lado, aY(huecoPt + hPt / 2), 0.7, 'F')
   })
 
 
@@ -1238,7 +1244,7 @@ function cajetin(doc: jsPDF, proyecto: Proyecto, area: Area, hoja: number, hojas
   campo(1, 1, 'PISO', area.piso, 66)
   campo(1, 2, 'TIPOLOGÍA', tipologia(area.config.tipologia).nombre, 66)
 
-  campo(2, 0, 'LÍNEA / MODELO', `${nombreLinea(area.config.linea)} · ${modeloParaCsv(area.config)}`, 52)
+  campo(2, 0, 'LÍNEA / MODELO', `${nombreLinea(area.config.linea)} · ${modeloParaCsv(area.config, area.tramos)}`, 52)
   // El código de materia prima NO va al plano: es de adentro de Modumex y el
   // plano lo ve el distribuidor. Se sigue guardando y viaja en el CSV del CIP,
   // que es donde de verdad hace falta.

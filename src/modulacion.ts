@@ -4,7 +4,7 @@ import {
 } from './catalog'
 import type { Cabina, Config, Moneda, Pais, Soporte, Tramo, TipologiaId, RenglonBOM } from './types'
 import {
-  alturasDe, ANCHOS_PILASTRA, esSoloOrinales, esVariacionPanel, familiaDelFrente,
+  altoEntre, alturasDe, alturasDeCabina, ANCHOS_PILASTRA, esSoloOrinales, esVariacionPanel, familiaDelFrente,
   llevaAccesibleSiempre, mamparaDe, tipologia, tierDeColor, type MedidaMG,
 } from './catalog'
 import {
@@ -1323,6 +1323,33 @@ export function pilastrasDe(tramo: Tramo): number {
   return cuantas
 }
 
+/**
+ * El alto de la pilastra que está en la frontera `k`.
+ *
+ * Separa la cabina k−1 de la k, y es una sola pieza: lleva la más alta de las
+ * dos. Con una regadera en un área Estándar eso da 180 de los dos lados.
+ */
+export function altoPilEntre(tramo: Tramo, k: number, config: Config): number {
+  return altoEntre(config.modelo, 'pilastra', tramo.cabinas[k - 1]?.tipo, tramo.cabinas[k]?.tipo)
+}
+
+/**
+ * El alto de CADA panel divisor del tramo, en el mismo orden en que los cuenta
+ * `panelesDe`. Antes alcanzaba con el número —todos medían igual—, pero una
+ * regadera sube el suyo a 180 y los demás se quedan donde estaban.
+ */
+export function altosDePaneles(tramo: Tramo, config: Config): number[] {
+  const n = tramo.cabinas.length
+  if (n === 0) return []
+  const alto = (i: number, j: number) =>
+    altoEntre(config.modelo, 'panel', tramo.cabinas[i]?.tipo, tramo.cabinas[j]?.tipo)
+  const altos: number[] = []
+  for (let i = 0; i < n - 1; i++) if (!entreOrinales(tramo, i)) altos.push(alto(i, i + 1))
+  if (!tramo.muroInicio) altos.push(alto(0, 0))
+  if (!tramo.muroFin && tramo.cabinas[n - 1]?.tipo !== 'orinal') altos.push(alto(n - 1, n - 1))
+  return altos
+}
+
 export function panelesDe(tramo: Tramo): number {
   const n = tramo.cabinas.length
   if (n === 0) return 0
@@ -1467,20 +1494,48 @@ export function bom(
     tarifas: precios.tarifas,
     modulos: precios.modulos,
   }
-  const puertas = new Map<number, number>()
+  /**
+   * Las piezas se agrupan por ANCHO Y ALTO, no solo por ancho: un cubículo de
+   * regadera metido en un área Estándar lleva su puerta y su panel a 180
+   * mientras el resto sigue en 150, y agrupando solo por ancho los dos se
+   * cobrarían a la misma altura.
+   */
+  const clavePieza = (ancho: number, alto: number) => `${ancho}|${alto}`
+  const leerClave = (clave: string) => clave.split('|').map(Number) as [number, number]
+  const meter = (m: Map<string, number>, ancho: number, alto: number, cuantas = 1) => {
+    const k = clavePieza(ancho, alto)
+    m.set(k, (m.get(k) ?? 0) + cuantas)
+  }
+  // las alturas del ÁREA; cada pieza puede llevar otra si es de una regadera
+  const alturas = alturasDe(config.modelo)
+  const puertas = new Map<string, number>()
   // Las pilastras ya no son todas del mismo ancho: la modulación elige la
   // medida de catálogo que le toca a cada posición, así que se cuentan por
   // ancho para que la cotización cobre los m² de verdad.
-  const pilastrasPorAncho = new Map<number, number>()
+  const pilastrasPorAncho = new Map<string, number>()
   /**
    * Lo que va al frente pero NO es pilastra: pasado el tope del catálogo —120
    * cm de pilastra— la pieza que cierra es un PANEL. Se cuentan aparte porque
    * se cobran con la tarifa de panel y salen con su propio código.
    */
-  const panelesDeFrentePorAncho = new Map<number, number>()
-  let paneles = 0
+  const panelesDeFrentePorAncho = new Map<string, number>()
+  /** los paneles divisores, por altura: una regadera los sube a 180 */
+  const panelesPorAlto = new Map<number, number>()
   /** los paneles de cuarto PMR, que miden distinto que los de las cabinas normales */
-  const panelesDelCuarto = new Map<number, number>()
+  const panelesDelCuarto = new Map<string, number>()
+  /**
+   * Suma los paneles divisores del tramo, cada uno con SU altura. Con
+   * `quitarUno` se descuenta el que reemplaza el panel del cuarto PMR: es el
+   * que da contra la cabina accesible.
+   */
+  const sumarPaneles = (tramo: Tramo, quitarUno: boolean) => {
+    const altos = altosDePaneles(tramo, config)
+    if (quitarUno && altos.length) {
+      const i = tramo.cabinas.findIndex((c) => c.tipo === 'accesible')
+      altos.splice(i >= 0 && i < altos.length ? i : 0, 1)
+    }
+    for (const a of altos) panelesPorAlto.set(a, (panelesPorAlto.get(a) ?? 0) + 1)
+  }
   /**
    * Las mamparas se cuentan DESDE LA TIRA, igual que las pilastras y las
    * puertas, y agrupadas por medida porque ya no tienen por qué ser todas
@@ -1511,7 +1566,7 @@ export function bom(
       // al precio de la más angosta.
       if (ancho <= 0) continue
       const donde = familiaDelFrente(ancho, config.modelo) === 'PN' ? panelesDeFrentePorAncho : pilastrasPorAncho
-      donde.set(ancho, (donde.get(ancho) ?? 0) + 1)
+      meter(donde, ancho, altoPilEntre(tramo, i, config))
     }
 
     /**
@@ -1527,14 +1582,14 @@ export function bom(
       if (acc) {
         const f = frenteAccesible(acc, config)
         for (const ancho of [f.pilastra, f.cierre]) {
-          if (ancho > 0) pilastrasPorAncho.set(ancho, (pilastrasPorAncho.get(ancho) ?? 0) + 1)
+          if (ancho > 0) meter(pilastrasPorAncho, ancho, altoPilEntre(tramo, 0, config))
         }
         // la pieza del frente es pilastra si entra en el catálogo, y panel si se pasa
         if (f.frente > 0) {
           const donde = familiaDelFrente(f.frente, config.modelo) === 'PN'
             ? panelesDeFrentePorAncho
             : pilastrasPorAncho
-          donde.set(f.frente, (donde.get(f.frente) ?? 0) + 1)
+          meter(donde, f.frente, altoPilEntre(tramo, 0, config))
         }
       }
     }
@@ -1544,29 +1599,29 @@ export function bom(
     // a Odoo, pero no en la cotización, y por eso los dos no cuadraban.
     for (const s of soportesDe(tramo, config)) {
       if (s.anchoCm <= 0) continue
-      pilastrasPorAncho.set(s.anchoCm, (pilastrasPorAncho.get(s.anchoCm) ?? 0) + 1)
+      meter(pilastrasPorAncho, s.anchoCm, altoPilEntre(tramo, s.frontera, config))
     }
     // El panel del cuarto PMR es más largo que los otros, así que se cuenta
     // aparte: cobrarlo con el fondo de las demás cabinas sería cobrar de menos.
     const acc = config.tipologia === 'PMR' ? tramo.cabinas.find((c) => c.tipo === 'accesible') : undefined
     const delCuarto = acc ? divisorDelCuarto(acc, config, profundidadDelLugar(config)) : null
     if (delCuarto && delCuarto.panel > 0 && delCuarto.panel !== config.profundidadCm) {
-      panelesDelCuarto.set(delCuarto.panel, (panelesDelCuarto.get(delCuarto.panel) ?? 0) + 1)
-      paneles += panelesDe(tramo) - 1
+      meter(panelesDelCuarto, delCuarto.panel, alturas.panel)
+      sumarPaneles(tramo, true)
     } else {
-      paneles += panelesDe(tramo)
+      sumarPaneles(tramo, false)
     }
     // El divisor del cuarto es panel + puerta + ESTA pilastra, la que cierra
     // contra el muro del fondo. El despiece la emite y la cotización no la
     // cobraba: por eso en los proyectos con cuarto PMR faltaba justo una
     // pilastra. Sale 0 cuando el fondo no deja lugar para ella, y ahí no va.
     if (delCuarto && delCuarto.pilastra > 0) {
-      pilastrasPorAncho.set(delCuarto.pilastra, (pilastrasPorAncho.get(delCuarto.pilastra) ?? 0) + 1)
+      meter(pilastrasPorAncho, delCuarto.pilastra, alturas.pilastra)
     }
     let nMg = 0
     tramo.cabinas.forEach((cab, i) => {
       if (cab.puerta.tipo === 'puerta' && cab.tipo !== 'orinal') {
-        puertas.set(cab.puerta.anchoCm, (puertas.get(cab.puerta.anchoCm) ?? 0) + 1)
+        meter(puertas, cab.puerta.anchoCm, alturasDeCabina(config.modelo, cab.tipo).puerta)
       }
       if (cab.tipo !== 'orinal') return
       // misma regla que el despiece: mampara entre dos orinales, y una más si la
@@ -1600,30 +1655,31 @@ export function bom(
   const tarifaExacta = !(precios.pais === 'MX' && precios.moneda !== 'MXN')
   const codigoLinea = config.linea === 'SUPERIOR' ? 'SUP' : config.linea === 'TOUCHLESS' ? 'TL' : 'LDR'
 
-  // las alturas las manda el modelo, no el vendedor
-  const alturas = alturasDe(config.modelo)
-  const altoPil = alturas.pilastra
 
-  for (const [ancho, cantidad] of [...puertas.entries()].sort((a, b) => a[0] - b[0])) {
+  for (const [clave, cantidad] of [...puertas.entries()].sort()) {
+    const [ancho, altoPt] = leerClave(clave)
     renglones.push({
       sku: `${codigoLinea}-PT${ancho}`,
-      clave: `PT${ancho}x${alturas.puerta}`,
-      descripcion: `Puerta ${ancho} × ${alturas.puerta} cm`,
+      clave: `PT${ancho}x${altoPt}`,
+      descripcion: `Puerta ${ancho} × ${altoPt} cm`,
       tipo: 'Puerta',
       cantidad,
-      precioUnit: precioPieza({ familia: 'PT', anchoCm: ancho, altoCm: alturas.puerta }, opciones),
+      precioUnit: precioPieza({ familia: 'PT', anchoCm: ancho, altoCm: altoPt }, opciones),
       tarifaReal: tarifaExacta,
     })
   }
-  if (paneles > 0) {
+  // Un renglón por altura: los de las cabinas normales y, aparte, los de los
+  // cubículos de regadera, que van más altos.
+  for (const [altoPn, cantidad] of [...panelesPorAlto.entries()].sort((a, b) => a[0] - b[0])) {
+    if (cantidad <= 0) continue
     renglones.push({
       sku: `${codigoLinea}-PN${config.profundidadCm}`,
-      clave: `PN${config.profundidadCm}x${alturas.panel}`,
-      descripcion: `Panel divisor ${config.profundidadCm} × ${alturas.panel} cm`,
+      clave: `PN${config.profundidadCm}x${altoPn}`,
+      descripcion: `Panel divisor ${config.profundidadCm} × ${altoPn} cm`,
       tipo: 'Panel',
-      cantidad: paneles,
+      cantidad,
       precioUnit: precioPieza(
-        { familia: 'PN', anchoCm: config.profundidadCm, altoCm: alturas.panel },
+        { familia: 'PN', anchoCm: config.profundidadCm, altoCm: altoPn },
         opciones,
       ),
       tarifaReal: tarifaExacta,
@@ -1631,37 +1687,40 @@ export function bom(
   }
   // Un panel de frente se cobra con la tarifa de PANEL, no de pilastra: es otra
   // pieza y otro precio por m².
-  for (const [ancho, cantidad] of [...panelesDeFrentePorAncho.entries()].sort((a, b) => a[0] - b[0])) {
+  for (const [clave, cantidad] of [...panelesDeFrentePorAncho.entries()].sort()) {
+    const [ancho, altoPn] = leerClave(clave)
     renglones.push({
       sku: `${codigoLinea}-PN${ancho}`,
-      clave: `PN${ancho}x${altoPil}`,
-      descripcion: `Panel de frente ${ancho} × ${altoPil} cm`,
+      clave: `PN${ancho}x${altoPn}`,
+      descripcion: `Panel de frente ${ancho} × ${altoPn} cm`,
       tipo: 'Panel',
       cantidad,
-      precioUnit: precioPieza({ familia: 'PN', anchoCm: ancho, altoCm: altoPil }, opciones),
+      precioUnit: precioPieza({ familia: 'PN', anchoCm: ancho, altoCm: altoPn }, opciones),
       tarifaReal: tarifaExacta,
     })
   }
-  for (const [ancho, cantidad] of [...panelesDelCuarto.entries()].sort((a, b) => a[0] - b[0])) {
+  for (const [clave, cantidad] of [...panelesDelCuarto.entries()].sort()) {
+    const [ancho, altoPn] = leerClave(clave)
     renglones.push({
       sku: `${codigoLinea}-PN${ancho}`,
-      clave: `PN${ancho}x${alturas.panel}`,
-      descripcion: `Panel del cuarto accesible ${ancho} × ${alturas.panel} cm`,
+      clave: `PN${ancho}x${altoPn}`,
+      descripcion: `Panel del cuarto accesible ${ancho} × ${altoPn} cm`,
       tipo: 'Panel',
       cantidad,
-      precioUnit: precioPieza({ familia: 'PN', anchoCm: ancho, altoCm: alturas.panel }, opciones),
+      precioUnit: precioPieza({ familia: 'PN', anchoCm: ancho, altoCm: altoPn }, opciones),
       tarifaReal: tarifaExacta,
     })
   }
   const sufijoPil = config.montaje === 'PISO_TECHO' ? 'PT' : 'STD'
-  for (const [ancho, cantidad] of [...pilastrasPorAncho.entries()].sort((a, b) => a[0] - b[0])) {
+  for (const [clave, cantidad] of [...pilastrasPorAncho.entries()].sort()) {
+    const [ancho, altoPl] = leerClave(clave)
     renglones.push({
       sku: `${codigoLinea}-PI${sufijoPil}${ancho}`,
-      clave: `PL${ancho}x${altoPil}`,
-      descripcion: `Pilastra ${ancho} × ${altoPil} cm`,
+      clave: `PL${ancho}x${altoPl}`,
+      descripcion: `Pilastra ${ancho} × ${altoPl} cm`,
       tipo: 'Pilastra',
       cantidad,
-      precioUnit: precioPieza({ familia: 'PL', anchoCm: ancho, altoCm: altoPil }, opciones),
+      precioUnit: precioPieza({ familia: 'PL', anchoCm: ancho, altoCm: altoPl }, opciones),
       tarifaReal: tarifaExacta,
     })
   }

@@ -137,6 +137,40 @@ export function alturasDe(modelo: string): AlturasModelo {
   return alturasCorregidas?.[codigo] ?? ALTURAS_POR_MODELO[codigo] ?? ALTURAS_POR_MODELO.ESTANDAR
 }
 
+/** el modelo del que salen las alturas de una regadera metida en otra área */
+export const MODELO_REGADERA = 'REGADERAS'
+
+/**
+ * Las alturas de las piezas de UNA cabina, que no siempre son las del área.
+ *
+ * Un cubículo de regadera va más alto que el resto aunque el área sea
+ * Estándar: la puerta y el panel suben a 180 y arrancan del piso, porque es
+ * una regadera y no un inodoro. El resto de las cabinas del área no cambian.
+ */
+export function alturasDeCabina(modelo: string, tipo?: string): AlturasModelo {
+  return alturasDe(tipo === 'regadera' ? MODELO_REGADERA : modelo)
+}
+
+/**
+ * El alto de una pieza que separa dos cabinas —una pilastra, un panel—.
+ *
+ * Es UNA sola pieza, así que no puede tener dos alturas: lleva la más alta de
+ * las dos que carga. Con una regadera en un área Estándar eso da 180 de los
+ * dos lados, que es lo que pide el plano; en Reforzado la pilastra se queda en
+ * 210, porque del otro lado sigue cargando un cubículo de 210.
+ */
+export function altoEntre(
+  modelo: string,
+  cual: 'puerta' | 'panel' | 'pilastra',
+  izquierda?: string,
+  derecha?: string,
+): number {
+  return Math.max(
+    alturasDeCabina(modelo, izquierda)[cual],
+    alturasDeCabina(modelo, derecha)[cual],
+  )
+}
+
 /** Cómo se ve el modelo DE FRENTE, para dibujar el alzado. */
 export interface AlzadoModelo {
   /** del piso al borde de abajo de la puerta y de los paneles, en cm */

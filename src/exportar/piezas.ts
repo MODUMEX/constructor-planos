@@ -1,5 +1,5 @@
 import type { Area, Cabina, Config, Tramo } from '../types'
-import { alturasDe, esSoloOrinales, esVariacionPanel, familiaDelFrente, llevaAccesibleSiempre, mamparaDe, nombreModelo, tipologia } from '../catalog'
+import { altoEntre, alturasDe, alturasDeCabina, esSoloOrinales, esVariacionPanel, familiaDelFrente, llevaAccesibleSiempre, mamparaDe, nombreModelo, tipologia } from '../catalog'
 import { arrancaConMingitorio, soportesDe } from '../modulacion'
 import { cierraConMingitorio, fronteraDeOrinal } from '../modulacion'
 import { cuartoPmr } from '../geometria'
@@ -61,9 +61,18 @@ export function altoPilastra(config: Config): number {
   return alturasDe(config.modelo).pilastra
 }
 
-/** el CSV y el cajetín llevan el nombre del modelo, no su código de tarifa */
-export function modeloParaCsv(config: Config): string {
-  return nombreModelo(config.linea, config.modelo)
+/**
+ * El CSV y el cajetín llevan el nombre del modelo, no su código de tarifa.
+ *
+ * Si el área tiene algún cubículo de REGADERA se dice, porque esas piezas no
+ * van a la altura del modelo sino a la de la ficha de regaderas: un área
+ * Estándar con una regadera adentro es "Estándar / Regadera".
+ */
+export function modeloParaCsv(config: Config, tramos?: Tramo[]): string {
+  const nombre = nombreModelo(config.linea, config.modelo)
+  const hayRegadera = (tramos ?? []).some((t) => t.cabinas.some((c) => c.tipo === 'regadera'))
+  if (!hayRegadera) return nombre
+  return /regadera/i.test(nombre) ? nombre : `${nombre} / Regadera`
 }
 
 export function sku(pieza: Pieza, config: Config): string {
@@ -91,12 +100,16 @@ export function orientacionDeSubTipo(subTipo: string): string {
 function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastraInicial = false): Pieza[] {
   const piezas: Pieza[] = []
   const n = tramo.cabinas.length
-  // cada familia lleva la altura que le da el modelo; solo en SCUDO el panel
-  // es más alto que la puerta
-  const alturas = alturasDe(config.modelo)
-  const alto = alturas.puerta
-  const altoPanel = alturas.panel
-  const altoPil = altoPilastra(config)
+  /**
+   * La altura ya no es una sola por área: un cubículo de REGADERA va más alto
+   * que el resto aunque el área sea Estándar. Las piezas que separan dos
+   * cabinas —pilastra y panel— son una sola pieza, así que llevan la más alta
+   * de las dos que cargan.
+   */
+  const tipoDe = (i: number) => tramo.cabinas[i]?.tipo
+  const altoPuertaDe = (i: number) => alturasDeCabina(config.modelo, tipoDe(i)).puerta
+  const altoPanelEntre = (i: number) => altoEntre(config.modelo, 'panel', tipoDe(i), tipoDe(i + 1))
+  const altoPilEntre = (i: number) => altoEntre(config.modelo, 'pilastra', tipoDe(i - 1), tipoDe(i))
   /**
    * Qué número de mampara va saliendo. Se cuenta aparte del índice de cabina
    * porque en un baño mixto los orinales arrancan después de las cabinas, y la
@@ -112,7 +125,7 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
       piezas.push({
         familia: 'PT',
         anchoCm: cab.puerta.anchoCm,
-        altoCm: alto,
+        altoCm: altoPuertaDe(i),
         subTipo: subTipoPuerta(cab, contraMuro),
         area,
       })
@@ -162,7 +175,7 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
         piezas.push({
           familia: 'PN',
           anchoCm: delCuarto && delCuarto.panelCm > 0 ? delCuarto.panelCm : config.profundidadCm,
-          altoCm: altoPanel,
+          altoCm: altoPanelEntre(i),
           subTipo: esUltima || esDelCuarto ? 'PNLAT' : 'PNCEN',
           area,
         })
@@ -192,7 +205,7 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
   const arrancaLaAccesible =
     llevaAccesibleSiempre(config.tipologia) && tramo.cabinas[0]?.tipo === 'accesible'
   if (n > 0 && !tramo.muroInicio && !arrancaLaAccesible) {
-    piezas.push({ familia: 'PN', anchoCm: config.profundidadCm, altoCm: altoPanel, subTipo: 'PNLAT', area })
+    piezas.push({ familia: 'PN', anchoCm: config.profundidadCm, altoCm: altoPanelEntre(-1), subTipo: 'PNLAT', area })
   }
 
   // pilastras: una en cada extremo y una por divisor interno.
@@ -227,7 +240,7 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
       piezas.push({
         familia: familiaDe(0),
         anchoCm: anchoDe(0),
-        altoCm: altoPil,
+        altoCm: altoPilEntre(0),
         // contra el muro la pilastra tiene su propio subtipo; un panel no
         subTipo: familiaDe(0) === 'PN' ? 'PNLAT' : tramo.muroInicio ? 'PLLATMUR' : 'PLLAT',
         area,
@@ -248,7 +261,7 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
       piezas.push({
         familia: familiaDe(i + 1),
         anchoCm: anchoDe(i + 1),
-        altoCm: altoPil,
+        altoCm: altoPilEntre(i + 1),
         subTipo: subTipoDe(i + 1, cierraLaTira || salaDelCuarto),
         area,
       })
@@ -259,7 +272,7 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
       piezas.push({
         familia: familiaDe(n),
         anchoCm: anchoDe(n),
-        altoCm: altoPil,
+        altoCm: altoPilEntre(n),
         subTipo: familiaDe(n) === 'PN' ? 'PNLAT' : tramo.muroFin ? 'PLLATMUR' : 'PLLAT',
         area,
       })
