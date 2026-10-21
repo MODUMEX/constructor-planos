@@ -51,7 +51,9 @@ console.log('\n1 · el SKU se arma como la plantilla de Syclick')
     ['Colgante', cfg({ modelo: 'COLGANTE' }), 4, 'L-M1-LC-CL-PL-G1'],
     ['Estándar 170', cfg({ modelo: 'ESTANDAR170' }), 4, 'L-M1-LC-ST170-PL-G1'],
     ['Superior 2.0 Reforzado', cfg({ linea: 'SUPERIOR', modelo: 'SUP_REFORZADO' }), 4, 'S-2-LC-RF-PL-G1'],
-    ['Touchless S3 es LEEDER S3 Reforzado', cfg({ linea: 'TOUCHLESS', modelo: 'TL_S3' }), 4, 'L-S3-LC-RF-PL-G1'],
+    // En S3 el modelo comercial depende del ALTO: el RF de Syclick solo
+    // tiene la pieza de 150, el resto sale del RF170 (Dayanna, 21-oct-2026).
+    ['Touchless S3: la pilastra de 210 va RF170', cfg({ linea: 'TOUCHLESS', modelo: 'TL_S3' }), 4, 'L-S3-LC-RF170-PL-G1'],
     ['Superior acero inoxidable', cfg({ linea: 'SUPERIOR', modelo: 'SUP_ESTANDAR', acabado: 'Acero Inoxidable', color: 'Acero Inoxidable' }), 4, 'S-2-A-ST-PL-AI'],
     ['Superior esmaltada', cfg({ linea: 'SUPERIOR', modelo: 'SUP_ESTANDAR', acabado: 'Esmaltada Antigrafiti', color: 'Blanco' }), 4, 'S-2-E-ST-PL-EA'],
     ['color especial con menos de 10 cabinas', cfg({ color: 'Verde Inventado' }), 4, 'L-M1-LC-RF-PL-CEN10'],
@@ -64,6 +66,23 @@ console.log('\n1 · el SKU se arma como la plantilla de Syclick')
   }
   revisar('la mampara de orinal es PM', skuSyclick('MG', cfg(), 4).includes('-PM-'), skuSyclick('MG', cfg(), 4))
   revisar('el panel es PN', skuSyclick('PN', cfg(), 4).includes('-PN-'))
+
+  const s3 = cfg({ linea: 'TOUCHLESS', modelo: 'TL_S3' })
+  revisar(
+    'Touchless S3: una pieza de 150 sí va RF',
+    skuSyclick('PT', s3, 4, false, 150) === 'L-S3-LC-RF-PT-G1',
+    skuSyclick('PT', s3, 4, false, 150),
+  )
+  revisar(
+    'Touchless S3: la de 180 va RF170',
+    skuSyclick('PT', s3, 4, false, 180) === 'L-S3-LC-RF170-PT-G1',
+    skuSyclick('PT', s3, 4, false, 180),
+  )
+  revisar(
+    'y en LEEDER el alto no cambia nada',
+    skuSyclick('PT', cfg(), 4, false, 180) === 'L-M1-LC-RF-PT-G1',
+    skuSyclick('PT', cfg(), 4, false, 180),
+  )
   revisar('la puerta es PT', skuSyclick('PT', cfg(), 4).includes('-PT-'))
 }
 

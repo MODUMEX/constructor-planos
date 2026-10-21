@@ -50,7 +50,8 @@ const COMERCIAL: Record<string, string> = {
   SUP_REFORZADO: 'RF',
   SUP_REFORZADO170: 'RF170',
   SUP_COLGANTE: 'CL',
-  // Touchless es el Reforzado con los electrónicos S3: en Syclick es L-S3-LC-RF
+  // Touchless es el Reforzado con los electrónicos S3: en Syclick es L-S3-LC-RF…
+  // El sufijo lo decide la ALTURA de la pieza, ver `comercialDe`.
   TL_S3: 'RF',
 }
 
@@ -91,16 +92,34 @@ export function grupoSyclick(config: Config, cabinas: number): string {
   return mayor ? 'CEM10' : 'CEN10'
 }
 
+/**
+ * El modelo comercial, que es la cuarta parte del SKU.
+ *
+ * En S3 hay dos: **RF** y **RF170**. El RF solo tiene la pieza de 150; todo
+ * lo demás sale del RF170 (Dayanna, 21-oct-2026). Por eso acá no alcanza el
+ * modelo del área: hace falta el alto de la pieza.
+ */
+function comercialDe(config: Config, altoCm: number | undefined, regadera: boolean): string {
+  if (regadera) return COMERCIAL[MODELO_REGADERA]
+  if (config.linea === 'TOUCHLESS') return altoCm === 150 ? 'RF' : 'RF170'
+  return COMERCIAL[config.modelo] ?? 'ST'
+}
+
 /** el SKU de Syclick para esa familia de pieza */
-export function skuSyclick(familia: string, config: Config, cabinas: number, regadera = false): string {
+export function skuSyclick(
+  familia: string,
+  config: Config,
+  cabinas: number,
+  regadera = false,
+  altoCm?: number,
+): string {
   const acabado =
     config.acabado === 'Acero Inoxidable' ? 'A' : config.acabado === 'Esmaltada Antigrafiti' ? 'E' : 'LC'
   return [
     LINEA[config.linea],
     MODELO[config.linea],
     acabado,
-    // una pieza de regadera lleva SU modelo, aunque el área sea Estándar
-    regadera ? COMERCIAL.REGADERAS : COMERCIAL[config.modelo] ?? 'ST',
+    comercialDe(config, altoCm, regadera),
     FAMILIA[familia] ?? familia,
     grupoSyclick(config, cabinas),
   ].join('-')
@@ -190,7 +209,7 @@ export function generarSyclick(proyecto: Proyecto, _pais: Pais = 'MX'): Uint8Arr
      */
     for (const r of agrupar(piezasDeArea(area), config)) {
       const caja = cajon(!!r.regadera)
-      const sku = skuSyclick(r.familia, config, cabinas, r.regadera)
+      const sku = skuSyclick(r.familia, config, cabinas, r.regadera, r.altoCm)
       const rem = remate(r.familia, config)
       const clave = `${sku}|${r.anchoCm}|${r.altoCm}|${rem}`
       const ya = caja.filas.get(clave)
