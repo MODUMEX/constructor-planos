@@ -17,7 +17,7 @@
  * se pueden tocar: el importador los busca por nombre.
  */
 import type { Area, Config, Pais, Proyecto } from '../types'
-import { nombreModelo } from '../catalog'
+import { MODELO_REGADERA, nombreModelo } from '../catalog'
 import { grupoMx } from '../coloresMx'
 import { agrupar, piezasDeArea } from './piezas'
 import { libroXlsx, type HojaXlsx } from './xlsx'
@@ -157,16 +157,29 @@ export function generarSyclick(proyecto: Proyecto, _pais: Pais = 'MX'): Uint8Arr
     const config = area.config
     const grupo = grupoSyclick(config, cabinas)
     const fijo = COLOR_DEL_GRUPO[grupo]
-    areas.filas.push([
-      nombres[i],
-      // la descripción es obligatoria para las áreas nuevas
-      `${nombreModelo(config.linea, config.modelo)} · ${config.acabado}`,
-      1,
-      // con un color especial va la etiqueta del grupo y el color de verdad
-      // viaja en «Color libre»; si no, el color tal cual
-      fijo ?? (grupo === 'AI' ? '' : config.color.toUpperCase()),
-      fijo ? config.color.slice(0, 60) : '',
-    ])
+
+    /**
+     * Un área de Syclick es de UN SOLO modelo.
+     *
+     * En la plataforma el área lleva su línea, su modelo y su color, y de ahí
+     * salen los SKU; no se pueden revolver. Así que un área del Constructor
+     * que tenga cubículos de REGADERA se parte en dos: la de siempre con lo
+     * normal y otra, "… · Regadera", con las piezas del cubículo. Es como lo
+     * manda Sanimax a mano: en la cotización 103451 son tres áreas, y la del
+     * medio es "MODULO REGADERA BAÑOS DORMITORIOS" con modelo REGADERAS.
+     */
+    const porModelo = new Map<string, { nombre: string; modelo: string; filas: Map<string, (string | number)[]> }>()
+    const cajon = (esRegadera: boolean) => {
+      const k = esRegadera ? 'RG' : 'ST'
+      if (!porModelo.has(k)) {
+        porModelo.set(k, {
+          nombre: esRegadera ? `${nombres[i]} · Regadera`.slice(0, 100) : nombres[i],
+          modelo: esRegadera ? MODELO_REGADERA : config.modelo,
+          filas: new Map(),
+        })
+      }
+      return porModelo.get(k)!
+    }
 
     /**
      * Para Syclick dos renglones son el mismo cuando coinciden SKU, medida y
@@ -175,16 +188,32 @@ export function generarSyclick(proyecto: Proyecto, _pais: Pais = 'MX'): Uint8Arr
      * lateral—, y sin juntarlos la hoja salía con dos filas idénticas que la
      * plataforma suma igual pero que al leerlas parecen un error.
      */
-    const juntos = new Map<string, (string | number)[]>()
     for (const r of agrupar(piezasDeArea(area), config)) {
+      const caja = cajon(!!r.regadera)
       const sku = skuSyclick(r.familia, config, cabinas, r.regadera)
       const rem = remate(r.familia, config)
       const clave = `${sku}|${r.anchoCm}|${r.altoCm}|${rem}`
-      const ya = juntos.get(clave)
+      const ya = caja.filas.get(clave)
       if (ya) ya[5] = Number(ya[5]) + r.cantidad
-      else juntos.set(clave, [nombres[i], sku, r.anchoCm, r.altoCm, rem, r.cantidad])
+      else caja.filas.set(clave, [caja.nombre, sku, r.anchoCm, r.altoCm, rem, r.cantidad])
     }
-    for (const fila of juntos.values()) captura.filas.push(fila)
+
+    // primero la de siempre y después la de regadera, como en la cotización
+    for (const k of ['ST', 'RG']) {
+      const caja = porModelo.get(k)
+      if (!caja || !caja.filas.size) continue
+      areas.filas.push([
+        caja.nombre,
+        // la descripción es obligatoria para las áreas nuevas
+        `${nombreModelo(config.linea, caja.modelo)} · ${config.acabado}`,
+        1,
+        // con un color especial va la etiqueta del grupo y el color de verdad
+        // viaja en «Color libre»; si no, el color tal cual
+        fijo ?? (grupo === 'AI' ? '' : config.color.toUpperCase()),
+        fijo ? config.color.slice(0, 60) : '',
+      ])
+      for (const fila of caja.filas.values()) captura.filas.push(fila)
+    }
   })
 
   const otros: HojaXlsx = { nombre: 'Otros productos', filas: [['SKU', 'Cantidad']] }
