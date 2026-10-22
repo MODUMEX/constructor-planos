@@ -1,10 +1,10 @@
-import {
+import { alturasDeConfig,
   GRUESO_PILASTRA, MIN_ACCESIBLE_CM, MIN_CABINA_CM, SNAP_CM, anchosPuerta, MARGEN_PUERTA_CM,
   COSTILLA_MINIMA_CM, LARGO_SECUNDARIO_CM, PIEZA_PIDE_COSTILLA_CM,
 } from './catalog'
 import type { Cabina, Config, Moneda, Pais, Soporte, Tramo, TipologiaId, RenglonBOM } from './types'
 import {
-  altoEntre, alturasDe, alturasDeCabina, ANCHOS_PILASTRA, esSoloOrinales, esVariacionPanel, familiaDelFrente,
+  altoEntre, alturasDeCabina, ANCHOS_PILASTRA, esSoloOrinales, esVariacionPanel, familiaDelFrente,
   llevaAccesibleSiempre, mamparaDe, tipologia, tierDeColor, type MedidaMG,
 } from './catalog'
 import {
@@ -1330,7 +1330,7 @@ export function pilastrasDe(tramo: Tramo): number {
  * dos. Con una regadera en un área Estándar eso da 180 de los dos lados.
  */
 export function altoPilEntre(tramo: Tramo, k: number, config: Config): number {
-  return altoEntre(config.modelo, 'pilastra', tramo.cabinas[k - 1]?.tipo, tramo.cabinas[k]?.tipo)
+  return altoEntre(config, 'pilastra', tramo.cabinas[k - 1]?.tipo, tramo.cabinas[k]?.tipo)
 }
 
 /**
@@ -1342,7 +1342,7 @@ export function altosDePaneles(tramo: Tramo, config: Config): number[] {
   const n = tramo.cabinas.length
   if (n === 0) return []
   const alto = (i: number, j: number) =>
-    altoEntre(config.modelo, 'panel', tramo.cabinas[i]?.tipo, tramo.cabinas[j]?.tipo)
+    altoEntre(config, 'panel', tramo.cabinas[i]?.tipo, tramo.cabinas[j]?.tipo)
   const altos: number[] = []
   for (let i = 0; i < n - 1; i++) if (!entreOrinales(tramo, i)) altos.push(alto(i, i + 1))
   if (!tramo.muroInicio) altos.push(alto(0, 0))
@@ -1507,7 +1507,7 @@ export function bom(
     m.set(k, (m.get(k) ?? 0) + cuantas)
   }
   // las alturas del ÁREA; cada pieza puede llevar otra si es de una regadera
-  const alturas = alturasDe(config.modelo)
+  const alturas = alturasDeConfig(config)
   const puertas = new Map<string, number>()
   // Las pilastras ya no son todas del mismo ancho: la modulación elige la
   // medida de catálogo que le toca a cada posición, así que se cuentan por
@@ -1621,7 +1621,7 @@ export function bom(
     let nMg = 0
     tramo.cabinas.forEach((cab, i) => {
       if (cab.puerta.tipo === 'puerta' && cab.tipo !== 'orinal') {
-        meter(puertas, cab.puerta.anchoCm, alturasDeCabina(config.modelo, cab.tipo).puerta)
+        meter(puertas, cab.puerta.anchoCm, alturasDeCabina(config, cab.tipo).puerta)
       }
       if (cab.tipo !== 'orinal') return
       // misma regla que el despiece: mampara entre dos orinales, y una más si la

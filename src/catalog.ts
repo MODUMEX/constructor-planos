@@ -137,6 +137,38 @@ export function alturasDe(modelo: string): AlturasModelo {
   return alturasCorregidas?.[codigo] ?? ALTURAS_POR_MODELO[codigo] ?? ALTURAS_POR_MODELO.ESTANDAR
 }
 
+/**
+ * Los modelos cuya PUERTA Y PANEL se eligen de varias alturas.
+ *
+ * La ficha de Touchless S3 (abr-2026) ofrece 150, 170 y 180 para puerta y
+ * panel lateral; la pilastra es siempre de 210. En LEEDER y Superior el 170 es
+ * un modelo aparte —Reforzado y Reforzado 170— y por eso no van acá.
+ */
+export const ALTURAS_ELEGIBLES: Record<string, number[]> = {
+  TL_S3: [150, 170, 180],
+}
+
+export function alturasElegibles(modelo: string): number[] {
+  return ALTURAS_ELEGIBLES[(modelo || '').toUpperCase()] ?? []
+}
+
+/**
+ * Las alturas que de verdad usa un área.
+ *
+ * Son las del modelo, salvo que el modelo deje elegir y el vendedor haya
+ * elegido: ahí mandan la puerta y el panel que pidió. La PILASTRA no se toca,
+ * la pone el modelo.
+ */
+export function alturasDeConfig(config: {
+  modelo: string
+  alturaPiezaCm?: number
+}): AlturasModelo {
+  const base = alturasDe(config.modelo)
+  const pedida = config.alturaPiezaCm
+  if (!pedida || !alturasElegibles(config.modelo).includes(pedida)) return base
+  return { ...base, puerta: pedida, panel: pedida }
+}
+
 /** el modelo del que salen las alturas de una regadera metida en otra área */
 export const MODELO_REGADERA = 'REGADERAS'
 
@@ -147,8 +179,11 @@ export const MODELO_REGADERA = 'REGADERAS'
  * Estándar: la puerta y el panel suben a 180 y arrancan del piso, porque es
  * una regadera y no un inodoro. El resto de las cabinas del área no cambian.
  */
-export function alturasDeCabina(modelo: string, tipo?: string): AlturasModelo {
-  return alturasDe(tipo === 'regadera' ? MODELO_REGADERA : modelo)
+export function alturasDeCabina(
+  config: { modelo: string; alturaPiezaCm?: number },
+  tipo?: string,
+): AlturasModelo {
+  return tipo === 'regadera' ? alturasDe(MODELO_REGADERA) : alturasDeConfig(config)
 }
 
 /**
@@ -160,14 +195,14 @@ export function alturasDeCabina(modelo: string, tipo?: string): AlturasModelo {
  * 210, porque del otro lado sigue cargando un cubículo de 210.
  */
 export function altoEntre(
-  modelo: string,
+  config: { modelo: string; alturaPiezaCm?: number },
   cual: 'puerta' | 'panel' | 'pilastra',
   izquierda?: string,
   derecha?: string,
 ): number {
   return Math.max(
-    alturasDeCabina(modelo, izquierda)[cual],
-    alturasDeCabina(modelo, derecha)[cual],
+    alturasDeCabina(config, izquierda)[cual],
+    alturasDeCabina(config, derecha)[cual],
   )
 }
 

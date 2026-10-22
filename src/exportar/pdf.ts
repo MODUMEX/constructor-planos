@@ -8,7 +8,7 @@ import {
   profundidadDelLugar, pt, SOBRA_MURO_CM,
   type Marco,
 } from '../geometria'
-import { MODELO_REGADERA, alturasDe, alzadoDe, mamparaDe, nombreHerraje, tipologia } from '../catalog'
+import { alturasDeConfig, MODELO_REGADERA, alturasDe, alzadoDe, mamparaDe, nombreHerraje, tipologia } from '../catalog'
 import { altoPilEntre, anchoDeSoporte, anchoTotal, arrancaElCuartoPmr, esEspacioLibre, ladosDeCabina, lugaresDe, mamparaEn, soportesDe } from '../modulacion'
 import { COSTILLA_TOLERANCIA_CM } from '../catalog'
 import type { CuartoPmr } from '../geometria'
@@ -802,7 +802,7 @@ function alzadoPmr(
   desdeCm: number,
   pisoY: number,
 ) {
-  const alturas = alturasDe(area.config.modelo)
+  const alturas = alturasDeConfig(area.config)
   const hPilastra = alturas.pilastra
   const hPuerta = alturas.puerta
   const hPanel = alturas.panel
@@ -877,7 +877,7 @@ function alzadoPmr(
 function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) {
   const n = tramo.cabinas.length
   if (n === 0) return
-  const alturas = alturasDe(area.config.modelo)
+  const alturas = alturasDeConfig(area.config)
   const hPilastra = alturas.pilastra
   const hPuerta = alturas.puerta
   /**
@@ -1347,7 +1347,7 @@ export function generarPDF(proyecto: Proyecto, fecha = new Date().toLocaleDateSt
     const anchoAlzadoCm = cuartoDelAlzado
       ? largoAlzadoCm + SEPARA_ALZADOS_CM + cuartoDelAlzado.profCm + SOBRA_MURO_CM * 2
       : 0
-    const hPilastra = alturasDe(area.config.modelo).pilastra
+    const hPilastra = alturasDeConfig(area.config).pilastra
     // lo que ocupan las dos vistas en cm, y aparte lo que ocupan en mm el aire
     // entre ellas y el rótulo de abajo
     const altoDibujo = caja.h + (conAlzado ? hPilastra : 0)

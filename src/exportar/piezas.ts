@@ -1,5 +1,5 @@
 import type { Area, Cabina, Config, Tramo } from '../types'
-import { altoEntre, alturasDe, alturasDeCabina, esSoloOrinales, esVariacionPanel, familiaDelFrente, llevaAccesibleSiempre, mamparaDe, nombreModelo, tipologia } from '../catalog'
+import { alturasDeConfig, altoEntre, alturasDeCabina, esSoloOrinales, esVariacionPanel, familiaDelFrente, llevaAccesibleSiempre, mamparaDe, nombreModelo, tipologia } from '../catalog'
 import { arrancaConMingitorio, soportesDe } from '../modulacion'
 import { cierraConMingitorio, fronteraDeOrinal } from '../modulacion'
 import { cuartoPmr } from '../geometria'
@@ -67,7 +67,7 @@ export function nombreSistema(config: Config): string {
 
 /** el alto de la pilastra lo pone el modelo, no la altura de la puerta */
 export function altoPilastra(config: Config): number {
-  return alturasDe(config.modelo).pilastra
+  return alturasDeConfig(config).pilastra
 }
 
 /**
@@ -118,9 +118,9 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
   const tipoDe = (i: number) => tramo.cabinas[i]?.tipo
   /** la pieza es de un cubículo de regadera si toca uno, de cualquiera de sus dos lados */
   const esRegadera = (...is: number[]) => is.some((i) => tipoDe(i) === 'regadera')
-  const altoPuertaDe = (i: number) => alturasDeCabina(config.modelo, tipoDe(i)).puerta
-  const altoPanelEntre = (i: number) => altoEntre(config.modelo, 'panel', tipoDe(i), tipoDe(i + 1))
-  const altoPilEntre = (i: number) => altoEntre(config.modelo, 'pilastra', tipoDe(i - 1), tipoDe(i))
+  const altoPuertaDe = (i: number) => alturasDeCabina(config, tipoDe(i)).puerta
+  const altoPanelEntre = (i: number) => altoEntre(config, 'panel', tipoDe(i), tipoDe(i + 1))
+  const altoPilEntre = (i: number) => altoEntre(config, 'pilastra', tipoDe(i - 1), tipoDe(i))
   /**
    * Qué número de mampara va saliendo. Se cuenta aparte del índice de cabina
    * porque en un baño mixto los orinales arrancan después de las cabinas, y la
@@ -349,7 +349,7 @@ function piezasDelFrente(area: Area): Pieza[] {
       salida.push({
         familia: 'PN',
         anchoCm: cuarto.profCm,
-        altoCm: alturasDe(area.config.modelo).panel,
+        altoCm: alturasDeConfig(area.config).panel,
         subTipo: 'PNLAT',
         area: area.nombre,
       })

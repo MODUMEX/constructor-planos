@@ -17,7 +17,7 @@ import {
 import { destinoOdoo } from './odoo/region'
 import { esAdmin, faltaParaVencer, IVA_CR, puedeCatalogos, puedeColoresReservados, puedeDistribuidores, puedePiezas, puedeUsuarios, renovarSesion, type Usuario } from './auth'
 import type { Area, Cabina, Config, Soporte, Moneda, Pais, Proyecto, TipoCabina, TipologiaId, Tramo } from './types'
-import {
+import { alturasElegibles, alturasDeConfig,
   acabadoEsElColor, acabadosPara, alturasDe, anchosPanel, claroAjustado, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, mgMedidas, MODELOS,
   type PiezaEspecial,
   PAISES, etiquetaTier, nombreHerraje, nombreModelo, tierDeColor, TIPOLOGIAS, tipologia, tipologiaEspejo,
@@ -502,7 +502,7 @@ export default function App() {
   const setClaroCm = (n: number) => setConfig({ claroPedidoCm: n })
   const setCantidad = (n: number) => setConfig({ cabinasPedidas: n })
   // la altura de cada pieza la manda el modelo, no el vendedor
-  const alturas = alturasDe(config.modelo)
+  const alturas = alturasDeConfig(config)
   // los proyectos viejos no traen la pregunta: ahí manda la tipología, como antes
   const llevaAccesible = config.tipologia === 'PMR' || config.llevaAccesible === true
   /** el área es un CUARTO accesible, no una cabina accesible en la tira */
@@ -2452,6 +2452,28 @@ export default function App() {
                       )
                     })}
                   </div>
+
+                  {alturasElegibles(config.modelo).length > 0 && (
+                    <div style={{ marginTop: 26 }}>
+                      <h4 style={{ margin: '0 0 6px', color: 'var(--text-2)' }}>Alto de puerta y panel</h4>
+                      <p className="sub" style={{ margin: '0 0 10px' }}>
+                        {nombreModelo(config.linea, config.modelo)} se fabrica en varias alturas.
+                        La pilastra no cambia: va de {alturasDeConfig(config).pilastra} cm.
+                      </p>
+                      <div className="chips">
+                        {alturasElegibles(config.modelo).map((h) => (
+                          <button
+                            key={h}
+                            type="button"
+                            className={`chip ${alturasDeConfig(config).puerta === h ? 'sel' : ''}`}
+                            onClick={() => setConfig({ alturaPiezaCm: h, alturaCm: h })}
+                          >
+                            {h} cm
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <div style={{ marginTop: 20, maxWidth: 720 }}>
                     <VistaRender

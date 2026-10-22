@@ -1,6 +1,6 @@
 import type { jsPDF } from 'jspdf'
 import type { Area, Proyecto } from '../types'
-import { alturasDe, nombreModelo } from '../catalog'
+import { alturasDeConfig, nombreModelo } from '../catalog'
 import { nombreLinea as nombreDeLinea } from './piezas'
 import { LOGO_MODUMEX, LOGO_RELACION } from '../assets/logo'
 
@@ -74,7 +74,7 @@ function texto(
  */
 function descripcion(area: Area): string[] {
   const c = area.config
-  const a = alturasDe(c.modelo)
+  const a = alturasDeConfig(c)
   const remate = c.terminacion === 'ZOCLO' ? 'zoclo de acero inoxidable' : 'patas de acero inoxidable'
   const alturas = `Pilastras de ${(a.pilastra / 100).toFixed(2)}m, puertas y paneles laterales de ${(a.puerta / 100).toFixed(2)}m de altura.`
   // sin el código de materia prima: es de adentro, no del cliente
@@ -184,7 +184,7 @@ export function portada(
     ['REMATE INFERIOR:', c.terminacion === 'ZOCLO' ? 'ZOCLO' : 'PATA'],
     ['ACABADO:', c.acabado],
     ['COLOR:', c.color],
-    ['ALTURA PILASTRA:', `${alturasDe(c.modelo).pilastra} cm`],
+    ['ALTURA PILASTRA:', `${alturasDeConfig(c).pilastra} cm`],
     ['KAP:', c.kap ? 'SÍ' : 'NO'],
   ]
   filas.forEach(([etiqueta, valor], i) => {

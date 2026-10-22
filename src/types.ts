@@ -208,6 +208,14 @@ export interface Config {
   /** acabado del juego completo de herrajes */
   herrajeAcabado: HerrajeAcabado
   alturaCm: number
+  /**
+   * El alto de PUERTA Y PANEL cuando el modelo deja elegirlo.
+   *
+   * La ficha de Touchless S3 ofrece 150, 170 y 180; la pilastra sigue siendo
+   * la del modelo. Sin este dato manda la altura de la ficha, que es lo que
+   * pasa con los proyectos guardados antes de que se pudiera elegir.
+   */
+  alturaPiezaCm?: number
   profundidadCm: number
   anchoAccesibleCm: number
   /**
