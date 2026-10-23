@@ -229,6 +229,110 @@ export async function iniciarSesion(email: string, clave: string): Promise<Usuar
 
 export const CUENTAS_DEMO = CUENTAS.map((c) => ({ email: c.email, clave: c.clave, rol: c.rol }))
 
+/** la dirección de la app a la que vuelve el correo de recuperación */
+export const VUELTA_RECUPERAR = 'https://modumex.github.io/constructor-planos/'
+
+/**
+ * "¿Olvidaste tu contraseña?": Supabase manda un correo con un enlace que
+ * trae un token de un solo uso y vuelve a esta misma app, donde se escribe la
+ * contraseña nueva.
+ *
+ * Responde 200 aunque el correo no exista —así nadie puede averiguar quién
+ * tiene cuenta probando direcciones—, por eso el mensaje que ve la persona es
+ * el mismo en los dos casos.
+ *
+ * En el escritorio el correo no puede abrir la aplicación, así que el enlace
+ * siempre apunta a la web: ahí se cambia la contraseña y con esa se entra en
+ * cualquiera de las dos.
+ */
+export async function pedirRestablecer(email: string): Promise<string> {
+  if (!hayNube) throw new Error('Sin conexión a la nube no se puede restablecer la contraseña.')
+  const correo = email.trim().toLowerCase()
+  if (!correo) throw new Error('Escribí tu correo.')
+
+  const r = await fetch(
+    `${URL_SUPABASE}/auth/v1/recover?redirect_to=${encodeURIComponent(VUELTA_RECUPERAR)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: LLAVE_SUPABASE! },
+      body: JSON.stringify({ email: correo }),
+    },
+  )
+  if (r.status === 429) {
+    throw new Error('Ya se mandó un correo hace poco. Esperá un minuto y volvé a intentar.')
+  }
+  if (!r.ok) {
+    const detalle = await r.json().catch(() => null)
+    throw new Error(String(detalle?.msg || detalle?.error_description || '') || 'No se pudo enviar el correo.')
+  }
+  return `Si ${correo} tiene cuenta, le llega un correo con el enlace para cambiar la contraseña.`
+    + ' Revisá también el correo no deseado. El enlace vence en una hora y sirve una sola vez.'
+}
+
+/** lo que viene en el enlace del correo, que Supabase deja en el # de la dirección */
+export interface Recuperacion {
+  token: string | null
+  error: string | null
+}
+
+/**
+ * Lee el enlace del correo y lo BORRA de la barra de direcciones: ese token
+ * entra a la cuenta, así que no tiene por qué quedar a la vista ni en el
+ * historial.
+ */
+let recuperacionLeida: Recuperacion | null = null
+
+export function leerRecuperacion(): Recuperacion {
+  // Se lee UNA sola vez: el primer llamado borra el token de la dirección, así
+  // que al segundo ya no habría nada —en desarrollo React monta dos veces y la
+  // pantalla de contraseña nueva no llegaba a aparecer—.
+  if (recuperacionLeida) return recuperacionLeida
+  if (typeof window === 'undefined') return { token: null, error: null }
+  const h = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+  const tipo = h.get('type')
+  const token = h.get('access_token')
+  const err = h.get('error_description') || h.get('error')
+  if (!token && !err) return { token: null, error: null }
+  if (token && tipo !== 'recovery') return { token: null, error: null }
+  window.history.replaceState(null, '', window.location.pathname + window.location.search)
+  recuperacionLeida = {
+    token: token ?? null,
+    error: err
+      ? /expired|invalid/i.test(err)
+        ? 'Ese enlace ya venció o se usó. Pedí uno nuevo desde "¿Olvidaste tu contraseña?".'
+        : err
+      : null,
+  }
+  return recuperacionLeida
+}
+
+/** Guarda la contraseña nueva con el token que vino en el correo. */
+export async function cambiarClaveConToken(token: string, clave: string): Promise<void> {
+  if (!hayNube) throw new Error('Sin conexión a la nube no se puede cambiar la contraseña.')
+  if (clave.length < 6) throw new Error('La contraseña tiene que tener al menos 6 caracteres.')
+
+  const r = await fetch(`${URL_SUPABASE}/auth/v1/user`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: LLAVE_SUPABASE!,
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ password: clave }),
+  })
+  if (!r.ok) {
+    const detalle = await r.json().catch(() => null)
+    const msg = String(detalle?.msg || detalle?.error_description || detalle?.error || '')
+    if (r.status === 401 || /expired|invalid/i.test(msg)) {
+      throw new Error('El enlace ya venció o se usó. Pedí uno nuevo desde "¿Olvidaste tu contraseña?".')
+    }
+    if (/should be different|same.*password/i.test(msg)) {
+      throw new Error('Esa es la contraseña que ya tenías: poné una distinta.')
+    }
+    throw new Error(msg || 'No se pudo cambiar la contraseña.')
+  }
+}
+
 /**
  * Pedir una cuenta sin tenerla. Crea el usuario en Supabase Auth con la marca
  * `auto_registro`, que el trigger convierte en una SOLICITUD: la cuenta existe
