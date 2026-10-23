@@ -702,7 +702,7 @@ export function frenteAccesible(
   // cambiado a mano sobre el plano.
   const automatica = lateralesDelFrente(cabina.anchoCm, puerta)
   const pedida = config.pilastraLateralMrCm
-  const pilastra = pedida != null && pedida > 0 ? pedida : automatica
+  let pilastra = pedida != null && pedida > 0 ? pedida : automatica
   // Una puerta NUNCA cierra contra un panel: cierra contra una pilastra. Así
   // que del lado del panel divisor va otra lateral, la de cierre, y la puerta
   // queda entre las dos. Sin ella, la hoja topaba contra el canto del panel.
@@ -710,13 +710,19 @@ export function frenteAccesible(
   // No tienen por qué medir lo mismo: la de cierre se elige aparte y, si no se
   // eligió, sale igual que la lateral.
   const pedidaCierre = config.pilastraCierreMrCm
-  const cierre = pedidaCierre != null && pedidaCierre > 0 ? pedidaCierre : pilastra
-  return {
-    pilastra,
-    puerta,
-    cierre,
-    frente: Math.round((cabina.anchoCm - puerta - pilastra - cierre) * 10) / 10,
+  let cierre = pedidaCierre != null && pedidaCierre > 0 ? pedidaCierre : pilastra
+  const sobra = (p: number, c: number) => Math.round((cabina.anchoCm - puerta - p - c) * 10) / 10
+  // Una lateral elegida a mano que no deja frente FABRICABLE no se respeta: la
+  // pieza del frente no puede salir más angosta que la pilastra más chica del
+  // catálogo. Con 24 y 24 sobre un cubículo de 150 con puerta de 100 quedaba
+  // una de 2 cm, que se iba así al plano, al despiece y a la cotización. Se
+  // vuelve a las que sí cierran y la pantalla avisa del cambio.
+  const minima = Math.min(...ANCHOS_PILASTRA)
+  if (sobra(pilastra, cierre) < minima && sobra(automatica, automatica) >= minima) {
+    pilastra = automatica
+    cierre = automatica
   }
+  return { pilastra, puerta, cierre, frente: sobra(pilastra, cierre) }
 }
 
 /**

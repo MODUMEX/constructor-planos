@@ -510,11 +510,30 @@ export default function App() {
   /** las tres de la hoja de LEEDER con la accesible más honda y su panel de pared */
   const esVariacion = esVariacionPanel(config.tipologia)
   /** cómo queda repartido el frente de la accesible, para mostrarlo al pedir medidas */
-  const frenteMr = frenteAccesible(
-    area.tramos[0]?.cabinas.find((c) => c.tipo === 'accesible')
-      ?? { puerta: { anchoCm: config.puertaAccesibleCm ?? 100 }, anchoCm: config.anchoAccesibleCm } as Cabina,
-    config,
-  )
+  const cabinaMr = area.tramos[0]?.cabinas.find((c) => c.tipo === 'accesible')
+    ?? { puerta: { anchoCm: config.puertaAccesibleCm ?? 100 }, anchoCm: config.anchoAccesibleCm } as Cabina
+  const frenteMr = frenteAccesible(cabinaMr, config)
+  /**
+   * La pieza del frente no puede salir más angosta que la pilastra más chica
+   * del catálogo: no hay nada tan finito que cortar. Pasa cuando la lateral se
+   * cambió a mano y entre las dos y la puerta no dejan lugar —con 24, 100 y 24
+   * sobre 150 el frente quedaba de 2 cm y así se iba al despiece—.
+   */
+  const minimaPl = Math.min(...ANCHOS_PILASTRA)
+  const frenteAngosto = esVariacion && frenteMr.frente > 0 && frenteMr.frente < minimaPl
+  /**
+   * La lateral que alguien eligió a mano y la modulación NO pudo respetar
+   * porque dejaba una pieza de frente que no se puede fabricar. Se avisa: un
+   * cambio silencioso sobre una medida puesta a propósito confunde más que el
+   * error.
+   */
+  const lateralPedida = config.pilastraLateralMrCm
+  const lateralCorregida = esVariacion && lateralPedida != null && lateralPedida > 0
+    && frenteMr.pilastra !== lateralPedida
+  const frenteQueDaba = lateralCorregida
+    ? Math.round((cabinaMr.anchoCm - frenteMr.puerta - lateralPedida
+      - (config.pilastraCierreMrCm ?? lateralPedida)) * 10) / 10
+    : 0
   /**
    * Cuántos orinales tiene el área. En las tipologías con cabinas los orinales
    * van aparte y los cuenta `config.orinales`; en las de solo orinales, la
@@ -2116,6 +2135,29 @@ export default function App() {
                   {avisosAccesible.map((t) => (
                     <span key={t.id}>{t.avisoAccesible}</span>
                   ))}
+                </div>
+              )}
+
+              {lateralCorregida && (
+                <div className="aviso-caja" style={{ margin: '0 0 12px' }}>
+                  <b>{ICONO_MR} La pilastra lateral del {CUBICULO_MR.toLowerCase()} se cambió sola</b>
+                  <span>
+                    Con la de {lateralPedida} el frente quedaba de <b>{frenteQueDaba}</b> cm y no hay pieza
+                    tan angosta: la más chica es de {minimaPl}. El plano va con laterales de{' '}
+                    <b>{frenteMr.pilastra}</b> y un frente de <b>{frenteMr.frente}</b> cm. Si necesitás la
+                    de {lateralPedida}, agrandá el cubículo o achicá la puerta.
+                  </span>
+                </div>
+              )}
+
+              {frenteAngosto && (
+                <div className="aviso-caja" style={{ margin: '0 0 12px' }}>
+                  <b>{ICONO_MR} El frente del {CUBICULO_MR.toLowerCase()} queda de {frenteMr.frente} cm</b>
+                  <span>
+                    No hay pieza tan angosta: la más chica es de {minimaPl}, y ni con las laterales más
+                    chicas alcanza. La puerta de {frenteMr.puerta} casi se come sola los{' '}
+                    {cabinaMr.anchoCm} cm del cubículo: agrandalo o achicá la puerta.
+                  </span>
                 </div>
               )}
 

@@ -1,5 +1,5 @@
 import type { Cabina, Config, Tramo } from './types'
-import { anchosPanelFabrica, GRUESO_PILASTRA } from './catalog'
+import { anchosPanelFabrica, anchosPilastra, GRUESO_PILASTRA } from './catalog'
 import {
   anchoTotal, divisorDelCuarto, frenteAccesible, ladoDePilastra, ladosDeCabina, lugaresDe,
   profundidadAccesible, profundidadDelLugar,
@@ -380,6 +380,14 @@ function avisoDelFrente(
   if (frente <= 0) {
     return `La puerta de ${puerta} y la pilastra lateral de ${pilastra} ya suman los ${ancho} cm de la`
       + ` cabina accesible: no queda frente. Agrandá la cabina o achicá la puerta.`
+  }
+  // Tampoco puede quedar más angosto que la pilastra más chica del modelo: ahí
+  // no hay pieza que cortar y el despiece salía con una PL de 2 cm.
+  const minima = Math.min(...anchosPilastra(modelo ?? ''))
+  if (frente < minima) {
+    return `El frente de la cabina accesible quedaría de ${frente} cm y la pieza más angosta de`
+      + ` este modelo es de ${minima}: no se puede fabricar. Bajá la pilastra lateral de ${pilastra},`
+      + ` o cambiale el ancho a la cabina o a la puerta.`
   }
   const deFicha = anchosPanelFabrica(modelo ?? '')
   const mayor = Math.max(...deFicha)
