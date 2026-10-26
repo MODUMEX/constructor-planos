@@ -327,7 +327,7 @@ export function cuartoPmr(tramo: Tramo, config: Config): CuartoPmr | null {
       divisor: [{ tipo: 'panel', desdeCm: 0, hastaCm: profA }],
       pilastraCm: f.pilastra,
       panelCm: profA,
-      aviso: avisoDelFrente(f.frente, cab.anchoCm, f.puerta, f.pilastra, config.modelo),
+      aviso: avisoDelFrente(f.frente, cab.anchoCm, f.puerta, f.pilastra, config.modelo, f.juntada),
     }
   }
 
@@ -375,8 +375,11 @@ export function cuartoPmr(tramo: Tramo, config: Config): CuartoPmr | null {
  * hoja, tampoco.
  */
 function avisoDelFrente(
-  frente: number, ancho: number, puerta: number, pilastra: number, modelo?: string,
+  frente: number, ancho: number, puerta: number, pilastra: number, modelo?: string, juntada?: boolean,
 ): string | null {
+  // frente 0 con la pieza juntada no es un problema: el rincón se cortó de una
+  // sola pieza y el frente cierra igual
+  if (juntada) return null
   if (frente <= 0) {
     return `La puerta de ${puerta} y la pilastra lateral de ${pilastra} ya suman los ${ancho} cm de la`
       + ` cabina accesible: no queda frente. Agrandá la cabina o achicá la puerta.`

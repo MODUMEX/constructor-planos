@@ -529,7 +529,7 @@ export default function App() {
    */
   const lateralPedida = config.pilastraLateralMrCm
   const lateralCorregida = esVariacion && lateralPedida != null && lateralPedida > 0
-    && frenteMr.pilastra !== lateralPedida
+    && !frenteMr.juntada && frenteMr.pilastra !== lateralPedida
   const frenteQueDaba = lateralCorregida
     ? Math.round((cabinaMr.anchoCm - frenteMr.puerta - lateralPedida
       - (config.pilastraCierreMrCm ?? lateralPedida)) * 10) / 10

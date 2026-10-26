@@ -4,7 +4,8 @@ import { alturasDeConfig,
 } from './catalog'
 import type { Cabina, Config, Moneda, Pais, Soporte, Tramo, TipologiaId, RenglonBOM } from './types'
 import {
-  altoEntre, alturasDeCabina, ANCHOS_PILASTRA, esSoloOrinales, esVariacionPanel, familiaDelFrente,
+  altoEntre, alturasDeCabina, ANCHOS_PILASTRA, anchosPilastra, esSoloOrinales, esVariacionPanel,
+  familiaDelFrente,
   llevaAccesibleSiempre, mamparaDe, tipologia, tierDeColor, type MedidaMG,
 } from './catalog'
 import {
@@ -696,7 +697,7 @@ export function lateralesDelFrente(anchoCm: number, puertaCm: number): number {
 export function frenteAccesible(
   cabina: Cabina,
   config: Config,
-): { pilastra: number; frente: number; puerta: number; cierre: number } {
+): { pilastra: number; frente: number; puerta: number; cierre: number; juntada: boolean } {
   const puerta = Math.max(0, cabina.puerta.anchoCm || config.puertaAccesibleCm || 100)
   // La medida que salga de la modulación, salvo que el vendedor la haya
   // cambiado a mano sobre el plano.
@@ -722,7 +723,24 @@ export function frenteAccesible(
     pilastra = automatica
     cierre = automatica
   }
-  return { pilastra, puerta, cierre, frente: sobra(pilastra, cierre) }
+
+  // DOS PILASTRAS PEGADAS NO EXISTEN. Lo que sobra del frente es relleno, no
+  // una pieza: si entrara en la familia de las pilastras, saldrían la lateral y
+  // el relleno una contra otra —19 y 12 en un cubículo de 150 con puerta de
+  // 100—, y eso en planta no se arma. El rincón se corta de una sola pieza con
+  // la suma de las dos, mientras no se pase de la pilastra más ancha del
+  // modelo. Pasado ese ancho el frente ya es un PANEL, que sí va aparte y
+  // apoyado contra la lateral, como en la hoja de LEEDER.
+  let frente = sobra(pilastra, cierre)
+  let juntada = false
+  const topePilastra = Math.max(...anchosPilastra(config.modelo))
+  if (frente > 0 && familiaDelFrente(frente, config.modelo) === 'PL'
+      && pilastra + frente <= topePilastra) {
+    pilastra = Math.round((pilastra + frente) * 10) / 10
+    frente = 0
+    juntada = true
+  }
+  return { pilastra, puerta, cierre, frente, juntada }
 }
 
 /**
