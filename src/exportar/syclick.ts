@@ -51,7 +51,7 @@ const COMERCIAL: Record<string, string> = {
   SUP_REFORZADO170: 'RF170',
   SUP_COLGANTE: 'CL',
   // Touchless es el Reforzado con los electrónicos S3: en Syclick es L-S3-LC-RF…
-  // El sufijo lo decide la ALTURA de la pieza, ver `comercialDe`.
+  // El 170 solo lo lleva la puerta, ver `comercialDe`.
   TL_S3: 'RF',
 }
 
@@ -95,13 +95,21 @@ export function grupoSyclick(config: Config, cabinas: number): string {
 /**
  * El modelo comercial, que es la cuarta parte del SKU.
  *
- * En S3 hay dos: **RF** y **RF170**. El RF solo tiene la pieza de 150; todo
- * lo demás sale del RF170 (Dayanna, 21-oct-2026). Por eso acá no alcanza el
- * modelo del área: hace falta el alto de la pieza.
+ * En S3 hay dos y no cubren lo mismo: del **RF170** Syclick tiene cargada
+ * nada más la PUERTA —el panel, la pilastra y la mampara de orinal solo
+ * existen en el **RF**— (Dayanna, 26-oct-2026). Así que el 170 lo lleva la
+ * puerta cuando no es la de 150, y todo lo demás va RF mida lo que mida.
+ * Como un área admite un solo modelo, esas puertas se van a un área aparte,
+ * ver `generarSyclick`.
  */
-function comercialDe(config: Config, altoCm: number | undefined, regadera: boolean): string {
+function comercialDe(
+  config: Config,
+  altoCm: number | undefined,
+  regadera: boolean,
+  familia: string,
+): string {
   if (regadera) return COMERCIAL[MODELO_REGADERA]
-  if (config.linea === 'TOUCHLESS') return altoCm === 150 ? 'RF' : 'RF170'
+  if (config.linea === 'TOUCHLESS') return familia === 'PT' && altoCm !== 150 ? 'RF170' : 'RF'
   return COMERCIAL[config.modelo] ?? 'ST'
 }
 
@@ -119,7 +127,7 @@ export function skuSyclick(
     LINEA[config.linea],
     MODELO[config.linea],
     acabado,
-    comercialDe(config, altoCm, regadera),
+    comercialDe(config, altoCm, regadera, familia),
     FAMILIA[familia] ?? familia,
     grupoSyclick(config, cabinas),
   ].join('-')
@@ -182,22 +190,32 @@ export function generarSyclick(proyecto: Proyecto, _pais: Pais = 'MX'): Uint8Arr
      *
      * En la plataforma el área lleva su línea, su modelo y su color, y de ahí
      * salen los SKU; no se pueden revolver. Así que un área del Constructor
-     * que tenga cubículos de REGADERA se parte en dos: la de siempre con lo
-     * normal y otra, "… · Regadera", con las piezas del cubículo. Es como lo
-     * manda Sanimax a mano: en la cotización 103451 son tres áreas, y la del
-     * medio es "MODULO REGADERA BAÑOS DORMITORIOS" con modelo REGADERAS.
+     * se parte en tantas como modelos comerciales tenga adentro:
+     *
+     * - los cubículos de REGADERA se van a "… · Regadera". Es como lo manda
+     *   Sanimax a mano: en la cotización 103451 son tres áreas, y la del
+     *   medio es "MODULO REGADERA BAÑOS DORMITORIOS" con modelo REGADERAS.
+     * - en Touchless S3, las puertas de 170 y 180 se van a "… · 170": son lo
+     *   único que Syclick tiene cargado en el RF170.
      */
-    const porModelo = new Map<string, { nombre: string; modelo: string; filas: Map<string, (string | number)[]> }>()
-    const cajon = (esRegadera: boolean) => {
-      const k = esRegadera ? 'RG' : 'ST'
-      if (!porModelo.has(k)) {
-        porModelo.set(k, {
-          nombre: esRegadera ? `${nombres[i]} · Regadera`.slice(0, 100) : nombres[i],
-          modelo: esRegadera ? MODELO_REGADERA : config.modelo,
+    const porModelo = new Map<string, { nombre: string; desc: string; filas: Map<string, (string | number)[]> }>()
+    const base = COMERCIAL[config.modelo] ?? 'ST'
+    const cajon = (comercial: string, esRegadera: boolean) => {
+      if (!porModelo.has(comercial)) {
+        const aparte = !esRegadera && comercial !== base
+        porModelo.set(comercial, {
+          nombre: esRegadera
+            ? `${nombres[i]} · Regadera`.slice(0, 100)
+            : aparte
+              ? `${nombres[i]} · 170`.slice(0, 100)
+              : nombres[i],
+          desc: esRegadera
+            ? `${nombreModelo(config.linea, MODELO_REGADERA)} · ${config.acabado}`
+            : `${nombreModelo(config.linea, config.modelo)}${aparte ? ' 170' : ''} · ${config.acabado}`,
           filas: new Map(),
         })
       }
-      return porModelo.get(k)!
+      return porModelo.get(comercial)!
     }
 
     /**
@@ -208,7 +226,7 @@ export function generarSyclick(proyecto: Proyecto, _pais: Pais = 'MX'): Uint8Arr
      * plataforma suma igual pero que al leerlas parecen un error.
      */
     for (const r of agrupar(piezasDeArea(area), config)) {
-      const caja = cajon(!!r.regadera)
+      const caja = cajon(comercialDe(config, r.altoCm, !!r.regadera, r.familia), !!r.regadera)
       const sku = skuSyclick(r.familia, config, cabinas, r.regadera, r.altoCm)
       const rem = remate(r.familia, config)
       const clave = `${sku}|${r.anchoCm}|${r.altoCm}|${rem}`
@@ -217,14 +235,15 @@ export function generarSyclick(proyecto: Proyecto, _pais: Pais = 'MX'): Uint8Arr
       else caja.filas.set(clave, [caja.nombre, sku, r.anchoCm, r.altoCm, rem, r.cantidad])
     }
 
-    // primero la de siempre y después la de regadera, como en la cotización
-    for (const k of ['ST', 'RG']) {
+    // primero la de siempre, después las puertas de 170 y al final la de
+    // regadera, como en la cotización
+    for (const k of new Set([base, 'RF170', 'RG'])) {
       const caja = porModelo.get(k)
       if (!caja || !caja.filas.size) continue
       areas.filas.push([
         caja.nombre,
         // la descripción es obligatoria para las áreas nuevas
-        `${nombreModelo(config.linea, caja.modelo)} · ${config.acabado}`,
+        caja.desc,
         1,
         // con un color especial va la etiqueta del grupo y el color de verdad
         // viaja en «Color libre»; si no, el color tal cual

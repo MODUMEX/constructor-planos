@@ -3,8 +3,9 @@
  *
  * La ficha de abril 2026 lo dice en su tabla: puertas y paneles laterales en
  * **150, 170 y 180**, pilastras siempre de **210**. La app tenía una sola
- * altura fija y por eso no había forma de pedir la de 150 —la que Syclick
- * vende como `RF`, contra el `RF170` del resto—.
+ * altura fija y por eso no había forma de pedir la de 150. En Syclick el
+ * `RF170` del S3 es solo la PUERTA: el resto de las piezas van `RF` midan
+ * lo que midan.
  *
  * La pilastra NO se elige: la pone el modelo.
  *
@@ -65,7 +66,9 @@ for (const h of [150, 170, 180]) {
   const puertaSku = skus.find((s) => s.includes('-PT-')) ?? ''
   ok(puertaSku === `L-S3-LC-${esperado}-PT-G1`, `  la puerta va con ${esperado} · ${puertaSku}`)
   const pilastraSku = skus.find((s) => s.includes('-PL-')) ?? ''
-  ok(pilastraSku === 'L-S3-LC-RF170-PL-G1', `  y la pilastra de 210 siempre RF170 · ${pilastraSku}`)
+  ok(pilastraSku === 'L-S3-LC-RF-PL-G1', `  y la pilastra siempre RF · ${pilastraSku}`)
+  const panelSku = skus.find((s) => s.includes('-PN-')) ?? ''
+  ok(panelSku === 'L-S3-LC-RF-PN-G1', `  el panel también · ${panelSku}`)
 }
 
 console.log('\n— y la cotización cobra lo que mide: más alto, más plata')

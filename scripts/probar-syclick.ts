@@ -51,9 +51,9 @@ console.log('\n1 · el SKU se arma como la plantilla de Syclick')
     ['Colgante', cfg({ modelo: 'COLGANTE' }), 4, 'L-M1-LC-CL-PL-G1'],
     ['Estándar 170', cfg({ modelo: 'ESTANDAR170' }), 4, 'L-M1-LC-ST170-PL-G1'],
     ['Superior 2.0 Reforzado', cfg({ linea: 'SUPERIOR', modelo: 'SUP_REFORZADO' }), 4, 'S-2-LC-RF-PL-G1'],
-    // En S3 el modelo comercial depende del ALTO: el RF de Syclick solo
-    // tiene la pieza de 150, el resto sale del RF170 (Dayanna, 21-oct-2026).
-    ['Touchless S3: la pilastra de 210 va RF170', cfg({ linea: 'TOUCHLESS', modelo: 'TL_S3' }), 4, 'L-S3-LC-RF170-PL-G1'],
+    // De todo el S3, Syclick solo tiene cargada la PUERTA en el RF170: el
+    // resto vive en el RF (Dayanna, 26-oct-2026).
+    ['Touchless S3: la pilastra va RF', cfg({ linea: 'TOUCHLESS', modelo: 'TL_S3' }), 4, 'L-S3-LC-RF-PL-G1'],
     ['Superior acero inoxidable', cfg({ linea: 'SUPERIOR', modelo: 'SUP_ESTANDAR', acabado: 'Acero Inoxidable', color: 'Acero Inoxidable' }), 4, 'S-2-A-ST-PL-AI'],
     ['Superior esmaltada', cfg({ linea: 'SUPERIOR', modelo: 'SUP_ESTANDAR', acabado: 'Esmaltada Antigrafiti', color: 'Blanco' }), 4, 'S-2-E-ST-PL-EA'],
     ['color especial con menos de 10 cabinas', cfg({ color: 'Verde Inventado' }), 4, 'L-M1-LC-RF-PL-CEN10'],
@@ -69,15 +69,19 @@ console.log('\n1 · el SKU se arma como la plantilla de Syclick')
 
   const s3 = cfg({ linea: 'TOUCHLESS', modelo: 'TL_S3' })
   revisar(
-    'Touchless S3: una pieza de 150 sí va RF',
+    'Touchless S3: la puerta de 150 va RF',
     skuSyclick('PT', s3, 4, false, 150) === 'L-S3-LC-RF-PT-G1',
     skuSyclick('PT', s3, 4, false, 150),
   )
   revisar(
-    'Touchless S3: la de 180 va RF170',
+    'Touchless S3: la puerta de 180 va RF170',
     skuSyclick('PT', s3, 4, false, 180) === 'L-S3-LC-RF170-PT-G1',
     skuSyclick('PT', s3, 4, false, 180),
   )
+  for (const [f, alto] of [['PN', 180], ['PL', 210], ['MG', 120]] as const) {
+    const sku = skuSyclick(f, s3, 4, false, alto)
+    revisar(`Touchless S3: ${f} de ${alto} va RF, no RF170`, !sku.includes('RF170'), sku)
+  }
   revisar(
     'y en LEEDER el alto no cambia nada',
     skuSyclick('PT', cfg(), 4, false, 180) === 'L-M1-LC-RF-PT-G1',
@@ -153,6 +157,25 @@ console.log('\n4 · un color especial manda la etiqueta y el color libre')
   revisar('va la etiqueta del grupo', txt.includes('ESPECIAL MENOR A 10 MODULOS'))
   revisar('y el color de verdad en «Color libre»', txt.includes('Verde Inventado'))
   unlinkSync(tmp)
+}
+
+console.log('\n5 · en Touchless S3 las puertas de 170 y 180 se van a un área aparte')
+{
+  const s3 = cfg({ linea: 'TOUCHLESS', modelo: 'TL_S3', alturaPiezaCm: 180 })
+  const bytes = generarSyclick(proyectoDe(s3, 4))
+  const tmp = 'syclick-s3.xlsx'
+  writeFileSync(tmp, bytes)
+  const txt = readFileSync(tmp).toString('utf8')
+  unlinkSync(tmp)
+  const celdas = [...txt.matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map((m) => m[1])
+  const skus = celdas.filter((c) => c.startsWith('L-S3-'))
+  const areas = [...new Set(celdas.filter((c) => c.startsWith('Baño hombres')))]
+  revisar('salen las dos áreas', areas.length === 2, areas.join(' + '))
+  revisar('la de las puertas se llama «… · 170»', areas.includes('Baño hombres · 170'))
+  revisar('la puerta es lo único que va RF170', skus.every((s) => !s.includes('RF170') || s.includes('-PT-')), skus.join(' '))
+  revisar('ningún panel, pilastra ni mingitorio quedó en RF170', !skus.some((s) => /RF170-(PN|PL|PM)/.test(s)))
+  revisar('y la descripción del área nueva dice 170', celdas.some((c) => c.startsWith('Touchless S3 170 ·')),
+    celdas.filter((c) => c.startsWith('Touchless S3')).join(' | '))
 }
 
 console.log(fallos ? `\n${fallos} revisiones mal.\n` : '\nTodo cuadra.\n')
