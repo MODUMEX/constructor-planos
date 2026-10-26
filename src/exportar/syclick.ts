@@ -21,6 +21,7 @@ import { MODELO_REGADERA, nombreModelo } from '../catalog'
 import { grupoMx } from '../coloresMx'
 import { agrupar, piezasDeArea } from './piezas'
 import { libroXlsx, type HojaXlsx } from './xlsx'
+import { terminacionDe } from '../renders'
 
 /**
  * De cuántas cabinas para arriba un color especial cambia de SKU.
@@ -136,7 +137,7 @@ export function skuSyclick(
 /** PATA o ZOCLO; solo la pilastra lleva remate */
 function remate(familia: string, config: Config): string {
   if (FAMILIA[familia] !== 'PL') return ''
-  return config.terminacion === 'PATAS' ? 'PATA' : 'ZOCLO'
+  return terminacionDe(config) === 'PATAS' ? 'PATA' : 'ZOCLO'
 }
 
 /** el nombre del área como lo va a ver Syclick; no se puede repetir */

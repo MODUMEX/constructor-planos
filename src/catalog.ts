@@ -331,6 +331,15 @@ export const HERRAJE_ACABADOS: { id: HerrajeAcabado; nombre: string; nota: strin
   { id: 'NEGRO', nombre: 'Negro', nota: 'Todo el juego en negro: bisagra, cerrojo, escuadras, patas y gancho' },
 ]
 
+/**
+ * Los juegos que se venden en esa línea. Superior 2.0 va solo en inoxidable:
+ * el negro no existe para esa línea.
+ */
+export function herrajesDe(linea: Linea): typeof HERRAJE_ACABADOS {
+  if (linea === 'SUPERIOR') return HERRAJE_ACABADOS.filter((h) => h.id === 'INOX')
+  return HERRAJE_ACABADOS
+}
+
 export function nombreHerraje(id: HerrajeAcabado): string {
   return HERRAJE_ACABADOS.find((h) => h.id === id)?.nombre ?? id
 }

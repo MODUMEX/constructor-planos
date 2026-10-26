@@ -731,12 +731,18 @@ export function frenteAccesible(
   // la suma de las dos, mientras no se pase de la pilastra más ancha del
   // modelo. Pasado ese ancho el frente ya es un PANEL, que sí va aparte y
   // apoyado contra la lateral, como en la hoja de LEEDER.
+  //
+  // La suma se baja a una medida DE CATÁLOGO: no se fabrican otras. 19 y 12
+  // suman 31 y lo que sale es una de 30; el centímetro que queda se cubre en
+  // obra, con canaleta o repartido en las otras juntas.
   let frente = sobra(pilastra, cierre)
   let juntada = false
-  const topePilastra = Math.max(...anchosPilastra(config.modelo))
+  const delModelo = anchosPilastra(config.modelo)
+  const topePilastra = Math.max(...delModelo)
   if (frente > 0 && familiaDelFrente(frente, config.modelo) === 'PL'
       && pilastra + frente <= topePilastra) {
-    pilastra = Math.round((pilastra + frente) * 10) / 10
+    const suma = Math.round((pilastra + frente) * 10) / 10
+    pilastra = Math.max(...delModelo.filter((a) => a <= suma))
     frente = 0
     juntada = true
   }

@@ -3,13 +3,15 @@
  *
  * Dos pilastras pegadas una contra otra no se arman, así que lo que sobra del
  * frente no sale como pieza aparte: se corta junto con la lateral. En un
- * cubículo de 150 con puerta de 100 el rincón es UNA pilastra de 31, no una de
- * 19 más una de 12. Solo cuando el frente es tan ancho que ya es un PANEL va
- * aparte, apoyado contra la lateral.
+ * cubículo de 150 con puerta de 100 el rincón es UNA pilastra, no una de 19
+ * más una de 12. Y esa pieza baja a medida de catálogo —31 no se fabrica, sale
+ * de 30— porque el centímetro que falta se cubre en obra. Solo cuando el
+ * frente es tan ancho que ya es un PANEL va aparte, apoyado contra la lateral.
  *
  *   npm run probar-frente-mr
  */
 import { frenteAccesible } from '../src/modulacion'
+import { ANCHOS_PILASTRA } from '../src/catalog'
 import { cuartoPmr } from '../src/geometria'
 import type { Cabina, Config, Tramo } from '../src/types'
 
@@ -32,13 +34,14 @@ const tramo = (c: Cabina) => ({
   id: 't1', claroCm: 510, muroInicio: true, muroFin: true, cabinas: [c], pilastras: [],
 }) as unknown as Tramo
 
-console.log('— el rincón va de UNA pieza: dos pilastras pegadas no se arman')
-for (const [ancho, puerta, esperada] of [[150, 100, 31], [150, 90, 41], [180, 100, 61], [204, 100, 85]] as const) {
+console.log('— el rincón va de UNA pieza, y de medida de catálogo')
+for (const [ancho, puerta, esperada] of [[150, 100, 30], [150, 90, 40], [180, 100, 60], [204, 100, 85]] as const) {
   const c = cab(ancho, puerta)
   const f = frenteAccesible(c, cfg())
   ok(f.juntada && f.frente === 0 && f.pilastra === esperada,
     `${ancho} con puerta de ${puerta} → una sola de ${f.pilastra} (esperada ${esperada}), sin relleno`)
-  ok(f.pilastra + f.frente + f.puerta + f.cierre === ancho, `  y el frente cierra los ${ancho}`)
+  ok(ANCHOS_PILASTRA.includes(f.pilastra), `  y ${f.pilastra} es medida de catálogo`)
+  ok(f.pilastra + f.frente + f.puerta + f.cierre <= ancho, `  sin pasarse de los ${ancho}`)
   ok(cuartoPmr(tramo(c), cfg())?.aviso == null, '  sin aviso, porque cierra')
 }
 
@@ -48,7 +51,7 @@ console.log('— la lateral puesta a mano también se junta con el relleno')
   const c = cab(150, 100)
   const config = cfg({ pilastraLateralMrCm: 24 })
   const f = frenteAccesible(c, config)
-  ok(f.frente === 0 && f.pilastra + f.puerta + f.cierre === 150,
+  ok(f.frente === 0 && ANCHOS_PILASTRA.includes(f.pilastra) && f.pilastra + f.puerta + f.cierre <= 150,
     `150 con lateral de 24 → ${f.pilastra} · ${f.puerta} · ${f.cierre}, sin el relleno de 2 cm`)
 }
 

@@ -178,5 +178,18 @@ console.log('\n5 · en Touchless S3 las puertas de 170 y 180 se van a un área a
     celdas.filter((c) => c.startsWith('Touchless S3')).join(' | '))
 }
 
+console.log('\n6 · Superior 2.0 nunca manda PATA: esa pilastra no existe con pata')
+{
+  const sup = cfg({ linea: 'SUPERIOR', modelo: 'SUP_ESTANDAR170', terminacion: 'PATAS' })
+  const bytes = generarSyclick(proyectoDe(sup, 4))
+  const tmp = 'syclick-sup.xlsx'
+  writeFileSync(tmp, bytes)
+  const txt = readFileSync(tmp).toString('utf8')
+  unlinkSync(tmp)
+  const celdas = [...txt.matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map((m) => m[1])
+  revisar('ni un remate PATA en toda la captura', !celdas.includes('PATA'))
+  revisar('la pilastra sale con zoclo', celdas.includes('ZOCLO'))
+}
+
 console.log(fallos ? `\n${fallos} revisiones mal.\n` : '\nTodo cuadra.\n')
 process.exit(fallos ? 1 : 0)

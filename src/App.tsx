@@ -18,7 +18,7 @@ import { destinoOdoo } from './odoo/region'
 import { esAdmin, faltaParaVencer, IVA_CR, puedeCatalogos, puedeColoresReservados, puedeDistribuidores, puedePiezas, puedeUsuarios, renovarSesion, type Usuario } from './auth'
 import type { Area, Cabina, Config, Soporte, Moneda, Pais, Proyecto, TipoCabina, TipologiaId, Tramo } from './types'
 import { alturasElegibles, alturasDeConfig,
-  acabadoEsElColor, acabadosPara, alturasDe, anchosPanel, claroAjustado, coloresPara, espesorPorLinea, HERRAJE_ACABADOS, LINEAS, mgMedidas, MODELOS,
+  acabadoEsElColor, acabadosPara, alturasDe, anchosPanel, claroAjustado, coloresPara, espesorPorLinea, herrajesDe, LINEAS, mgMedidas, MODELOS,
   type PiezaEspecial,
   PAISES, etiquetaTier, nombreHerraje, nombreModelo, tierDeColor, TIPOLOGIAS, tipologia, tipologiaEspejo,
   ANCHOS_PILASTRA, COLOR_DE_LINEA, CUBICULO_MR, esDeLinea, esEspecial, esSoloOrinales, esVariacionPanel, ICONO_MR, PIEZA_PIDE_COSTILLA_CM,
@@ -842,9 +842,18 @@ export default function App() {
     const paneles = anchosPanel(modelo)
     const mg = mgMedidas(linea, modelo)
     const mgSigue = mg.some((m) => m.anchoCm === (config.mgAnchoCm ?? 60) && m.altoCm === config.mgAlturaCm)
+    const juegos = herrajesDe(linea)
+    const herrajeAcabado = juegos.some((h) => h.id === config.herrajeAcabado)
+      ? config.herrajeAcabado
+      : juegos[0].id
+    const terminaciones = terminacionesDe(herrajeAcabado, linea)
     setConfig({
       linea,
       modelo,
+      // Superior 2.0 va solo en inoxidable y nunca con pata: si venían
+      // elegidos, se bajan a lo que esa línea sí tiene
+      herrajeAcabado,
+      ...(terminaciones.includes(config.terminacion) ? {} : { terminacion: terminaciones[0] }),
       ...(mgSigue ? {} : { mgAnchoCm: mg[0].anchoCm, mgAlturaCm: mg[0].altoCm }),
       acabado,
       ...colorInicial(linea, acabado),
@@ -875,7 +884,7 @@ export default function App() {
    * la terminación, para que la foto y el pedido digan lo mismo.
    */
   function elegirHerraje(herrajeAcabado: Config['herrajeAcabado']) {
-    const posibles = terminacionesDe(herrajeAcabado)
+    const posibles = terminacionesDe(herrajeAcabado, config.linea)
     const terminacion = posibles.includes(config.terminacion) ? config.terminacion : posibles[0]
     setConfig({ herrajeAcabado, terminacion })
   }
@@ -2627,7 +2636,7 @@ export default function App() {
                     Va en juego completo: si el cliente pide negro, todas las piezas son negras. No se elige una por una.
                   </p>
                   <div className="grid-cards">
-                    {HERRAJE_ACABADOS.map((h) => (
+                    {herrajesDe(config.linea).map((h) => (
                       <button
                         key={h.id}
                         className={`card ${config.herrajeAcabado === h.id ? 'sel' : ''}`}
@@ -2680,12 +2689,16 @@ export default function App() {
                     <div className="campo">
                       <label>Terminación</label>
                       <select value={config.terminacion} onChange={(e) => setConfig({ terminacion: e.target.value as 'ZOCLO' | 'PATAS' })}>
-                        {terminacionesDe(config.herrajeAcabado).map((t) => (
+                        {terminacionesDe(config.herrajeAcabado, config.linea).map((t) => (
                           <option key={t} value={t}>{t === 'ZOCLO' ? 'Zoclo' : 'Pata'}</option>
                         ))}
                       </select>
-                      {terminacionesDe(config.herrajeAcabado).length === 1 && (
-                        <span className="ayuda">El juego negro va siempre con pata</span>
+                      {terminacionesDe(config.herrajeAcabado, config.linea).length === 1 && (
+                        <span className="ayuda">
+                          {config.linea === 'SUPERIOR'
+                            ? 'Superior 2.0 no lleva pata: la pilastra solo existe con zoclo'
+                            : 'El juego negro va siempre con pata'}
+                        </span>
                       )}
                     </div>
                     <div className="campo">

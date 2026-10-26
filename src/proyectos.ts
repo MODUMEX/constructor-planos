@@ -1,5 +1,7 @@
 import { renovarSesion, type Usuario } from './auth'
 import type { Proyecto } from './types'
+import { terminacionesDe } from './renders'
+import { herrajesDe } from './catalog'
 
 /**
  * Guardar y abrir proyectos en Supabase, contra la misma tabla `proyecto`
@@ -293,6 +295,27 @@ export async function guardarProyecto(
   }
 }
 
+/**
+ * Acomoda un proyecto viejo a las reglas de hoy. Superior 2.0 no lleva pata ni
+ * juego negro y antes se dejaban elegir, así que hay proyectos guardados con
+ * cosas que ya no existen y que Syclick rechaza al subir la cotización.
+ */
+function alDia(proyecto: Proyecto): Proyecto {
+  return {
+    ...proyecto,
+    areas: proyecto.areas.map((a) => {
+      const juegos = herrajesDe(a.config.linea)
+      const herrajeAcabado = juegos.some((h) => h.id === a.config.herrajeAcabado)
+        ? a.config.herrajeAcabado
+        : juegos[0].id
+      const posibles = terminacionesDe(herrajeAcabado, a.config.linea)
+      const terminacion = posibles.includes(a.config.terminacion) ? a.config.terminacion : posibles[0]
+      if (herrajeAcabado === a.config.herrajeAcabado && terminacion === a.config.terminacion) return a
+      return { ...a, config: { ...a.config, herrajeAcabado, terminacion } }
+    }),
+  }
+}
+
 /** Trae el proyecto completo desde el app_json para seguir editándolo. */
 export async function abrirProyecto(usuario: Usuario | null, proyectoId: number): Promise<Resultado<Proyecto>> {
   if (!URL_SUPABASE || !LLAVE_SUPABASE) return sinNube()
@@ -320,7 +343,7 @@ export async function abrirProyecto(usuario: Usuario | null, proyectoId: number)
     if (!guardado.proyecto.areas?.length) {
       return { ok: false, mensaje: `El proyecto ${filas[0].codigo} se guardó sin áreas.` }
     }
-    return { ok: true, dato: guardado.proyecto, mensaje: `Abierto ${filas[0].codigo}.` }
+    return { ok: true, dato: alDia(guardado.proyecto), mensaje: `Abierto ${filas[0].codigo}.` }
   } catch (e) {
     return { ok: false, mensaje: e instanceof Error ? e.message : 'No se pudo abrir.' }
   }

@@ -10,7 +10,7 @@
  *   · su panel cuenta como una PARED para modular, así que en la U se
  *     descuentan 3 cm de herraje y no 2.
  */
-import { claroAjustado } from '../src/catalog'
+import { ANCHOS_PILASTRA, claroAjustado } from '../src/catalog'
 import {
   anchoAccesibleDe, crearTramos, frenteAccesible, lateralesDelFrente, pedidoDeModulacion,
   profundidadAccesible, recesoDe,
@@ -92,11 +92,13 @@ console.log('\n3 · el frente: pilastra lateral + frente + puerta + pilastra de 
   revisar('la accesible arranca la tira', acc?.tipo === 'accesible')
   revisar('y se planta en el ancho pedido', acc?.anchoCm === 204, `${acc?.anchoCm}`)
   const f = frenteAccesible(acc, c)
-  revisar('la pilastra lateral es de 19', f.pilastra === 19, `${f.pilastra}`)
+  // El rincón se corta de una pieza: la lateral de 19 y el relleno de 66 salen
+  // juntos en una de 85.
+  revisar('la lateral se junta con el relleno: 85', f.pilastra === 85, `${f.pilastra}`)
   revisar('la puerta es de 100', f.puerta === 100, `${f.puerta}`)
-  revisar('la pilastra de cierre también es de 19', f.cierre === 19, `${f.cierre}`)
-  revisar('el frente se lleva lo que queda: 66', f.frente === 66, `${f.frente}`)
-  revisar('las cuatro suman el ancho', f.pilastra + f.frente + f.puerta + f.cierre === acc!.anchoCm)
+  revisar('la pilastra de cierre es de 19', f.cierre === 19, `${f.cierre}`)
+  revisar('ya no queda frente aparte', f.frente === 0 && f.juntada, `${f.frente}`)
+  revisar('las tres suman el ancho', f.pilastra + f.puerta + f.cierre === acc!.anchoCm)
   // Una puerta NUNCA cierra contra un panel: de los dos lados tiene pilastra.
   revisar('la puerta tiene pilastra de los dos lados', f.pilastra > 0 && f.cierre > 0)
 }
@@ -109,16 +111,20 @@ console.log('\n3b · la lateral y la de cierre pueden medir distinto')
   const t = crearTramos('MR_PANEL_U', 500, 4, c, 'CR')[0]
   const acc = t.cabinas[0]
   const f = frenteAccesible(acc, c)
-  revisar('la lateral toma su medida', f.pilastra === 24, String(f.pilastra))
+  // La lateral pedida se lleva el relleno: 24 + 70 son 94, que no es medida de
+  // catálogo, así que sale la de 90 y los 4 cm se cubren en obra.
+  revisar('la lateral se junta con el relleno', f.pilastra === 90, String(f.pilastra))
   revisar('la de cierre toma la suya', f.cierre === 10, String(f.cierre))
-  revisar('el frente absorbe la diferencia', f.pilastra + f.frente + f.puerta + f.cierre === acc.anchoCm,
+  revisar('y sale en medida de catálogo', ANCHOS_PILASTRA.includes(f.pilastra), String(f.pilastra))
+  revisar('sin pasarse del ancho', f.pilastra + f.frente + f.puerta + f.cierre <= acc.anchoCm,
     `${f.pilastra} + ${f.frente} + ${f.puerta} + ${f.cierre}`)
 
   // y si no se elige la de cierre, sale igual que la lateral
   const soloLateral = cfg('MR_PANEL_U', { puertaAccesibleCm: 100, pilastraLateralMrCm: 30 })
   const t2 = crearTramos('MR_PANEL_U', 500, 4, soloLateral, 'CR')[0]
   const f2 = frenteAccesible(t2.cabinas[0], soloLateral)
-  revisar('sin elegirla, la de cierre copia a la lateral', f2.cierre === 30 && f2.pilastra === 30, String(f2.cierre))
+  revisar('sin elegirla, la de cierre copia a la lateral', f2.cierre === 30, String(f2.cierre))
+  revisar('y la lateral se junta con el relleno', f2.pilastra === 70 && f2.juntada, String(f2.pilastra))
 }
 
 console.log('\n3c · las dos pilastras las elige la modulación, no se preguntan')
@@ -135,8 +141,9 @@ console.log('\n3c · las dos pilastras las elige la modulación, no se preguntan
   const c = cfg('MR_PANEL_U', { puertaAccesibleCm: 90, anchoAccesibleCm: 164 })
   const t = crearTramos('MR_PANEL_U', 449, 4, c)[0]
   const f = frenteAccesible(t.cabinas[0], c)
-  revisar('sin pedir nada, las dos salen de 19', f.pilastra === 19 && f.cierre === 19, f.pilastra + ' y ' + f.cierre)
-  revisar('y el frente se lleva el resto', f.pilastra + f.frente + f.puerta + f.cierre === 164,
+  revisar('sin pedir nada, la de cierre sale de 19', f.cierre === 19, String(f.cierre))
+  revisar('y la lateral se junta con el relleno: 55', f.pilastra === 55 && f.juntada, String(f.pilastra))
+  revisar('las tres cierran los 164', f.pilastra + f.frente + f.puerta + f.cierre === 164,
     [f.pilastra, f.frente, f.puerta, f.cierre].join(' + '))
 }
 

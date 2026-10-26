@@ -1,6 +1,7 @@
 import type { Config } from '../types'
 import type { Familia, Pieza } from '../exportar/piezas'
 import { buscarColor } from '../catalog'
+import { terminacionDe } from '../renders'
 
 /**
  * Traductor del despiece del Constructor al SKU de Odoo.
@@ -119,7 +120,7 @@ function tresDigitos(cm: number): string {
  * intermedia y a muro.
  */
 function variantes(pieza: Pieza, config: Config, linea: string): string[] | null {
-  const zoclo = config.terminacion === 'PATAS' ? 'PATA' : 'ZOC'
+  const zoclo = terminacionDe(config) === 'PATAS' ? 'PATA' : 'ZOC'
 
   if (pieza.familia === 'PT') {
     const mano = pieza.subTipo.startsWith('PTADER') ? 'DER' : 'IZQ'

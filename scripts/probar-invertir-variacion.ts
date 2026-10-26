@@ -61,11 +61,13 @@ for (const id of ['MR_PANEL_U', 'MR_PANEL_L', 'MR_PANEL_E'] as const) {
   revisar('la tira mide lo mismo', anchoTotal(derecho.cabinas) === anchoTotal(vuelta.cabinas))
   revisar('los muros se intercambian', derecho.muroInicio === vuelta.muroFin && derecho.muroFin === vuelta.muroInicio)
 
-  // el frente: la puerta va SIEMPRE pegada al panel que separa de la tira
+  // El frente: la puerta va SIEMPRE pegada al panel que separa de la tira. El
+  // rincón sale de una sola pieza, así que son TRES y no cuatro: lo que antes
+  // era pilastra + relleno hoy se corta junto.
   const ordenA = a.frente.map((p) => p.tipo).join('·')
   const ordenB = b.frente.map((p) => p.tipo).join('·')
-  revisar('derecha: pilastra, frente, puerta y cierre', ordenA === 'pilastra·frente·puerta·cierre', ordenA)
-  revisar('invertida: se dan vuelta', ordenB === 'cierre·puerta·frente·pilastra', ordenB)
+  revisar('derecha: pilastra, puerta y cierre', ordenA === 'pilastra·puerta·cierre', ordenA)
+  revisar('invertida: se dan vuelta', ordenB === 'cierre·puerta·pilastra', ordenB)
   // La de CIERRE es la que va contra el panel divisor: es contra ella que
   // cierra la puerta, porque una puerta nunca cierra contra un panel.
   revisar(

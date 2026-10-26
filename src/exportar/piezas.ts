@@ -3,6 +3,7 @@ import { alturasDeConfig, altoEntre, alturasDeCabina, esSoloOrinales, esVariacio
 import { arrancaConMingitorio, soportesDe } from '../modulacion'
 import { cierraConMingitorio, fronteraDeOrinal } from '../modulacion'
 import { cuartoPmr } from '../geometria'
+import { terminacionDe } from '../renders'
 
 /**
  * Piezas del proyecto con el SubTipo que espera el CIP.
@@ -62,7 +63,7 @@ export function nombreLinea(linea: Config['linea']): string {
 }
 
 export function nombreSistema(config: Config): string {
-  return config.terminacion === 'PATAS' ? 'Pata' : 'Zoclo'
+  return terminacionDe(config) === 'PATAS' ? 'Pata' : 'Zoclo'
 }
 
 /** el alto de la pilastra lo pone el modelo, no la altura de la puerta */
@@ -86,7 +87,7 @@ export function modeloParaCsv(config: Config, tramos?: Tramo[]): string {
 
 export function sku(pieza: Pieza, config: Config): string {
   const color = colorAbreviado(config.color)
-  const sistema = config.terminacion === 'PATAS' ? 'P' : 'Z'
+  const sistema = terminacionDe(config) === 'PATAS' ? 'P' : 'Z'
   return `LM1LCRF${pieza.familia}${pieza.anchoCm}${pieza.altoCm}${color}${sistema}`
 }
 

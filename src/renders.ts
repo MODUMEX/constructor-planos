@@ -1,7 +1,7 @@
 import { COLORES, buscarColor } from './catalog'
 import { COLORES_FUERA_DE_CATALOGO, RENDERS } from './datos/renders'
 import { FOTOS_HERRAJES } from './datos/herrajes'
-import type { Acabado, HerrajeAcabado, Linea, Terminacion, TipoCabina } from './types'
+import type { Acabado, Config, HerrajeAcabado, Linea, Terminacion, TipoCabina } from './types'
 
 /**
  * Busca el render que le corresponde a lo que el vendedor eligió. Las fotos son
@@ -201,11 +201,24 @@ export function fotosHerraje(
 }
 
 /**
- * Terminaciones que se pueden pedir con ese juego de herrajes. El juego negro
- * no tiene zoclo: va siempre con pata.
+ * Terminaciones que se pueden pedir. Superior 2.0 no lleva pata: su pilastra
+ * solo existe con zoclo, en todos los modelos —y tampoco lleva juego negro,
+ * ver `herrajesDe`—. En las demás líneas manda el juego de herrajes, y el
+ * negro no tiene zoclo: va siempre con pata.
  */
-export function terminacionesDe(acabado: HerrajeAcabado): Terminacion[] {
+export function terminacionesDe(acabado: HerrajeAcabado, linea: Linea): Terminacion[] {
+  if (linea === 'SUPERIOR') return ['ZOCLO']
   return acabado === 'NEGRO' ? ['PATAS'] : ['ZOCLO', 'PATAS']
+}
+
+/**
+ * La terminación con la que sale el pedido. Pasa por acá y no por
+ * `config.terminacion` a secas porque hay proyectos viejos guardados con una
+ * terminación que la línea no admite, y lo que se pide tiene que existir.
+ */
+export function terminacionDe(config: Config): Terminacion {
+  const posibles = terminacionesDe(config.herrajeAcabado, config.linea)
+  return posibles.includes(config.terminacion) ? config.terminacion : posibles[0]
 }
 
 /** true si todavía no llegaron las fotos de ese juego */
