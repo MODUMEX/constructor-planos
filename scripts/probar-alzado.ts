@@ -8,6 +8,7 @@
  *   npm run probar-alzado
  */
 import { alturasDe, alzadoDe } from '../src/catalog'
+import { pieDePilastra } from '../src/exportar/pdf'
 
 let mal = 0
 const ok = (b: boolean, t: string) => { if (!b) mal++; console.log(`${b ? '✓' : '✕'} ${t}`) }
@@ -45,6 +46,29 @@ ok(alzadoDe('REFORZADO').pisoCm === 30, '…pero la puerta va a 30: por eso no s
 
 // Un modelo que no esté en la tabla no puede reventar el plano.
 ok(alzadoDe('LO_QUE_SEA').pisoCm >= 0, 'un modelo desconocido no rompe el alzado')
+
+console.log('')
+console.log('— el pie de la pilastra: zoclo corrido, o una o dos patas repartidas')
+{
+  const redondo = (x: number) => Math.round(x * 100) / 100
+  for (const ancho of [10, 12, 15, 17, 19, 24, 30, 60, 120]) {
+    const pies = pieDePilastra(ancho, false)
+    const cuantas = ancho >= 17 ? 2 : 1
+    const aires = [
+      pies[0].desdeCm,
+      ...pies.slice(1).map((p, j) => p.desdeCm - (pies[j].desdeCm + pies[j].anchoCm)),
+      ancho - (pies[pies.length - 1].desdeCm + pies[pies.length - 1].anchoCm),
+    ].map(redondo)
+    ok(pies.length === cuantas, `la de ${ancho} lleva ${pies.length} pata(s)`)
+    ok(aires.every((a) => Math.abs(a - aires[0]) < 0.01) && aires[0] > 0,
+      `  y los aires son iguales · ${aires.join(" / ")}`)
+    ok(pies[pies.length - 1].desdeCm + pies[pies.length - 1].anchoCm <= ancho,
+      '  sin salirse de la pieza')
+  }
+  const zoclo = pieDePilastra(24, true)
+  ok(zoclo.length === 1 && zoclo[0].desdeCm === 0 && zoclo[0].anchoCm === 24,
+    'el zoclo es uno solo y corre de lado a lado')
+}
 
 console.log(mal === 0 ? '\ntodo correcto' : `\n${mal} fallas`)
 process.exit(mal ? 1 : 0)

@@ -45,6 +45,60 @@ const ROTULO_MM = 12
  */
 const ALTO_BASE_CM = 10
 
+/** ancho de cada pata, en cm */
+const ANCHO_PATA_CM = 6
+
+/** de este ancho para arriba la pilastra lleva DOS patas; más angosta, una sola */
+const PILASTRA_DE_DOS_PATAS_CM = 17
+
+/**
+ * El pie de la pilastra, en cm desde su canto izquierdo.
+ *
+ * El zoclo corre de lado a lado, así que es uno solo del ancho de la pieza.
+ * Las patas son tacos sueltos: dos de 17 de ancho para arriba y una sola en
+ * las más angostas, repartidas para que quede el MISMO aire entre el canto y
+ * la pata, entre las dos patas y entre la última pata y el otro canto
+ * (Dayanna, 28-oct-2026).
+ */
+export function pieDePilastra(anchoCm: number, conZoclo: boolean): { desdeCm: number; anchoCm: number }[] {
+  if (conZoclo) return [{ desdeCm: 0, anchoCm }]
+  const cuantas = anchoCm >= PILASTRA_DE_DOS_PATAS_CM ? 2 : 1
+  // en las medidas de catálogo la pata siempre entra entera; el tope es por si
+  // alguna vez llega una pieza tan angosta que no dejaría aire a los lados
+  const pata = Math.min(ANCHO_PATA_CM, (anchoCm * 0.8) / cuantas)
+  const aire = (anchoCm - cuantas * pata) / (cuantas + 1)
+  return Array.from({ length: cuantas }, (_, i) => ({
+    desdeCm: aire * (i + 1) + pata * i,
+    anchoCm: pata,
+  }))
+}
+
+/**
+ * Dibuja una pilastra de frente: el cuerpo ARRANCA donde termina el pie, que
+ * es lo que se ve en obra —la pieza se apoya sobre el zoclo o sobre las
+ * patas, no las tapa—, y después el pie.
+ */
+function pilastraDeFrente(
+  doc: jsPDF,
+  xIzqCm: number,
+  anchoCm: number,
+  altoCm: number,
+  conZoclo: boolean,
+  aX: (u: number) => number,
+  aY: (h: number) => number,
+  k: number,
+) {
+  doc.setFillColor(120, 120, 120)
+  doc.setDrawColor(70)
+  doc.setLineWidth(0.25)
+  doc.rect(aX(xIzqCm), aY(altoCm), anchoCm * k, (altoCm - ALTO_BASE_CM) * k, 'FD')
+  doc.setFillColor(200, 203, 208)
+  for (const pie of pieDePilastra(anchoCm, conZoclo)) {
+    doc.rect(aX(xIzqCm + pie.desdeCm), aY(ALTO_BASE_CM), pie.anchoCm * k, ALTO_BASE_CM * k, 'FD')
+  }
+  doc.setFillColor(120, 120, 120)
+}
+
 const TINTA = 25
 const GRIS = 130
 /** azul del logo, para las hojas de puerta */
@@ -825,14 +879,10 @@ function alzadoPmr(
     const w = ancho * e.k
     if (pieza.tipo === 'pilastra') {
       // la pilastra es la única que baja al piso
-      doc.setFillColor(120, 120, 120)
-      doc.setDrawColor(70)
-      doc.setLineWidth(0.25)
-      doc.rect(x, aY(hPilastra), w, hPilastra * e.k, 'FD')
-      const conZoclo = area.config.terminacion === 'ZOCLO'
-      const anchoBase = conZoclo ? ancho : Math.min(ancho, 6)
-      doc.setFillColor(200, 203, 208)
-      doc.rect(aX(pieza.desdeCm + (ancho - anchoBase) / 2), aY(ALTO_BASE_CM), anchoBase * e.k, ALTO_BASE_CM * e.k, 'FD')
+      pilastraDeFrente(
+        doc, pieza.desdeCm, ancho, hPilastra,
+        area.config.terminacion === 'ZOCLO', aX, aY, e.k,
+      )
       continue
     }
     // panel y puerta cuelgan: arrancan arriba y dejan el hueco de abajo
@@ -922,19 +972,11 @@ function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) 
     const centro = centroPilastra(tramo, cortes, k, ancho, cuarto)
     // cada pilastra con SU alto: la que toca una regadera sube con ella
     const hPil = altoPilEntre(tramo, k, area.config)
-    doc.rect(aX(centro - ancho / 2), aY(hPil), ancho * e.k, hPil * e.k, 'FD')
-    // el zoclo o la pata al pie, los 10 cm que acota la ficha
-    const conZoclo = area.config.terminacion === 'ZOCLO'
-    const anchoBase = conZoclo ? ancho : Math.min(ancho, 6)
-    doc.setFillColor(200, 203, 208)
-    doc.rect(
-      aX(centro - anchoBase / 2),
-      aY(ALTO_BASE_CM),
-      anchoBase * e.k,
-      ALTO_BASE_CM * e.k,
-      'FD',
+    // el zoclo o las patas al pie, los 10 cm que acota la ficha
+    pilastraDeFrente(
+      doc, centro - ancho / 2, ancho, hPil,
+      area.config.terminacion === 'ZOCLO', aX, aY, e.k,
     )
-    doc.setFillColor(120, 120, 120)
   })
 
   // El refuerzo superior de aluminio: una barra que corre de punta a punta por
@@ -1002,17 +1044,7 @@ function alzado(doc: jsPDF, area: Area, e: Escala, tramo: Tramo, pisoY: number) 
         continue
       }
       // pilastra lateral y pieza del frente: de piso a tope, como una pilastra
-      doc.setFillColor(120, 120, 120)
-      doc.setDrawColor(70)
-      doc.setLineWidth(0.25)
-      doc.rect(aX(pieza.desdeCm), aY(hPilastra), ancho * e.k, hPilastra * e.k, 'FD')
-      const anchoBase = conZoclo ? ancho : Math.min(ancho, 6)
-      doc.setFillColor(200, 203, 208)
-      doc.rect(
-        aX(pieza.desdeCm + (ancho - anchoBase) / 2), aY(ALTO_BASE_CM),
-        anchoBase * e.k, ALTO_BASE_CM * e.k, 'FD',
-      )
-      doc.setFillColor(120, 120, 120)
+      pilastraDeFrente(doc, pieza.desdeCm, ancho, hPilastra, conZoclo, aX, aY, e.k)
     }
     // y sus medidas, en la misma cadena de arriba
     for (const pieza of cuarto.frente) {
