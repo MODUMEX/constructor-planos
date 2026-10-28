@@ -90,12 +90,12 @@ function subirA(valor: number, opciones: number[]): number {
  *
  * Las medidas de catálogo no se tocan: `subirA` las devuelve iguales.
  */
-export function anchoCobrado(familia: Pieza['familia'], anchoCm: number, modeloCodigo: string): number {
+export function anchoCobrado(familia: Pieza['familia'], anchoCm: number, modeloCodigo: string, altoCm?: number): number {
   switch (familia) {
     case 'PT':
       return anchoCobradoPuerta(subirA(anchoCm, [...ANCHOS_PUERTA, ...ANCHOS_PUERTA_CR]))
     case 'PN':
-      return subirA(anchoCm, anchosPanelFabrica(modeloCodigo))
+      return subirA(anchoCm, anchosPanelFabrica(modeloCodigo, altoCm))
     case 'PL':
       return subirA(anchoCm, ANCHOS_PILASTRA)
     default:
@@ -116,7 +116,7 @@ function m2Cobrados(pieza: Pieza, modeloCodigo: string): number {
     const m = contiene ?? { anchoCm: pieza.anchoCm, altoCm: pieza.altoCm }
     return (m.anchoCm * m.altoCm) / 1e4
   }
-  return (anchoCobrado(pieza.familia, pieza.anchoCm, modeloCodigo) * pieza.altoCm) / 1e4
+  return (anchoCobrado(pieza.familia, pieza.anchoCm, modeloCodigo, pieza.altoCm) * pieza.altoCm) / 1e4
 }
 
 /**

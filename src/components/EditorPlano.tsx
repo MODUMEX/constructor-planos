@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Cabina, Config, Pais, Soporte, Tramo } from '../types'
-import { anchosPanelFabrica, anchosPilastra, COSTILLA_MINIMA_CM, COSTILLA_TOLERANCIA_CM, esVariacionPanel, familiaDelFrente, ICONO_MR, medidasDeFrente, PIEZA_PIDE_COSTILLA_CM, puertasPosibles, tipologia } from '../catalog'
+import { alturasDeConfig, anchosPanelFabrica, anchosPilastra, COSTILLA_MINIMA_CM, COSTILLA_TOLERANCIA_CM, esVariacionPanel, familiaDelFrente, ICONO_MR, medidasDeFrente, PIEZA_PIDE_COSTILLA_CM, puertasPosibles, tipologia } from '../catalog'
 import { anchoTotal, arrancaElCuartoPmr, esEspacioLibre, minimoDe, nuevaCabina, pilastrasParaAncho, profundidadAccesible, puertaSugerida, snap, cierraConMingitorio, ladosDeCabina, lugaresDe, mamparaEn } from '../modulacion'
 import { anchosPilastraEn, medidaCercana, PILASTRA_MINIMA_CM, PUERTA_ACCESIBLE_MIN } from '../modulador'
 import { Grupo, Item, Menu, Raya } from './Menu'
@@ -352,7 +352,7 @@ export default function EditorPlano({
       // medida que se fabrique: con el fondo en 255 y la puerta en 90, una
       // pilastra de 12 pediría un panel de 153 y no existe, solo el de 150. Así
       // que las medidas que se ofrecen son SOLO las que dejan un panel de ficha.
-      const deFicha = anchosPanelFabrica(config.modelo)
+      const deFicha = anchosPanelFabrica(config.modelo, alturasDeConfig(config).panel)
       const calzan = anchosPilastra(config.modelo).filter((p) =>
         deFicha.includes(Math.round((q.fondo - q.puerta - p) * 10) / 10),
       )

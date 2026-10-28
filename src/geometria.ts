@@ -1,5 +1,5 @@
 import type { Cabina, Config, Tramo } from './types'
-import { anchosPanelFabrica, anchosPilastra, GRUESO_PILASTRA } from './catalog'
+import { alturasDeConfig, anchosPanelFabrica, anchosPilastra, GRUESO_PILASTRA } from './catalog'
 import {
   anchoTotal, divisorDelCuarto, frenteAccesible, ladoDePilastra, ladosDeCabina, lugaresDe,
   profundidadAccesible, profundidadDelLugar,
@@ -327,7 +327,7 @@ export function cuartoPmr(tramo: Tramo, config: Config): CuartoPmr | null {
       divisor: [{ tipo: 'panel', desdeCm: 0, hastaCm: profA }],
       pilastraCm: f.pilastra,
       panelCm: profA,
-      aviso: avisoDelFrente(f.frente, cab.anchoCm, f.puerta, f.pilastra, config.modelo, f.juntada),
+      aviso: avisoDelFrente(f.frente, cab.anchoCm, f.puerta, f.pilastra, config.modelo, f.juntada, alturasDeConfig(config).panel),
     }
   }
 
@@ -363,7 +363,7 @@ export function cuartoPmr(tramo: Tramo, config: Config): CuartoPmr | null {
     divisor,
     pilastraCm: pilastra,
     panelCm: panel,
-    aviso: avisoDelDivisor(prof, panel, puerta, pilastra, config.modelo),
+    aviso: avisoDelDivisor(prof, panel, puerta, pilastra, config.modelo, alturasDeConfig(config).panel),
   }
 }
 
@@ -376,6 +376,7 @@ export function cuartoPmr(tramo: Tramo, config: Config): CuartoPmr | null {
  */
 function avisoDelFrente(
   frente: number, ancho: number, puerta: number, pilastra: number, modelo?: string, juntada?: boolean,
+  altoPanelCm?: number,
 ): string | null {
   // frente 0 con la pieza juntada no es un problema: el rincón se cortó de una
   // sola pieza y el frente cierra igual
@@ -392,7 +393,7 @@ function avisoDelFrente(
       + ` este modelo es de ${minima}: no se puede fabricar. Bajá la pilastra lateral de ${pilastra},`
       + ` o cambiale el ancho a la cabina o a la puerta.`
   }
-  const deFicha = anchosPanelFabrica(modelo ?? '')
+  const deFicha = anchosPanelFabrica(modelo ?? '', altoPanelCm)
   const mayor = Math.max(...deFicha)
   if (frente > mayor) {
     return `El frente de la cabina accesible tendría que medir ${frente} cm y la hoja más grande de`
@@ -411,13 +412,13 @@ function avisoDelFrente(
  * entonces se corta de la de arriba.
  */
 function avisoDelDivisor(
-  prof: number, panel: number, puerta: number, pilastra: number, modelo?: string,
+  prof: number, panel: number, puerta: number, pilastra: number, modelo?: string, altoPanelCm?: number,
 ): string | null {
   if (panel <= 0) {
     return `La puerta de ${puerta} y la pilastra de ${pilastra} ya suman los ${prof} cm del fondo:`
       + ` no queda panel. Achicá la puerta o la pilastra.`
   }
-  const deFicha = anchosPanelFabrica(modelo ?? '')
+  const deFicha = anchosPanelFabrica(modelo ?? '', altoPanelCm)
   const mayor = Math.max(...deFicha)
   if (panel > mayor) {
     return `El panel del divisor tendría que medir ${panel} cm y el más grande de este modelo es de`

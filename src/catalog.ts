@@ -507,10 +507,10 @@ export const ANCHOS_PILASTRA = [10, 12, 15, 17, 19, 24, 30, 35, 40, 45, 50, 55, 
 /**
  * Anchos de panel divisor (familia PN); es la profundidad de la cabina.
  *
- * Los grandes NO existen en todos los modelos, y eso sale de las fichas de
- * abril 2026: hasta 140 los tiene cualquiera, pero de ahí para arriba depende.
- * Los de 170 —Estándar 170, Reforzado 170— y SCUDO llegan a 150; Imperial a
- * 165; el resto llega a 180.
+ * Hasta 140 los tiene cualquier modelo. De ahí para arriba manda el ALTO: la
+ * lista de precios de mayo 2026 solo trae el 165 y el 180 de ancho con el
+ * panel a 150 de alto —y en Kids, a 130—. Un panel más alto no pasa de 150 de
+ * ancho en ninguna línea, así que el 180 x 180 de Touchless S3 no existe.
  */
 const PANELES_HASTA_140 = [55, 60, 85, 90, 95, 100, 110, 120, 130, 135, 140]
 
@@ -540,15 +540,23 @@ export const ANCHOS_PANEL = [...PANELES_HASTA_140, 150, 165, 180]
  * Los anchos de panel de FICHA del modelo, sin las especiales. Es lo que se
  * usa para cobrar: una especial se cobra como la de catálogo de arriba.
  */
-export function anchosPanelFabrica(modelo: string): number[] {
-  const grandes = PANELES_GRANDES[(modelo || '').toUpperCase()] ?? [150]
-  return [...PANELES_HASTA_140, ...grandes].sort((a, b) => a - b)
+export function anchosPanelFabrica(modelo: string, altoPanelCm?: number): number[] {
+  return [...PANELES_HASTA_140, ...grandesDe(modelo, altoPanelCm)].sort((a, b) => a - b)
 }
 
-/** los anchos de panel que se pueden pedir en ese modelo */
-export function anchosPanel(modelo: string): number[] {
-  const grandes = PANELES_GRANDES[(modelo || '').toUpperCase()] ?? [150]
-  return unirAnchos([...PANELES_HASTA_140, ...grandes], especialesDe('PN', modelo))
+/**
+ * Los anchos grandes que agrega el modelo a ese alto. Sin alto, el del propio
+ * modelo: solo Touchless S3 deja elegirlo, los demás lo tienen fijo.
+ */
+function grandesDe(modelo: string, altoPanelCm?: number): number[] {
+  const todos = PANELES_GRANDES[(modelo || '').toUpperCase()] ?? [150]
+  const alto = altoPanelCm ?? alturasDe(modelo).panel
+  return alto > 150 ? todos.filter((a) => a <= 150) : todos
+}
+
+/** los anchos de panel que se pueden pedir en ese modelo, a ese alto */
+export function anchosPanel(modelo: string, altoPanelCm?: number): number[] {
+  return unirAnchos([...PANELES_HASTA_140, ...grandesDe(modelo, altoPanelCm)], especialesDe('PN', modelo))
 }
 
 /**
@@ -957,10 +965,10 @@ export function familiaDelFrente(anchoCm: number, modelo?: string): 'PL' | 'PN' 
  * Los paneles entran como relleno de frente, que es para lo que sirven cuando
  * el claro se pasa de lo que cierra una pilastra.
  */
-export function medidasDeFrente(modelo?: string): { anchoCm: number; familia: 'PL' | 'PN' }[] {
+export function medidasDeFrente(modelo?: string, altoPanelCm?: number): { anchoCm: number; familia: 'PL' | 'PN' }[] {
   const pilastras = anchosPilastra(modelo)
   const tope = Math.max(...pilastras)
-  const paneles = anchosPanel(modelo ?? '').filter((a) => a > tope)
+  const paneles = anchosPanel(modelo ?? '', altoPanelCm).filter((a) => a > tope)
   return [
     ...pilastras.map((anchoCm) => ({ anchoCm, familia: 'PL' as const })),
     ...paneles.map((anchoCm) => ({ anchoCm, familia: 'PN' as const })),

@@ -576,8 +576,8 @@ export default function App() {
     const pilastra = sobra > 0 ? medidaCercana(ANCHOS_PILASTRA, sobra) : 0
     return { panel, puerta, sobra, pilastra }
   })()
-  // los paneles grandes no existen en todos los modelos
-  const panelesDelModelo = anchosPanel(config.modelo)
+  // los paneles grandes no existen en todos los modelos ni a todo alto
+  const panelesDelModelo = anchosPanel(config.modelo, alturasDeConfig(config).panel)
   /**
    * Los fondos que puede tomar la cabina de movilidad reducida.
    *
@@ -839,7 +839,7 @@ export default function App() {
   function cambiarLinea(linea: Config['linea']) {
     const modelo = MODELOS[linea][0].codigo
     const acabado = acabadosPara(linea, modelo, proyecto.paisFabricacion)[0]
-    const paneles = anchosPanel(modelo)
+    const paneles = anchosPanel(modelo, alturasDeConfig({ modelo, alturaPiezaCm: config.alturaPiezaCm }).panel)
     const mg = mgMedidas(linea, modelo)
     const mgSigue = mg.some((m) => m.anchoCm === (config.mgAnchoCm ?? 60) && m.altoCm === config.mgAlturaCm)
     const juegos = herrajesDe(linea)
@@ -872,11 +872,24 @@ export default function App() {
    * panel más grande que sí: mejor eso que dejar pedida una pieza inexistente.
    */
   function elegirModelo(modelo: string) {
-    const paneles = anchosPanel(modelo)
+    const paneles = anchosPanel(modelo, alturasDeConfig({ modelo, alturaPiezaCm: config.alturaPiezaCm }).panel)
     const profundidadCm = paneles.includes(config.profundidadCm)
       ? config.profundidadCm
       : paneles[paneles.length - 1]
     setConfig({ modelo, alturaCm: alturasDe(modelo).puerta, profundidadCm })
+  }
+
+  /**
+   * Subir el alto de la pieza achica el panel más grande que existe: a 150 se
+   * fabrica hasta 180 de ancho, pero de 170 para arriba no pasa de 150. Si el
+   * fondo pedido se queda sin panel, baja al más grande que sí se fabrica.
+   */
+  function elegirAlturaPieza(alturaPiezaCm: number) {
+    const paneles = anchosPanel(config.modelo, alturaPiezaCm)
+    const profundidadCm = paneles.includes(config.profundidadCm)
+      ? config.profundidadCm
+      : paneles[paneles.length - 1]
+    setConfig({ alturaPiezaCm, alturaCm: alturaPiezaCm, profundidadCm })
   }
 
   /**
@@ -2517,7 +2530,7 @@ export default function App() {
                             key={h}
                             type="button"
                             className={`chip ${alturasDeConfig(config).puerta === h ? 'sel' : ''}`}
-                            onClick={() => setConfig({ alturaPiezaCm: h, alturaCm: h })}
+                            onClick={() => elegirAlturaPieza(h)}
                           >
                             {h} cm
                           </button>
