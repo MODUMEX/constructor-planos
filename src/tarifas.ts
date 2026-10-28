@@ -1,4 +1,4 @@
-import type { Moneda, TierColor } from './types'
+import type { Moneda, Pais, TierColor } from './types'
 import { ANCHOS_PILASTRA, ANCHOS_PUERTA, ANCHOS_PUERTA_CR, anchosPanelFabrica, mgFabrica } from './catalog'
 import { TARIFAS_BASE } from './datos/tarifas-base'
 import { TARIFAS_MXN } from './datos/tarifas-mexico'
@@ -90,12 +90,14 @@ function subirA(valor: number, opciones: number[]): number {
  *
  * Las medidas de catálogo no se tocan: `subirA` las devuelve iguales.
  */
-export function anchoCobrado(familia: Pieza['familia'], anchoCm: number, modeloCodigo: string, altoCm?: number): number {
+export function anchoCobrado(
+  familia: Pieza['familia'], anchoCm: number, modeloCodigo: string, altoCm?: number, pais: Pais = 'CR',
+): number {
   switch (familia) {
     case 'PT':
       return anchoCobradoPuerta(subirA(anchoCm, [...ANCHOS_PUERTA, ...ANCHOS_PUERTA_CR]))
     case 'PN':
-      return subirA(anchoCm, anchosPanelFabrica(modeloCodigo, altoCm))
+      return subirA(anchoCm, anchosPanelFabrica(modeloCodigo, altoCm, pais))
     case 'PL':
       return subirA(anchoCm, ANCHOS_PILASTRA)
     default:
@@ -108,7 +110,7 @@ export function anchoCobrado(familia: Pieza['familia'], anchoCm: number, modeloC
  * las dos medidas a la vez —se elige la de ficha más chica que la contenga—
  * porque ancho y alto salen de la misma hoja.
  */
-function m2Cobrados(pieza: Pieza, modeloCodigo: string): number {
+function m2Cobrados(pieza: Pieza, modeloCodigo: string, pais: Pais = 'CR'): number {
   if (pieza.familia === 'MG') {
     const contiene = mgFabrica(modeloCodigo)
       .filter((m) => m.anchoCm >= pieza.anchoCm && m.altoCm >= pieza.altoCm)
@@ -116,7 +118,7 @@ function m2Cobrados(pieza: Pieza, modeloCodigo: string): number {
     const m = contiene ?? { anchoCm: pieza.anchoCm, altoCm: pieza.altoCm }
     return (m.anchoCm * m.altoCm) / 1e4
   }
-  return (anchoCobrado(pieza.familia, pieza.anchoCm, modeloCodigo, pieza.altoCm) * pieza.altoCm) / 1e4
+  return (anchoCobrado(pieza.familia, pieza.anchoCm, modeloCodigo, pieza.altoCm, pais) * pieza.altoCm) / 1e4
 }
 
 /**
@@ -166,7 +168,8 @@ export function precioPieza(pieza: Pieza, o: OpcionesPrecio): number {
   const modelo = tabla[o.modeloCodigo] ?? tabla.ESTANDAR
   if (!modelo) return 0
 
-  const m2 = m2Cobrados(pieza, o.modeloCodigo)
+  // la moneda dice de qué lista de precios sale, y cada lista tiene sus medidas
+  const m2 = m2Cobrados(pieza, o.modeloCodigo, o.moneda === 'MXN' ? 'MX' : 'CR')
   const fam = familiaTarifa(pieza.familia)
   const juego = juegoDeTier(o.tier, o.moneda === 'MXN' ? o.modulos : undefined)
 

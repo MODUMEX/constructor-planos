@@ -577,7 +577,7 @@ export default function App() {
     return { panel, puerta, sobra, pilastra }
   })()
   // los paneles grandes no existen en todos los modelos ni a todo alto
-  const panelesDelModelo = anchosPanel(config.modelo, alturasDeConfig(config).panel)
+  const panelesDelModelo = anchosPanel(config.modelo, alturasDeConfig(config).panel, proyecto.paisFabricacion)
   /**
    * Los fondos que puede tomar la cabina de movilidad reducida.
    *
@@ -817,6 +817,23 @@ export default function App() {
         if (paisFabricacion === 'CR' && !lineasDe('CR').some((l) => l.id === a.config.linea)) {
           a = { ...a, config: { ...a.config, linea: 'LEEDER', espesorMm: espesorPorLinea('LEEDER') } }
         }
+        // Cada país tiene su lista de precios y las dos no traen las mismas
+        // medidas: el panel de 95 de Imperial es solo de México y los altos de
+        // 90, 130 y 140 del S3 son solo de la internacional. Lo que deja de
+        // existir se baja a lo que sí se fabrica allá.
+        {
+          const altos = alturasElegibles(a.config.modelo, paisFabricacion)
+          const alturaPiezaCm = a.config.alturaPiezaCm != null && !altos.includes(a.config.alturaPiezaCm)
+            ? undefined
+            : a.config.alturaPiezaCm
+          const paneles = anchosPanel(a.config.modelo, alturasDeConfig({ ...a.config, alturaPiezaCm }).panel, paisFabricacion)
+          const profundidadCm = paneles.includes(a.config.profundidadCm)
+            ? a.config.profundidadCm
+            : paneles[paneles.length - 1]
+          if (alturaPiezaCm !== a.config.alturaPiezaCm || profundidadCm !== a.config.profundidadCm) {
+            a = { ...a, config: { ...a.config, alturaPiezaCm, profundidadCm } }
+          }
+        }
         if (paisFabricacion === 'MX') {
           const disponibles = coloresMxAgrupados(
             a.config.linea, puedeColoresReservados(usuario), a.config.acabado,
@@ -839,7 +856,7 @@ export default function App() {
   function cambiarLinea(linea: Config['linea']) {
     const modelo = MODELOS[linea][0].codigo
     const acabado = acabadosPara(linea, modelo, proyecto.paisFabricacion)[0]
-    const paneles = anchosPanel(modelo, alturasDeConfig({ modelo, alturaPiezaCm: config.alturaPiezaCm }).panel)
+    const paneles = anchosPanel(modelo, alturasDeConfig({ modelo, alturaPiezaCm: config.alturaPiezaCm }).panel, proyecto.paisFabricacion)
     const mg = mgMedidas(linea, modelo)
     const mgSigue = mg.some((m) => m.anchoCm === (config.mgAnchoCm ?? 60) && m.altoCm === config.mgAlturaCm)
     const juegos = herrajesDe(linea)
@@ -872,7 +889,7 @@ export default function App() {
    * panel más grande que sí: mejor eso que dejar pedida una pieza inexistente.
    */
   function elegirModelo(modelo: string) {
-    const paneles = anchosPanel(modelo, alturasDeConfig({ modelo, alturaPiezaCm: config.alturaPiezaCm }).panel)
+    const paneles = anchosPanel(modelo, alturasDeConfig({ modelo, alturaPiezaCm: config.alturaPiezaCm }).panel, proyecto.paisFabricacion)
     const profundidadCm = paneles.includes(config.profundidadCm)
       ? config.profundidadCm
       : paneles[paneles.length - 1]
@@ -885,7 +902,7 @@ export default function App() {
    * fondo pedido se queda sin panel, baja al más grande que sí se fabrica.
    */
   function elegirAlturaPieza(alturaPiezaCm: number) {
-    const paneles = anchosPanel(config.modelo, alturaPiezaCm)
+    const paneles = anchosPanel(config.modelo, alturaPiezaCm, proyecto.paisFabricacion)
     const profundidadCm = paneles.includes(config.profundidadCm)
       ? config.profundidadCm
       : paneles[paneles.length - 1]
@@ -2525,7 +2542,7 @@ export default function App() {
                         La pilastra no cambia: va de {alturasDeConfig(config).pilastra} cm.
                       </p>
                       <div className="chips">
-                        {alturasElegibles(config.modelo).map((h) => (
+                        {alturasElegibles(config.modelo, proyecto.paisFabricacion).map((h) => (
                           <button
                             key={h}
                             type="button"

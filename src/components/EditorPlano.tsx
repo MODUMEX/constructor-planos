@@ -352,7 +352,7 @@ export default function EditorPlano({
       // medida que se fabrique: con el fondo en 255 y la puerta en 90, una
       // pilastra de 12 pediría un panel de 153 y no existe, solo el de 150. Así
       // que las medidas que se ofrecen son SOLO las que dejan un panel de ficha.
-      const deFicha = anchosPanelFabrica(config.modelo, alturasDeConfig(config).panel)
+      const deFicha = anchosPanelFabrica(config.modelo, alturasDeConfig(config).panel, pais)
       const calzan = anchosPilastra(config.modelo).filter((p) =>
         deFicha.includes(Math.round((q.fondo - q.puerta - p) * 10) / 10),
       )
@@ -380,7 +380,7 @@ export default function EditorPlano({
       if (Math.abs(deseado - p.ancho0) > 0.5) arrastroPil.current = true
       const opciones = [
         ...anchosPilastraEn(p.extremo, config.modelo, p.ancho0),
-        ...medidasDeFrente(config.modelo).filter((m) => m.familia === 'PN').map((m) => m.anchoCm),
+        ...medidasDeFrente(config.modelo, alturasDeConfig(config).panel, pais).filter((m) => m.familia === 'PN').map((m) => m.anchoCm),
       ]
       onPilastra(p.tramoId, p.indice, medidaCercana(opciones, deseado))
       return
@@ -1592,7 +1592,7 @@ export default function EditorPlano({
               // con el corte marcado.
               const k = menu.indice + 1
               const actual = t.pilastras?.[k] ?? config.anchoPilastraCm
-              const medidas = medidasDeFrente(config.modelo)
+              const medidas = medidasDeFrente(config.modelo, alturasDeConfig(config).panel, pais)
               const permitidas = anchosPilastraEn(false, config.modelo, actual)
               const pilastras = medidas.filter((m) => m.familia === 'PL' && permitidas.includes(m.anchoCm))
               const paneles = medidas.filter((m) => m.familia === 'PN')
@@ -1752,7 +1752,7 @@ export default function EditorPlano({
         const cerrar = () => setMenu(null)
         const actual = t.pilastras?.[k] ?? config.anchoPilastraCm
         const extremo = k === 0 || k === n
-        const medidas = medidasDeFrente(config.modelo)
+        const medidas = medidasDeFrente(config.modelo, alturasDeConfig(config).panel, pais)
         // En las puntas entra CUALQUIER pilastra del catálogo: hay planos que
         // cierran con una ancha de relleno. Adentro, las de siempre.
         const permitidas = anchosPilastraEn(extremo, config.modelo, actual)

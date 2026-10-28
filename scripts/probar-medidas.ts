@@ -1,11 +1,15 @@
 /**
- * Las medidas que ofrece el Constructor contra la lista de precios de México.
+ * Las medidas que ofrece el Constructor contra las DOS listas de precios de
+ * mayo 2026: la de México y la internacional (LATAM y Costa Rica).
  *
- * La lista de mayo 2026 trae el 165 y el 180 de ancho SOLO con el panel a 150
- * de alto —en Kids, a 130—. De 170 para arriba ningún panel pasa de 150, así
- * que el 180 x 180 de Touchless S3 no se fabrica.
+ * Las dos traen la misma regla de panel —el 165 y el 180 de ancho solo con el
+ * panel a 150 de alto o menos, así que el 180 x 180 de Touchless S3 no se
+ * fabrica— y difieren en tres cosas, que la app respeta por país: el panel de
+ * 95 de Imperial es solo de México, y los paneles de 90, 130 y 140 de alto del
+ * S3 son solo de la internacional. La pilastra del Colgante 2.0 va de 220, el
+ * único alto que las dos listas aceptan.
  *
- *   npm run probar-medidas-mx
+ *   npm run probar-medidas
  */
 import {
   alturasDe, alturasElegibles, anchosPanelFabrica, ANCHOS_PILASTRA, ANCHOS_PUERTA,
@@ -31,20 +35,34 @@ const PANEL_ESPERADO: Record<string, number[]> = {
 
 const igual = (a: number[], b: number[]) => a.length === b.length && a.every((x, i) => x === b[i])
 
-console.log('— el panel de cada modelo, a su alto')
-for (const linea of ['LEEDER', 'SUPERIOR', 'TOUCHLESS'] as Linea[])
-  for (const m of MODELOS[linea]) {
-    const salen = anchosPanelFabrica(m.codigo)
-    const esperado = PANEL_ESPERADO[m.codigo]
-    ok(esperado != null && igual(salen, esperado),
-      `${m.codigo} (panel de ${alturasDe(m.codigo).panel}) → ${salen.join(' ')}`)
-  }
+console.log('— el panel de cada modelo, a su alto, en cada país')
+for (const pais of ['MX', 'CR'] as const)
+  for (const linea of ['LEEDER', 'SUPERIOR', 'TOUCHLESS'] as Linea[])
+    for (const m of MODELOS[linea]) {
+      const salen = anchosPanelFabrica(m.codigo, undefined, pais)
+      const esperado = m.codigo === 'IMPERIAL' && pais === 'CR'
+        ? SIN_GRANDES.filter((a) => a !== 95)
+        : PANEL_ESPERADO[m.codigo]
+      ok(esperado != null && igual(salen, esperado),
+        `${pais} · ${m.codigo} (panel de ${alturasDe(m.codigo).panel}) → ${salen.join(" ")}`)
+    }
 
 console.log('')
+console.log('— el panel de 95 de Imperial es solo de México')
+ok(anchosPanelFabrica('IMPERIAL', undefined, 'MX').includes(95), 'en México sí')
+ok(!anchosPanelFabrica('IMPERIAL', undefined, 'CR').includes(95), 'en Costa Rica no')
+ok(anchosPanelFabrica('ESTANDAR', undefined, 'CR').includes(95), 'y en los demás modelos sigue estando')
+
+console.log('')
+console.log('— los altos de pieza del S3 que tiene cada lista')
+ok(alturasElegibles('TL_S3', 'MX').join(' ') === '150 170 180', `México → ${alturasElegibles("TL_S3", "MX").join(" ")}`)
+ok(alturasElegibles('TL_S3', 'CR').join(' ') === '90 130 140 150 170 180', `internacional → ${alturasElegibles("TL_S3", "CR").join(" ")}`)
+ok(igual(anchosPanelFabrica('TL_S3', 130, 'CR'), CON_GRANDES), 'a 130 de alto el S3 llega a 180 de ancho')
+
 console.log('— Touchless S3 deja elegir el alto, y el panel cambia con él')
 for (const alto of alturasElegibles('TL_S3')) {
   const salen = anchosPanelFabrica('TL_S3', alto)
-  ok(igual(salen, alto === 150 ? CON_GRANDES : SIN_GRANDES), `a ${alto} de alto → ${salen.join(' ')}`)
+  ok(igual(salen, alto <= 150 ? CON_GRANDES : SIN_GRANDES), `a ${alto} de alto → ${salen.join(' ')}`)
 }
 ok(!anchosPanelFabrica('TL_S3', 180).includes(180), 'el 180 x 180 no existe')
 ok(anchosPanelFabrica('TL_S3', 150).includes(180), 'pero el 180 x 150 sí')

@@ -153,8 +153,18 @@ export const ALTURAS_ELEGIBLES: Record<string, number[]> = {
   TL_S3: [150, 170, 180],
 }
 
-export function alturasElegibles(modelo: string): number[] {
-  return ALTURAS_ELEGIBLES[(modelo || '').toUpperCase()] ?? []
+/**
+ * Las que agrega la lista internacional. El S3 que se fabrica en Costa Rica
+ * tiene además paneles de 90, 130 y 140 de alto; la lista de México no los
+ * trae, así que allá no se ofrecen.
+ */
+const ALTURAS_ELEGIBLES_CR: Record<string, number[]> = {
+  TL_S3: [90, 130, 140, 150, 170, 180],
+}
+
+export function alturasElegibles(modelo: string, pais: Pais = 'CR'): number[] {
+  const tabla = pais === 'MX' ? ALTURAS_ELEGIBLES : ALTURAS_ELEGIBLES_CR
+  return tabla[(modelo || '').toUpperCase()] ?? []
 }
 
 /**
@@ -545,8 +555,20 @@ export const ANCHOS_PANEL = [...PANELES_HASTA_140, 150, 165, 180]
  * Los anchos de panel de FICHA del modelo, sin las especiales. Es lo que se
  * usa para cobrar: una especial se cobra como la de catálogo de arriba.
  */
-export function anchosPanelFabrica(modelo: string, altoPanelCm?: number): number[] {
-  return [...PANELES_HASTA_140, ...grandesDe(modelo, altoPanelCm)].sort((a, b) => a - b)
+export function anchosPanelFabrica(
+  modelo: string, altoPanelCm?: number, pais: Pais = 'CR',
+): number[] {
+  return [...hasta140De(modelo, pais), ...grandesDe(modelo, altoPanelCm)].sort((a, b) => a - b)
+}
+
+/**
+ * Los anchos chicos, que son los mismos en todos los modelos menos uno: el
+ * panel de 95 de Imperial está en la lista de México y NO en la
+ * internacional, así que en Costa Rica no se ofrece.
+ */
+function hasta140De(modelo: string, pais: Pais): number[] {
+  if (pais === 'MX' || (modelo || '').toUpperCase() !== 'IMPERIAL') return PANELES_HASTA_140
+  return PANELES_HASTA_140.filter((a) => a !== 95)
 }
 
 /**
@@ -559,9 +581,12 @@ function grandesDe(modelo: string, altoPanelCm?: number): number[] {
   return alto > 150 ? todos.filter((a) => a <= 150) : todos
 }
 
-/** los anchos de panel que se pueden pedir en ese modelo, a ese alto */
-export function anchosPanel(modelo: string, altoPanelCm?: number): number[] {
-  return unirAnchos([...PANELES_HASTA_140, ...grandesDe(modelo, altoPanelCm)], especialesDe('PN', modelo))
+/** los anchos de panel que se pueden pedir en ese modelo, a ese alto y en ese país */
+export function anchosPanel(modelo: string, altoPanelCm?: number, pais: Pais = 'CR'): number[] {
+  return unirAnchos(
+    [...hasta140De(modelo, pais), ...grandesDe(modelo, altoPanelCm)],
+    especialesDe('PN', modelo),
+  )
 }
 
 /**
@@ -970,10 +995,12 @@ export function familiaDelFrente(anchoCm: number, modelo?: string): 'PL' | 'PN' 
  * Los paneles entran como relleno de frente, que es para lo que sirven cuando
  * el claro se pasa de lo que cierra una pilastra.
  */
-export function medidasDeFrente(modelo?: string, altoPanelCm?: number): { anchoCm: number; familia: 'PL' | 'PN' }[] {
+export function medidasDeFrente(
+  modelo?: string, altoPanelCm?: number, pais: Pais = 'CR',
+): { anchoCm: number; familia: 'PL' | 'PN' }[] {
   const pilastras = anchosPilastra(modelo)
   const tope = Math.max(...pilastras)
-  const paneles = anchosPanel(modelo ?? '', altoPanelCm).filter((a) => a > tope)
+  const paneles = anchosPanel(modelo ?? '', altoPanelCm, pais).filter((a) => a > tope)
   return [
     ...pilastras.map((anchoCm) => ({ anchoCm, familia: 'PL' as const })),
     ...paneles.map((anchoCm) => ({ anchoCm, familia: 'PN' as const })),

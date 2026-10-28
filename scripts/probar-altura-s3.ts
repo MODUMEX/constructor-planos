@@ -31,8 +31,10 @@ function cfg(alturaPiezaCm?: number): Config {
   } as unknown as Config
 }
 
-console.log('— las tres alturas de la ficha')
-ok(alturasElegibles('TL_S3').join(',') === '150,170,180', 'S3 ofrece 150, 170 y 180')
+console.log('— las alturas de la ficha, que no son las mismas en los dos países')
+ok(alturasElegibles('TL_S3', 'MX').join(',') === '150,170,180', 'en México, 150, 170 y 180')
+ok(alturasElegibles('TL_S3', 'CR').join(',') === '90,130,140,150,170,180',
+  'en Costa Rica y LATAM se agregan 90, 130 y 140')
 ok(alturasElegibles('REFORZADO').length === 0, 'en LEEDER no se elige: el 170 es otro modelo')
 
 console.log('\n— la elegida manda sobre la del modelo, salvo en la pilastra')
