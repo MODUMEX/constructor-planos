@@ -117,6 +117,11 @@ export const ALTURAS_POR_MODELO: Record<string, AlturasModelo> = {
   SUP_ESTANDAR170: { puerta: 170, panel: 170, pilastra: 180, mingitorio: 120 },
   SUP_REFORZADO: { puerta: 150, panel: 150, pilastra: 210, mingitorio: 120 },
   SUP_REFORZADO170: { puerta: 170, panel: 170, pilastra: 210, mingitorio: 120 },
+  // El Colgante 2.0 no tenía alturas propias y heredaba las del Estándar, con
+  // la pilastra en 180: ese alto no existe en la lista de México, que da el
+  // Colgante en 210, 220, 240, 260 y 300. Va en 220, como el de LEEDER
+  // (Dayanna, 28-oct-2026).
+  SUP_COLGANTE: { puerta: 150, panel: 150, pilastra: 220, mingitorio: 120 },
   TL_S3: { puerta: 180, panel: 180, pilastra: 210, mingitorio: 120 },
 }
 

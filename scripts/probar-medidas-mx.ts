@@ -59,5 +59,21 @@ ok(mgMedidas('LEEDER').map((m) => `${m.anchoCm}x${m.altoCm}`).join(' ') === '45x
 ok(mgMedidas('SUPERIOR').map((m) => `${m.anchoCm}x${m.altoCm}`).join(' ') === '45x120 60x150',
   'Superior 2.0: 45x120 60x150, sin el 60x120')
 
+console.log('')
+console.log('— alturas de pilastra que la lista sí tiene')
+for (const [modelo, validas] of [
+  ['COLGANTE', [210, 220, 240, 260, 300]],
+  ['SUP_COLGANTE', [210, 220, 240, 260, 300]],
+  ['SCUDO', [210, 220, 240, 260, 270, 300]],
+  ['IMPERIAL', [190]], ['KIDS', [150]],
+  ['ESTANDAR', [180]], ['ESTANDAR170', [180]], ['REGADERAS', [180]],
+  ['SUP_ESTANDAR', [180]], ['SUP_ESTANDAR170', [180]],
+  ['REFORZADO', [210]], ['REFORZADO170', [210]], ['TL_S3', [210]],
+  ['SUP_REFORZADO', [210]], ['SUP_REFORZADO170', [210]],
+] as const) {
+  const alto = alturasDe(modelo).pilastra
+  ok((validas as readonly number[]).includes(alto), `${modelo} → pilastra de ${alto}`)
+}
+
 console.log(mal === 0 ? '\nTodo cuadra con la lista.' : `\n${mal} medida(s) fuera de la lista.`)
 process.exit(mal === 0 ? 0 : 1)
