@@ -154,12 +154,22 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
     // El campo de orinales puede quedar al PRINCIPIO —área invertida—, y ahí la
     // mampara de cierre va del otro lado: es la del primer orinal.
     const arrancaMG = arrancaConMingitorio(tramo)
+    // Lo que separa el campo de orinales de la tira de baños es el PANEL de la
+    // cabina de baño, esté el campo donde esté. Como cada cabina emite el
+    // divisor que tiene A SU DERECHA, con el campo al final lo pone el último
+    // baño, y con el campo al principio —el área invertida— lo tiene que poner
+    // el último orinal. Sin esto, al invertir se perdía ese panel.
+    const cierraElCampo =
+      cab.tipo === 'orinal' &&
+      tramo.cabinas[i + 1] != null &&
+      tramo.cabinas[i + 1].tipo !== 'orinal'
     const llevaDivisor =
       cab.tipo === 'orinal'
         ? tramo.cabinas[i + 1]?.tipo === 'orinal' || (esUltima && cierraMG) || (i === 0 && arrancaMG)
+          || cierraElCampo
         : !esUltima || !tramo.muroFin
     if (llevaDivisor) {
-      if (cab.tipo === 'orinal') {
+      if (cab.tipo === 'orinal' && !cierraElCampo) {
         const mg = mamparaDe(config, nMg++)
         piezas.push({
           familia: 'MG',
@@ -218,7 +228,11 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
   // propia medida. Sin esta salvedad salían los dos.
   const arrancaLaAccesible =
     llevaAccesibleSiempre(config.tipologia) && tramo.cabinas[0]?.tipo === 'accesible'
-  if (n > 0 && !tramo.muroInicio && !arrancaLaAccesible) {
+  // Y si quien arranca es el campo de orinales, ese extremo tampoco cierra con
+  // panel: lo cierra su propio mingitorio. Es el mismo caso del final de la
+  // tira visto al revés, y pasa al invertir el área.
+  const arrancaElCampo = tramo.cabinas[0]?.tipo === 'orinal'
+  if (n > 0 && !tramo.muroInicio && !arrancaLaAccesible && !arrancaElCampo) {
     piezas.push({
       familia: 'PN', anchoCm: config.profundidadCm, altoCm: altoPanelEntre(-1),
       subTipo: 'PNLAT', area, regadera: esRegadera(0),
@@ -267,10 +281,11 @@ function piezasDeTramo(tramo: Tramo, config: Config, area: string, omitirPilastr
     for (let i = 0; i < n - 1; i++) {
       // entre dos orinales va el mingitorio, no pilastra
       if (fronteraDeOrinal(tramo, i + 1)) continue
-      // Donde termina la tira de baños y empieza el campo de orinales, la pilastra
-      // es LATERAL: cierra la tira, no divide dos cabinas.
+      // Donde la tira de baños toca el campo de orinales, la pilastra es
+      // LATERAL: cierra la tira, no divide dos cabinas. Vale en los dos
+      // sentidos, porque al invertir el área el campo pasa a arrancarla.
       const cierraLaTira =
-        tramo.cabinas[i].tipo !== 'orinal' && tramo.cabinas[i + 1].tipo === 'orinal'
+        (tramo.cabinas[i].tipo === 'orinal') !== (tramo.cabinas[i + 1].tipo === 'orinal')
       // La que sale del cuarto PMR tampoco divide dos cabinas: cierra el cuarto
       // y arranca la tira, así que es LATERAL.
       const salaDelCuarto =

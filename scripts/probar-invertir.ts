@@ -25,10 +25,15 @@ function cfg(tipologia: string, orinales: number): Config {
   } as unknown as Config
 }
 
-/** el despiece sin la mano de la puerta, que es lo único que el espejo cambia a propósito */
+/**
+ * El despiece sin la mano de la puerta, que es lo único que el espejo cambia a
+ * propósito. El SUBTIPO sí entra en la cuenta: es lo que el CIP lee para saber
+ * si una pilastra es central o lateral, y al invertir se colaba una central
+ * donde iba la lateral que cierra contra el campo de orinales.
+ */
 function piezas(t: Tramo, config: Config): string[] {
   return piezasDeArea({ id: 'a', nombre: 'A', piso: '', config, tramos: [t] } as unknown as Area)
-    .map((p) => `${p.familia} ${p.anchoCm}×${p.altoCm}`)
+    .map((p) => `${p.familia} ${p.subTipo.replace(/^PTA(IZQ|DER)/, "PTA")} ${p.anchoCm}×${p.altoCm}`)
     .sort()
 }
 
@@ -59,8 +64,11 @@ function probar(tipologia: string, orinales: number, claro: number, cantidad: nu
 }
 
 probar('RECTA_ENTRE_MUROS', 0, 420, 3)
+// entre muros CON orinales: el caso del plano de 460 que salía mal
+probar('RECTA_ENTRE_MUROS', 3, 460, 3)
 probar('RECTA_MURO_IZQ', 0, 420, 3)
 probar('RECTA_MURO_IZQ', 3, 420, 3)
+probar('RECTA_MURO_DER', 3, 460, 3)
 probar('PMR', 0, 500, 3)
 probar('PMR', 3, 693, 4)
 

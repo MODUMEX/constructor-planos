@@ -1231,7 +1231,7 @@ export default function App() {
     if (r.ajuste === 'falta' && t.ajuste !== 'falta') {
       setBloqueo(
         `Con el orinal de ${ancho} cm las piezas no caben en el claro de ${t.claroCm} cm. ${r.mensaje}. ` +
-          'El plano quedó como estaba.',
+          'El plano NO cambió: los avisos de abajo son de cómo está ahora, no de este cambio.',
       )
       return
     }
@@ -1280,7 +1280,7 @@ export default function App() {
     if (!r) return
     if (r.ajuste === 'falta') {
       setBloqueo(
-        `Con esas descargas las piezas no caben en el claro de ${t.claroCm} cm. ${r.mensaje}. El plano quedó como estaba.`,
+        `Con esas descargas las piezas no caben en el claro de ${t.claroCm} cm. ${r.mensaje}. El plano NO cambió: los avisos de abajo son de cómo está ahora, no de este cambio.`,
       )
       return
     }
@@ -1403,7 +1403,7 @@ export default function App() {
       const todasClavadas = elegidas.length >= posiciones
       setBloqueo(
         `Con esa medida las piezas no caben en el claro de ${t.claroCm} cm. ${r.mensaje}. ` +
-          'El plano quedó como estaba.' +
+          'El plano NO cambió: los avisos de abajo son de cómo está ahora, no de este cambio.' +
           (todasClavadas
             ? ` Tenés las ${posiciones} pilastras elegidas a mano, así que no queda ninguna libre para acomodar: soltalas con el botón de arriba.`
             : elegidas.length > 1
@@ -2172,7 +2172,13 @@ export default function App() {
                 <div className="aviso-caja" style={{ margin: '0 0 12px' }}>
                   <b>{ICONO_MR} El {CUBICULO_MR.toLowerCase()} no llega a su ancho</b>
                   {avisosAccesible.map((t) => (
-                    <span key={t.id}>{t.avisoAccesible}</span>
+                    <span key={t.id}>
+                      {t.avisoAccesible}
+                      {/* Con pilastras clavadas a mano el buscador no las puede achicar para
+                          darle ancho al cubículo, así que la salida no es solo el claro. */}
+                      {pilastrasElegidas > 0 &&
+                        ` O soltá las ${pilastrasElegidas} pilastra${pilastrasElegidas === 1 ? '' : 's'} que elegiste a mano: mientras estén clavadas no se pueden achicar para darle ese ancho.`}
+                    </span>
                   ))}
                 </div>
               )}
