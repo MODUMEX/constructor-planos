@@ -31,10 +31,12 @@ function cfg(alturaPiezaCm?: number): Config {
   } as unknown as Config
 }
 
-console.log('— las alturas de la ficha, que no son las mismas en los dos países')
+console.log('— las alturas de la ficha: las que existen en PUERTA y en PANEL')
+// el chip mueve las dos piezas, y la puerta de S3 solo existe a 150, 170 y 180
+// en las dos listas de precios; los paneles de 90, 130 y 140 de la lista
+// internacional no tienen puerta que los acompañe
 ok(alturasElegibles('TL_S3', 'MX').join(',') === '150,170,180', 'en México, 150, 170 y 180')
-ok(alturasElegibles('TL_S3', 'CR').join(',') === '90,130,140,150,170,180',
-  'en Costa Rica y LATAM se agregan 90, 130 y 140')
+ok(alturasElegibles('TL_S3', 'CR').join(',') === '150,170,180', 'y en Costa Rica y LATAM, las mismas')
 ok(alturasElegibles('REFORZADO').length === 0, 'en LEEDER no se elige: el 170 es otro modelo')
 
 console.log('\n— la elegida manda sobre la del modelo, salvo en la pilastra')
@@ -67,10 +69,13 @@ for (const h of [150, 170, 180]) {
   const skus = agrupar(piezas, config).map((r) => skuSyclick(r.familia, config, 3, r.regadera, r.altoCm))
   const puertaSku = skus.find((s) => s.includes('-PT-')) ?? ''
   ok(puertaSku === `L-S3-LC-${esperado}-PT-G1`, `  la puerta va con ${esperado} · ${puertaSku}`)
+  // La pilastra no cambia de alto con el modelo —son 210 en los dos— y en
+  // Syclick solo existe en RF: va siempre ahí. El panel sí cambia, y el RF170
+  // lo tiene cargado.
   const pilastraSku = skus.find((s) => s.includes('-PL-')) ?? ''
   ok(pilastraSku === 'L-S3-LC-RF-PL-G1', `  y la pilastra siempre RF · ${pilastraSku}`)
   const panelSku = skus.find((s) => s.includes('-PN-')) ?? ''
-  ok(panelSku === 'L-S3-LC-RF-PN-G1', `  el panel también · ${panelSku}`)
+  ok(panelSku === `L-S3-LC-${esperado}-PN-G1`, `  el panel va con ${esperado} · ${panelSku}`)
 }
 
 console.log('\n— y la cotización cobra lo que mide: más alto, más plata')

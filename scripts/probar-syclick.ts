@@ -78,7 +78,19 @@ console.log('\n1 · el SKU se arma como la plantilla de Syclick')
     skuSyclick('PT', s3, 4, false, 180) === 'L-S3-LC-RF170-PT-G1',
     skuSyclick('PT', s3, 4, false, 180),
   )
-  for (const [f, alto] of [['PN', 180], ['PL', 210], ['MG', 120]] as const) {
+  revisar(
+    'Touchless S3: el panel de 180 va RF170',
+    skuSyclick('PN', s3, 4, false, 180) === 'L-S3-LC-RF170-PN-G1',
+    skuSyclick('PN', s3, 4, false, 180),
+  )
+  revisar(
+    'Touchless S3: el panel de 150 va RF',
+    skuSyclick('PN', s3, 4, false, 150) === 'L-S3-LC-RF-PN-G1',
+    skuSyclick('PN', s3, 4, false, 150),
+  )
+  // la pilastra y el mingitorio no cambian de alto con el modelo y en Syclick
+  // solo existen en RF: van siempre ahí
+  for (const [f, alto] of [['PL', 210], ['MG', 120]] as const) {
     const sku = skuSyclick(f, s3, 4, false, alto)
     revisar(`Touchless S3: ${f} de ${alto} va RF, no RF170`, !sku.includes('RF170'), sku)
   }
@@ -159,7 +171,7 @@ console.log('\n4 · un color especial manda la etiqueta y el color libre')
   unlinkSync(tmp)
 }
 
-console.log('\n5 · en Touchless S3 las puertas de 170 y 180 se van a un área aparte')
+console.log('\n5 · en Touchless S3 la puerta y el panel de 170 y 180 van a un área aparte')
 {
   const s3 = cfg({ linea: 'TOUCHLESS', modelo: 'TL_S3', alturaPiezaCm: 180 })
   const bytes = generarSyclick(proyectoDe(s3, 4))
@@ -172,8 +184,12 @@ console.log('\n5 · en Touchless S3 las puertas de 170 y 180 se van a un área a
   const areas = [...new Set(celdas.filter((c) => c.startsWith('Baño hombres')))]
   revisar('salen las dos áreas', areas.length === 2, areas.join(' + '))
   revisar('la de las puertas se llama «… · 170»', areas.includes('Baño hombres · 170'))
-  revisar('la puerta es lo único que va RF170', skus.every((s) => !s.includes('RF170') || s.includes('-PT-')), skus.join(' '))
-  revisar('ningún panel, pilastra ni mingitorio quedó en RF170', !skus.some((s) => /RF170-(PN|PL|PM)/.test(s)))
+  revisar('solo la puerta y el panel van RF170',
+    skus.every((s) => !s.includes('RF170') || s.includes('-PT-') || s.includes('-PN-')), skus.join(' '))
+  revisar('y el panel de 180 va RF170, no RF',
+    skus.includes('L-S3-LC-RF170-PN-G1') && !skus.includes('L-S3-LC-RF-PN-G1'))
+  revisar('la pilastra y el mingitorio siguen en RF, que es donde están cargados',
+    !skus.some((s) => /RF170-(PL|PM)/.test(s)))
   revisar('y la descripción del área nueva dice 170', celdas.some((c) => c.startsWith('Touchless S3 170 ·')),
     celdas.filter((c) => c.startsWith('Touchless S3')).join(' | '))
 }

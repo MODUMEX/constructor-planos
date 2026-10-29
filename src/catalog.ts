@@ -154,17 +154,14 @@ export const ALTURAS_ELEGIBLES: Record<string, number[]> = {
 }
 
 /**
- * Las que agrega la lista internacional. El S3 que se fabrica en Costa Rica
- * tiene además paneles de 90, 130 y 140 de alto; la lista de México no los
- * trae, así que allá no se ofrecen.
+ * Estas alturas mueven la PUERTA y el PANEL a la vez, así que solo valen las
+ * que existen en las dos piezas. La lista internacional trae además paneles
+ * de S3 a 90, 130 y 140 de alto, pero la PUERTA no: en las dos listas la
+ * puerta de S3 es 150, 170 o 180 y nada más. Por eso no se ofrecen, ni
+ * siquiera en Costa Rica: saldría una puerta que no se fabrica.
  */
-const ALTURAS_ELEGIBLES_CR: Record<string, number[]> = {
-  TL_S3: [90, 130, 140, 150, 170, 180],
-}
-
-export function alturasElegibles(modelo: string, pais: Pais = 'CR'): number[] {
-  const tabla = pais === 'MX' ? ALTURAS_ELEGIBLES : ALTURAS_ELEGIBLES_CR
-  return tabla[(modelo || '').toUpperCase()] ?? []
+export function alturasElegibles(modelo: string, _pais: Pais = 'CR'): number[] {
+  return ALTURAS_ELEGIBLES[(modelo || '').toUpperCase()] ?? []
 }
 
 /**

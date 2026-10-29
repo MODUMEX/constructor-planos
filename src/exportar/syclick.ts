@@ -52,7 +52,7 @@ const COMERCIAL: Record<string, string> = {
   SUP_REFORZADO170: 'RF170',
   SUP_COLGANTE: 'CL',
   // Touchless es el Reforzado con los electrónicos S3: en Syclick es L-S3-LC-RF…
-  // El 170 solo lo lleva la puerta, ver `comercialDe`.
+  // El 170 lo llevan la puerta y el panel, ver `comercialDe`.
   TL_S3: 'RF',
 }
 
@@ -96,12 +96,15 @@ export function grupoSyclick(config: Config, cabinas: number): string {
 /**
  * El modelo comercial, que es la cuarta parte del SKU.
  *
- * En S3 hay dos y no cubren lo mismo: del **RF170** Syclick tiene cargada
- * nada más la PUERTA —el panel, la pilastra y la mampara de orinal solo
- * existen en el **RF**— (Dayanna, 26-oct-2026). Así que el 170 lo lleva la
- * puerta cuando no es la de 150, y todo lo demás va RF mida lo que mida.
- * Como un área admite un solo modelo, esas puertas se van a un área aparte,
- * ver `generarSyclick`.
+ * En S3 hay dos y no cubren lo mismo. Del **RF170** Syclick tiene cargadas la
+ * PUERTA y el PANEL; la pilastra y la mampara de orinal existen solo en el
+ * **RF** (Dayanna lo verificó en la plataforma el 29-oct-2026). Y el RF no
+ * pasa de 150 de alto.
+ *
+ * Así que el alto manda en las dos piezas que cambian con él —puerta y
+ * panel—: 170 o 180 van RF170, 150 va RF. La pilastra y el mingitorio van
+ * siempre RF, que es donde están. Como un área admite un solo modelo, lo que
+ * sale en RF170 se va a un área aparte, ver `generarSyclick`.
  */
 function comercialDe(
   config: Config,
@@ -110,7 +113,10 @@ function comercialDe(
   familia: string,
 ): string {
   if (regadera) return COMERCIAL[MODELO_REGADERA]
-  if (config.linea === 'TOUCHLESS') return familia === 'PT' && altoCm !== 150 ? 'RF170' : 'RF'
+  if (config.linea === 'TOUCHLESS') {
+    const cambiaConElAlto = familia === 'PT' || familia === 'PN'
+    return cambiaConElAlto && altoCm !== 150 ? 'RF170' : 'RF'
+  }
   return COMERCIAL[config.modelo] ?? 'ST'
 }
 

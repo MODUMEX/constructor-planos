@@ -2545,7 +2545,15 @@ export default function App() {
                       <h4 style={{ margin: '0 0 6px', color: 'var(--text-2)' }}>Alto de puerta y panel</h4>
                       <p className="sub" style={{ margin: '0 0 10px' }}>
                         {nombreModelo(config.linea, config.modelo)} se fabrica en varias alturas.
+                        Hoy la puerta y el panel de esta área van de{' '}
+                        <b>{alturasDeConfig(config).puerta} cm</b>.
                         La pilastra no cambia: va de {alturasDeConfig(config).pilastra} cm.
+                        {/* Si el alto que manda no es ninguno de los que se ofrecen, ningún
+                            chip queda encendido y parece que el botón no responde. Pasa
+                            cuando la pantalla Alturas le guardó otra medida al modelo. */}
+                        {!alturasElegibles(config.modelo, proyecto.paisFabricacion).includes(alturasDeConfig(config).puerta) && (
+                          <> Ese alto no es ninguno de los de abajo: se lo puso la pantalla Alturas.</>
+                        )}
                       </p>
                       <div className="chips">
                         {alturasElegibles(config.modelo, proyecto.paisFabricacion).map((h) => (

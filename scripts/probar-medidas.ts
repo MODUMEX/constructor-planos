@@ -54,10 +54,13 @@ ok(!anchosPanelFabrica('IMPERIAL', undefined, 'CR').includes(95), 'en Costa Rica
 ok(anchosPanelFabrica('ESTANDAR', undefined, 'CR').includes(95), 'y en los demás modelos sigue estando')
 
 console.log('')
-console.log('— los altos de pieza del S3 que tiene cada lista')
+console.log('— los altos de pieza del S3 que se pueden elegir')
+// el chip mueve puerta y panel juntos: la puerta de S3 solo existe a 150,
+// 170 y 180 en las DOS listas, así que esos son los tres en los dos países
 ok(alturasElegibles('TL_S3', 'MX').join(' ') === '150 170 180', `México → ${alturasElegibles("TL_S3", "MX").join(" ")}`)
-ok(alturasElegibles('TL_S3', 'CR').join(' ') === '90 130 140 150 170 180', `internacional → ${alturasElegibles("TL_S3", "CR").join(" ")}`)
-ok(igual(anchosPanelFabrica('TL_S3', 130, 'CR'), CON_GRANDES), 'a 130 de alto el S3 llega a 180 de ancho')
+ok(alturasElegibles('TL_S3', 'CR').join(' ') === '150 170 180', `internacional → ${alturasElegibles("TL_S3", "CR").join(" ")}`)
+// el panel sí se fabrica más bajo en la internacional, y ahí llega a 180 de ancho
+ok(igual(anchosPanelFabrica('TL_S3', 130, 'CR'), CON_GRANDES), 'el panel a 130 de alto llega a 180 de ancho')
 
 console.log('— Touchless S3 deja elegir el alto, y el panel cambia con él')
 for (const alto of alturasElegibles('TL_S3')) {
