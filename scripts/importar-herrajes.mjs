@@ -57,9 +57,6 @@ const PIEZAS = [
 /** en qué orden se ven en la tira de la pantalla */
 const ORDEN = [
   'Bisagra',
-  'Cerrojo',
-  'Cerrojo con indicador',
-  'Contra del cerrojo',
   'Abrepuertas',
   'Gancho',
   'Escuadras',
@@ -76,6 +73,12 @@ const ORDEN = [
  * fotografiadas las demás piezas.
  */
 const IGNORAR = ['leeder/zoclo leeder.png']
+
+/**
+ * Piezas que NO se muestran, en ningún acabado. El cerrojo y su contra se
+ * sacaron de la tira el 2-nov-2026 a pedido de Dayanna.
+ */
+const PIEZAS_FUERA = new Set(['Cerrojo', 'Cerrojo con indicador', 'Contra del cerrojo'])
 
 const sinTildes = (s) =>
   s
@@ -147,6 +150,10 @@ for (const ruta of lista) {
   const pieza = PIEZAS.find(([token]) => nombre.includes(token))?.[1]
   if (!pieza) {
     descartados.push({ relativo, motivo: 'no se reconoce la pieza' })
+    continue
+  }
+  if (PIEZAS_FUERA.has(pieza)) {
+    descartados.push({ relativo, motivo: `${pieza}: no se muestra` })
     continue
   }
 

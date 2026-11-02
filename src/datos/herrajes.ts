@@ -17,24 +17,6 @@ export const FOTOS_HERRAJES: { linea?: Linea; acabado: HerrajeAcabado; pieza: st
   {
     "linea": "LEEDER",
     "acabado": "INOX",
-    "pieza": "Cerrojo",
-    "archivo": "herrajes/inox-leeder-cerrojo.webp"
-  },
-  {
-    "linea": "LEEDER",
-    "acabado": "INOX",
-    "pieza": "Cerrojo con indicador",
-    "archivo": "herrajes/inox-leeder-cerrojo-con-indicador.webp"
-  },
-  {
-    "linea": "LEEDER",
-    "acabado": "INOX",
-    "pieza": "Contra del cerrojo",
-    "archivo": "herrajes/inox-leeder-contra-del-cerrojo.webp"
-  },
-  {
-    "linea": "LEEDER",
-    "acabado": "INOX",
     "pieza": "Gancho",
     "archivo": "herrajes/inox-leeder-gancho.webp"
   },
@@ -77,18 +59,6 @@ export const FOTOS_HERRAJES: { linea?: Linea; acabado: HerrajeAcabado; pieza: st
   {
     "linea": "SUPERIOR",
     "acabado": "INOX",
-    "pieza": "Cerrojo",
-    "archivo": "herrajes/inox-superior-cerrojo.webp"
-  },
-  {
-    "linea": "SUPERIOR",
-    "acabado": "INOX",
-    "pieza": "Cerrojo con indicador",
-    "archivo": "herrajes/inox-superior-cerrojo-con-indicador.webp"
-  },
-  {
-    "linea": "SUPERIOR",
-    "acabado": "INOX",
     "pieza": "Escuadras",
     "archivo": "herrajes/inox-superior-escuadras.webp"
   },
@@ -114,21 +84,6 @@ export const FOTOS_HERRAJES: { linea?: Linea; acabado: HerrajeAcabado; pieza: st
     "acabado": "NEGRO",
     "pieza": "Bisagra",
     "archivo": "herrajes/negro-bisagra.webp"
-  },
-  {
-    "acabado": "NEGRO",
-    "pieza": "Cerrojo",
-    "archivo": "herrajes/negro-cerrojo.webp"
-  },
-  {
-    "acabado": "NEGRO",
-    "pieza": "Cerrojo con indicador",
-    "archivo": "herrajes/negro-cerrojo-con-indicador.webp"
-  },
-  {
-    "acabado": "NEGRO",
-    "pieza": "Contra del cerrojo",
-    "archivo": "herrajes/negro-contra-del-cerrojo.webp"
   },
   {
     "acabado": "NEGRO",
