@@ -161,6 +161,18 @@ input, select { font: inherit; }
 }
 .chip.on { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent); }
 
+/* Los chips que SE ELIGEN —las alturas de pieza— se marcan igual que la
+   tarjeta del modelo, para que se vea cuál está puesto. */
+.chips { display: flex; flex-wrap: wrap; gap: 10px; }
+button.chip { cursor: pointer; }
+button.chip:hover { border-color: var(--accent-line); color: var(--text); }
+.chip.sel {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 700;
+}
+
 .main { flex: 1 1 auto; display: flex; min-height: 0; }
 
 /* ---------- botones ---------- */
