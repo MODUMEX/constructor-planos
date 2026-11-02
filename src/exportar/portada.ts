@@ -79,7 +79,9 @@ function descripcion(area: Area): string[] {
   const alturas = `Pilastras de ${(a.pilastra / 100).toFixed(2)}m, puertas y paneles laterales de ${(a.puerta / 100).toFixed(2)}m de altura.`
   // sin el código de materia prima: es de adentro, no del cliente
   const color = `COLOR DE DIVISIONES: ${c.color}`
-  const herrajes = `herrajes, bisagras y cerrojos de ${nombreHerrajeLargo(c.herrajeAcabado)}.`
+  // Touchless no lleva cerrojo: la puerta abre y cierra sin contacto
+  const piezas = c.linea === 'TOUCHLESS' ? 'herrajes y bisagras' : 'herrajes, bisagras y cerrojos'
+  const herrajes = `${piezas} de ${nombreHerrajeLargo(c.herrajeAcabado)}.`
 
   if (c.linea === 'SUPERIOR') {
     return [

@@ -227,13 +227,26 @@ function esZocloOPata(pieza: string): boolean {
   return esDeTerminacion(pieza, 'ZOCLO') || esDeTerminacion(pieza, 'PATAS')
 }
 
+/**
+ * De qué línea son las fotos del juego.
+ *
+ * Touchless S3 monta el mismo juego que LEEDER —bisagra, gancho, las tres
+ * escuadras y el remate—, así que las fotos son las de LEEDER. Lo único que
+ * no lleva es cerrojo, porque la puerta abre sin contacto, y los cerrojos ya
+ * no están en ningún juego.
+ */
+function lineaDelJuego(linea: Linea): Linea {
+  return linea === 'TOUCHLESS' ? 'LEEDER' : linea
+}
+
 export function fotosHerraje(
   linea: Linea,
   acabado: HerrajeAcabado,
   terminacion: Terminacion = 'ZOCLO',
 ): FotoHerraje[] {
+  const suya = lineaDelJuego(linea)
   const juego = FOTOS_HERRAJES.filter(
-    (f) => f.acabado === acabado && (f.linea === undefined || f.linea === linea),
+    (f) => f.acabado === acabado && (f.linea === undefined || f.linea === suya),
   )
   const comunes = juego.filter((f) => !esZocloOPata(f.pieza))
   const propia = juego.find((f) => esDeTerminacion(f.pieza, terminacion))
@@ -284,7 +297,8 @@ export function terminacionDe(config: Config): Terminacion {
 export function faltanFotosHerraje(linea: Linea, acabado: HerrajeAcabado): boolean {
   // se mira el juego propio, no el que sale con fotos prestadas de otra línea:
   // una pata prestada no quiere decir que ya llegaron las fotos de esta
+  const suya = lineaDelJuego(linea)
   return !FOTOS_HERRAJES.some(
-    (x) => x.acabado === acabado && (x.linea === undefined || x.linea === linea),
+    (x) => x.acabado === acabado && (x.linea === undefined || x.linea === suya),
   )
 }
