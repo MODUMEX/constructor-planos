@@ -785,7 +785,9 @@ export default function App() {
     const slugColor = proyecto.paisFabricacion === 'MX'
       ? (slugRenderMx(cfg.color, cfg.acabado) ?? SIN_FOTO_PROPIA)
       : undefined
-    return { ...cfg, cabina, slugColor }
+    // Touchless S3 tiene un render por cada alto, así que la foto cambia
+    // cuando se cambia el alto de pieza
+    return { ...cfg, cabina, slugColor, altoPiezaCm: alturasDeConfig(cfg).puerta }
   }
 
   function setConfig(cambio: Partial<Config>) {

@@ -9,12 +9,16 @@
  *
  * La pilastra NO se elige: la pone el modelo.
  *
+ * Cada alto tiene su propio render: mercadeo mandó la foto del 170 y la del
+ * 180, y la del paquete original es la del alto de ficha.
+ *
  *   npm run probar-altura-s3
  */
 import { crearTramos, bom } from '../src/modulacion'
 import { piezasDeArea, agrupar } from '../src/exportar/piezas'
 import { skuSyclick } from '../src/exportar/syclick'
 import { alturasDeConfig, alturasElegibles, alturasDe } from '../src/catalog'
+import { fotoDe } from '../src/renders'
 import type { Config } from '../src/types'
 
 let mal = 0
@@ -90,6 +94,39 @@ console.log('\n— y la cotización cobra lo que mide: más alto, más plata')
   const t170 = total(170)
   const t180 = total(180)
   ok(t150 < t170 && t170 < t180, `150 ${t150.toFixed(2)} < 170 ${t170.toFixed(2)} < 180 ${t180.toFixed(2)}`)
+}
+
+console.log('\n— y la foto cambia con el alto: hay un render de cada uno')
+{
+  const consulta = (altoPiezaCm: number) => ({
+    linea: 'TOUCHLESS' as const,
+    modelo: 'TL_S3',
+    acabado: 'Laminado Compacto' as const,
+    color: 'ALUMINA 2103',
+    altoPiezaCm,
+  })
+  const fotos = [150, 170, 180].map((h) => fotoDe(consulta(h)))
+  const archivos = fotos.map((x) => x?.archivo ?? 'sin foto')
+  ok(new Set(archivos).size === 3, 'tres altos, tres fotos distintas')
+  ok(archivos[1].includes('-170'), `  170: ${archivos[1]}`)
+  ok(archivos[2].includes('-180'), `  180: ${archivos[2]}`)
+  ok(fotos[1]?.referencia === false && fotos[2]?.referencia === false, '  las dos son la foto de verdad')
+
+  ok(archivos[0].includes('-150'), `  150: ${archivos[0]}`)
+  ok(fotos[0]?.referencia === false, '  las tres son la foto de verdad, ninguna es de referencia')
+
+  // mientras un alto no tenga render se muestra el que haya y se avisa, que
+  // es mejor que no enseñar nada: el modelo y el color sí son los suyos
+  const sinRender = fotoDe(consulta(195))
+  ok(sinRender?.referencia === true, 'un alto sin render cae en la foto que haya')
+  ok((sinRender?.nota ?? '').includes('195'), `  y lo dice: ${sinRender?.nota}`)
+  ok(sinRender?.sinColor !== true, '  sin marcarla como de otro color, que sí es el suyo')
+
+  // Touchless no tiene foto propia de orinales: sale la del modelo al alto
+  // del área, marcada como de referencia, que es lo que ya hacía antes
+  const orinal = fotoDe({ ...consulta(170), cabina: 'orinal' })
+  ok((orinal?.archivo ?? '').includes('-170'), 'el orinal de un área de 170 sale con la foto de 170')
+  ok(orinal?.referencia === true, '  y avisa que no es la foto de un orinal')
 }
 
 console.log(mal === 0 ? '\nTodo cuadra.' : `\n${mal} caso(s) mal.`)

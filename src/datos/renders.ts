@@ -1,6 +1,11 @@
 /* GENERADO por scripts/importar-renders.mjs — no editar a mano */
 
-/** clave: linea|modelo|acabado(lam|esm|inox)|color, valor: ruta dentro de public/ */
+/**
+ * clave: linea|modelo|acabado(lam|esm|inox)|color[|alto], valor: ruta dentro
+ * de public/. El alto lo llevan los modelos que lo dejan elegir —hoy solo
+ * Touchless S3, con su foto de 150, de 170 y de 180—; los demás tienen una
+ * sola foto por color y van sin alto.
+ */
 export const RENDERS: Record<string, string> = {
   "LEEDER|COLGANTE|lam|gris": "renders/leeder-colgante-lam-gris.webp",
   "LEEDER|COLGANTE|lam|negro": "renders/leeder-colgante-lam-negro.webp",
@@ -163,13 +168,27 @@ export const RENDERS: Record<string, string> = {
   "SUPERIOR|__REGADERA|esm|esmalte-beige": "renders/superior-regadera-esm-esmalte-beige.webp",
   "SUPERIOR|__REGADERA|esm|esmalte-blanco": "renders/superior-regadera-esm-esmalte-blanco.webp",
   "SUPERIOR|__REGADERA|esm|esmaltada-antigrafiti": "renders/superior-regadera-esm-esmaltada-antigrafiti.webp",
-  "TOUCHLESS|TL_S3|lam|inox-satin": "renders/touchless-tls3-lam-inox-satin.webp",
-  "TOUCHLESS|TL_S3|lam|gris": "renders/touchless-tls3-lam-gris.webp",
-  "TOUCHLESS|TL_S3|lam|negro": "renders/touchless-tls3-lam-negro.webp",
-  "TOUCHLESS|TL_S3|lam|blanco": "renders/touchless-tls3-lam-blanco.webp",
-  "TOUCHLESS|TL_S3|lam|grafito-nocturno": "renders/touchless-tls3-lam-grafito-nocturno.webp",
-  "TOUCHLESS|TL_S3|lam|nogal-grafito": "renders/touchless-tls3-lam-nogal-grafito.webp",
-  "TOUCHLESS|TL_S3|lam|ambar-wood": "renders/touchless-tls3-lam-ambar-wood.webp"
+  "TOUCHLESS|TL_S3|lam|gris|170": "renders/touchless-tls3-lam-gris-170.webp",
+  "TOUCHLESS|TL_S3|lam|negro|170": "renders/touchless-tls3-lam-negro-170.webp",
+  "TOUCHLESS|TL_S3|lam|blanco|170": "renders/touchless-tls3-lam-blanco-170.webp",
+  "TOUCHLESS|TL_S3|lam|grafito-nocturno|170": "renders/touchless-tls3-lam-grafito-nocturno-170.webp",
+  "TOUCHLESS|TL_S3|lam|inox-satin|170": "renders/touchless-tls3-lam-inox-satin-170.webp",
+  "TOUCHLESS|TL_S3|lam|nogal-grafito|170": "renders/touchless-tls3-lam-nogal-grafito-170.webp",
+  "TOUCHLESS|TL_S3|lam|ambar-wood|170": "renders/touchless-tls3-lam-ambar-wood-170.webp",
+  "TOUCHLESS|TL_S3|lam|gris|180": "renders/touchless-tls3-lam-gris-180.webp",
+  "TOUCHLESS|TL_S3|lam|negro|180": "renders/touchless-tls3-lam-negro-180.webp",
+  "TOUCHLESS|TL_S3|lam|blanco|180": "renders/touchless-tls3-lam-blanco-180.webp",
+  "TOUCHLESS|TL_S3|lam|grafito-nocturno|180": "renders/touchless-tls3-lam-grafito-nocturno-180.webp",
+  "TOUCHLESS|TL_S3|lam|inox-satin|180": "renders/touchless-tls3-lam-inox-satin-180.webp",
+  "TOUCHLESS|TL_S3|lam|nogal-grafito|180": "renders/touchless-tls3-lam-nogal-grafito-180.webp",
+  "TOUCHLESS|TL_S3|lam|ambar-wood|180": "renders/touchless-tls3-lam-ambar-wood-180.webp",
+  "TOUCHLESS|TL_S3|lam|inox-satin|150": "renders/touchless-tls3-lam-inox-satin-150.webp",
+  "TOUCHLESS|TL_S3|lam|gris|150": "renders/touchless-tls3-lam-gris-150.webp",
+  "TOUCHLESS|TL_S3|lam|negro|150": "renders/touchless-tls3-lam-negro-150.webp",
+  "TOUCHLESS|TL_S3|lam|blanco|150": "renders/touchless-tls3-lam-blanco-150.webp",
+  "TOUCHLESS|TL_S3|lam|grafito-nocturno|150": "renders/touchless-tls3-lam-grafito-nocturno-150.webp",
+  "TOUCHLESS|TL_S3|lam|nogal-grafito|150": "renders/touchless-tls3-lam-nogal-grafito-150.webp",
+  "TOUCHLESS|TL_S3|lam|ambar-wood|150": "renders/touchless-tls3-lam-ambar-wood-150.webp"
 }
 
 /**

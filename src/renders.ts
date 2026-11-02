@@ -1,4 +1,4 @@
-import { COLORES, buscarColor } from './catalog'
+import { alturasDe, alturasElegibles, COLORES, buscarColor } from './catalog'
 import { COLORES_FUERA_DE_CATALOGO, RENDERS } from './datos/renders'
 import { FOTOS_HERRAJES } from './datos/herrajes'
 import type { Acabado, Config, HerrajeAcabado, Linea, Terminacion, TipoCabina } from './types'
@@ -97,27 +97,86 @@ export interface Consulta {
   cabina?: TipoCabina
   /** para los colores de México, que no están en el catálogo de Costa Rica */
   slugColor?: string
+  /**
+   * El alto de puerta y panel que se eligió, cuando el modelo deja elegirlo.
+   *
+   * Touchless S3 tiene render propio de cada alto, así que una S3 de 180 se
+   * ve distinta en pantalla que una de 150. Si falta el render de un alto se
+   * muestra el del alto más parecido y se avisa.
+   */
+  altoPiezaCm?: number
 }
 
-export function fotoDe({ linea, modelo, acabado, color, cabina, slugColor }: Consulta): Foto | null {
+/**
+ * Los altos con los que se busca la foto, en orden.
+ *
+ * Primero el que se pidió. Si de ese alto todavía no hay render se van
+ * probando los otros altos del modelo, del más parecido al más lejano, y de
+ * último la foto sin alto. Enseñar la mampara un poco más alta de lo que va a
+ * llegar —diciéndolo— sirve más que no enseñar nada.
+ */
+function altosCandidatos(modelo: string, alto?: number): (number | undefined)[] {
+  if (!alto) return [undefined]
+  const otros = alturasElegibles(modelo)
+    .filter((h) => h !== alto)
+    .sort((x, y) => Math.abs(x - alto) - Math.abs(y - alto))
+  return [alto, ...otros, undefined]
+}
+
+/**
+ * true si la foto sin alto sirve igual para ese alto.
+ *
+ * Los modelos que no eligen alto tienen una sola foto por color y no llevan
+ * número en la clave: caer en ella no es un reemplazo, es la foto que toca.
+ */
+function fotoDeFicha(modelo: string, alto?: number): boolean {
+  return alto === undefined || alturasElegibles(modelo).length === 0
+    || alto === alturasDe(modelo).puerta
+}
+
+function claveFoto(
+  linea: Linea,
+  modelo: string,
+  acabado: string,
+  color: string,
+  alto?: number,
+): string {
+  return `${linea}|${modelo}|${acabado}|${color}${alto ? `|${alto}` : ''}`
+}
+
+export function fotoDe({
+  linea,
+  modelo,
+  acabado,
+  color,
+  cabina,
+  slugColor,
+  altoPiezaCm,
+}: Consulta): Foto | null {
   const a = corto(acabado)
   const modelos = candidatosModelo(modelo, cabina)
   const exacto = slugExacto(color, acabado, slugColor)
   const colores = [...new Set([...(exacto ? [exacto] : []), ...coloresDeRespaldo(acabado)])]
+  const altos = altosCandidatos(modelo, altoPiezaCm)
+  const sirveLaDeFicha = fotoDeFicha(modelo, altoPiezaCm)
 
   for (const [im, m] of modelos.entries()) {
     for (const [ic, c] of colores.entries()) {
-      const archivo = RENDERS[`${linea}|${m}|${a}|${c}`]
-      if (!archivo) continue
-      // solo es la foto de verdad si el color tenía render propio y se usó
-      const colorExacto = exacto !== undefined && ic === 0
-      if (im === 0 && colorExacto) return { archivo, referencia: false }
-      const notas: string[] = []
-      if (im > 0) notas.push(`la foto es del modelo ${m.replace('__', '').toLowerCase()}`)
-      // Sin render de ese color no se nombra el de la foto: lo que importa no
-      // es qué color se está viendo sino que NO es el que se eligió.
-      if (!colorExacto) notas.push('la foto no es de ese color, es solo un ejemplo del modelo')
-      return { archivo, referencia: true, nota: notas.join(' y '), sinColor: !colorExacto }
+      for (const [ia, alt] of altos.entries()) {
+        const archivo = RENDERS[claveFoto(linea, m, a, c, alt)]
+        if (!archivo) continue
+        // solo es la foto de verdad si el color tenía render propio y se usó
+        const colorExacto = exacto !== undefined && ic === 0
+        const altoExacto = ia === 0 || (alt === undefined && sirveLaDeFicha)
+        if (im === 0 && colorExacto && altoExacto) return { archivo, referencia: false }
+        const notas: string[] = []
+        if (im > 0) notas.push(`la foto es del modelo ${m.replace('__', '').toLowerCase()}`)
+        if (!altoExacto) notas.push(`la foto no es del alto de ${altoPiezaCm}`)
+        // Sin render de ese color no se nombra el de la foto: lo que importa no
+        // es qué color se está viendo sino que NO es el que se eligió.
+        if (!colorExacto) notas.push('la foto no es de ese color, es solo un ejemplo del modelo')
+        return { archivo, referencia: true, nota: notas.join(' y '), sinColor: !colorExacto }
+      }
     }
   }
   return null
