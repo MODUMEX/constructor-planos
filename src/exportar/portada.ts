@@ -1,6 +1,6 @@
 import type { jsPDF } from 'jspdf'
 import type { Area, Proyecto } from '../types'
-import { alturasDeConfig, nombreModelo } from '../catalog'
+import { alturasDeConfig, llevaKap, nombreModelo } from '../catalog'
 import { nombreLinea as nombreDeLinea } from './piezas'
 import { LOGO_MODUMEX, LOGO_RELACION } from '../assets/logo'
 
@@ -187,8 +187,10 @@ export function portada(
     ['ACABADO:', c.acabado],
     ['COLOR:', c.color],
     ['ALTURA PILASTRA:', `${alturasDeConfig(c).pilastra} cm`],
-    ['KAP:', c.kap ? 'SÍ' : 'NO'],
   ]
+  // en México el KAP es solo de Touchless: donde no existe no se nombra, ni
+  // siquiera para decir que no va
+  if (llevaKap(c.linea, proyecto.paisFabricacion)) filas.push(['KAP:', c.kap ? 'SÍ' : 'NO'])
   filas.forEach(([etiqueta, valor], i) => {
     const y = M + 12 + i * 9.4
     texto(doc, etiqueta, colX, y, { size: 7.4, bold: true, color: MARCA })

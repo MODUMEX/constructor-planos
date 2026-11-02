@@ -18,7 +18,7 @@ import { destinoOdoo } from './odoo/region'
 import { esAdmin, faltaParaVencer, IVA_CR, puedeCatalogos, puedeColoresReservados, puedeDistribuidores, puedePiezas, puedeUsuarios, renovarSesion, type Usuario } from './auth'
 import type { Area, Cabina, Config, Soporte, Moneda, Pais, Proyecto, TipoCabina, TipologiaId, Tramo } from './types'
 import { alturasElegibles, alturasDeConfig,
-  acabadoEsElColor, acabadosPara, alturasDe, anchosPanel, claroAjustado, coloresPara, espesorPorLinea, herrajesDe, LINEAS, mgMedidas, MODELOS,
+  acabadoEsElColor, acabadosPara, alturasDe, anchosPanel, claroAjustado, coloresPara, espesorPorLinea, herrajesDe, LINEAS, llevaKap, mgMedidas, MODELOS,
   type PiezaEspecial,
   PAISES, etiquetaTier, nombreHerraje, nombreModelo, tierDeColor, TIPOLOGIAS, tipologia, tipologiaEspejo,
   ANCHOS_PILASTRA, COLOR_DE_LINEA, CUBICULO_MR, esDeLinea, esEspecial, esSoloOrinales, esVariacionPanel, ICONO_MR, PIEZA_PIDE_COSTILLA_CM,
@@ -819,6 +819,11 @@ export default function App() {
         if (paisFabricacion === 'CR' && !lineasDe('CR').some((l) => l.id === a.config.linea)) {
           a = { ...a, config: { ...a.config, linea: 'LEEDER', espesorMm: espesorPorLinea('LEEDER') } }
         }
+        // en México el KAP solo existe en Touchless: lo que venía puesto en
+        // otra línea se cae al pasar el proyecto a México
+        if (a.config.kap && !llevaKap(a.config.linea, paisFabricacion)) {
+          a = { ...a, config: { ...a.config, kap: false } }
+        }
         // Cada país tiene su lista de precios y las dos no traen las mismas
         // medidas: el panel de 95 de Imperial es solo de México y los altos de
         // 90, 130 y 140 del S3 son solo de la internacional. Lo que deja de
@@ -876,6 +881,9 @@ export default function App() {
       ...(mgSigue ? {} : { mgAnchoCm: mg[0].anchoCm, mgAlturaCm: mg[0].altoCm }),
       acabado,
       ...colorInicial(linea, acabado),
+      // en México el KAP solo lo lleva Touchless: al salirse de esa línea deja
+      // de existir, y no puede quedar puesto de arrastre
+      ...(llevaKap(linea, proyecto.paisFabricacion) ? {} : { kap: false }),
       alturaCm: alturasDe(modelo).puerta,
       profundidadCm: paneles.includes(config.profundidadCm)
         ? config.profundidadCm
@@ -2747,17 +2755,19 @@ export default function App() {
                         </span>
                       )}
                     </div>
-                    <div className="campo">
-                      <label>KAP · Kit de abrepuertas de pie</label>
-                      <select value={config.kap ? 'SI' : 'NO'} onChange={(e) => setConfig({ kap: e.target.value === 'SI' })}>
-                        <option value="NO">No</option>
-                        <option value="SI">Sí</option>
-                      </select>
-                      <span className="ayuda">
-                        Pedal al pie de la puerta para abrirla sin tocarla con las manos. Va uno por
-                        puerta y sale en el cajetín del plano y en el CSV del CIP.
-                      </span>
-                    </div>
+                    {llevaKap(config.linea, proyecto.paisFabricacion) && (
+                      <div className="campo">
+                        <label>KAP · Kit de abrepuertas de pie</label>
+                        <select value={config.kap ? 'SI' : 'NO'} onChange={(e) => setConfig({ kap: e.target.value === 'SI' })}>
+                          <option value="NO">No</option>
+                          <option value="SI">Sí</option>
+                        </select>
+                        <span className="ayuda">
+                          Pedal al pie de la puerta para abrirla sin tocarla con las manos. Va uno por
+                          puerta y sale en el cajetín del plano y en el CSV del CIP.
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </>
               )}

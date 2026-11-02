@@ -352,6 +352,17 @@ export function herrajesDe(linea: Linea): typeof HERRAJE_ACABADOS {
   return HERRAJE_ACABADOS
 }
 
+/**
+ * Si esa línea puede llevar KAP en ese país.
+ *
+ * En México el kit de abrepuertas de pie solo se arma para Touchless S3, así
+ * que en las demás líneas ni siquiera se pregunta. En Costa Rica, por ahora,
+ * cualquier modelo lo puede pedir.
+ */
+export function llevaKap(linea: Linea, pais: Pais): boolean {
+  return pais === 'MX' ? linea === 'TOUCHLESS' : true
+}
+
 export function nombreHerraje(id: HerrajeAcabado): string {
   return HERRAJE_ACABADOS.find((h) => h.id === id)?.nombre ?? id
 }

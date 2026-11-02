@@ -1,4 +1,5 @@
 import type { Proyecto } from '../types'
+import { llevaKap } from '../catalog'
 import { agrupar, modeloParaCsv, nombreLinea, nombreSistema, piezasDeArea } from './piezas'
 
 /**
@@ -43,7 +44,9 @@ export function generarCSV(proyecto: Proyecto): string {
           celda(modeloParaCsv(config, area.tramos)),
           celda(nombreSistema(config)),
           celda(config.color),
-          config.kap ? 'SI' : 'NO',
+          // el KAP de México es solo de Touchless: en el resto viaja NO aunque
+          // el proyecto venga guardado de antes con el kit puesto
+          config.kap && llevaKap(config.linea, proyecto.paisFabricacion) ? 'SI' : 'NO',
           celda(nombreLinea(config.linea)),
           celda(config.acabado),
           celda(config.herrajeAcabado),
