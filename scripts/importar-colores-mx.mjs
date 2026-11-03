@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { inflateRawSync } from 'node:zlib'
+import { fileURLToPath } from 'node:url'
 
 /**
  * Lee "colores x codigo.xlsx" (la lista de materia prima de la planta de
@@ -13,7 +14,9 @@ import { inflateRawSync } from 'node:zlib'
  * comentarios, que son los que marcan el material descontinuado.
  */
 
-const RAIZ = new URL('..', import.meta.url).pathname.replace(/^\//, '')
+// fileURLToPath y no `.pathname`: la carpeta del proyecto tiene espacios y por
+// ahí vienen escritos como %20, que no es una ruta que exista
+const RAIZ = fileURLToPath(new URL('..', import.meta.url))
 const origen = process.argv[2] || 'C:/Users/NancyLizano/Downloads/colores x codigo.xlsx'
 
 /**
@@ -149,8 +152,9 @@ const ts = `/* GENERADO por scripts/importar-colores-mx.mjs — no editar a mano
  * Un color de la lista de materia prima de la planta de México.
  *
  * De quién se compra el material, con qué código y en qué medida de lámina
- * llega NO están acá a propósito: son datos de adentro de Modumex. Lo único que
- * sobrevive es el \`codigoBase\`, porque es lo que el CSV le pasa al CIP.
+ * llega NO están acá a propósito: son datos de adentro de Modumex y esto viaja
+ * entero en la aplicación que usa el distribuidor. Lo único que sobrevive es el
+ * \`codigoBase\`, porque es lo que el CSV le pasa al CIP para comprar.
  */
 export interface ColorMX {
   color: string

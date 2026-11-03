@@ -1,5 +1,5 @@
 import type { Cabina, Config, Tramo } from './types'
-import { alturasDeConfig, anchosPanelFabrica, anchosPilastra, GRUESO_PILASTRA } from './catalog'
+import { alturasDeConfig, anchosPanelFabrica, anchosPilastra, COSTILLA_MINIMA_CM, GRUESO_PILASTRA } from './catalog'
 import {
   anchoTotal, divisorDelCuarto, frenteAccesible, ladoDePilastra, ladosDeCabina, lugaresDe,
   profundidadAccesible, profundidadDelLugar,
@@ -393,6 +393,24 @@ function avisoDelFrente(
       + ` este modelo es de ${minima}: no se puede fabricar. Bajá la pilastra lateral de ${pilastra},`
       + ` o cambiale el ancho a la cabina o a la puerta.`
   }
+  // DOS PILASTRAS PEGADAS NO SE ARMAN. Cuando el relleno del rincón todavía
+  // entra en la familia de las pilastras pero no se pudo juntar con la
+  // lateral —porque las dos sumadas se pasan de la más ancha del modelo—, el
+  // despiece sacaba dos piezas canto con canto, que en planta no existen. Se
+  // sale por abajo, juntándolas, o por arriba: pasado el tope el relleno ya
+  // es un PANEL, y un panel sí apoya contra la lateral.
+  const tope = Math.max(...anchosPilastra(modelo ?? ''))
+  if (frente <= tope && pilastra + frente > tope) {
+    const hasta = Math.round((ancho - frente + tope - pilastra) * 10) / 10
+    const desde = Math.round((ancho + tope - frente) * 10) / 10
+    return `El rincón de la cabina accesible daría una pilastra de ${frente} cm pegada a la lateral`
+      + ` de ${pilastra}, y dos pilastras no se arman una contra otra: juntas se pasan de ${tope},`
+      + ` que es la más ancha del modelo. Bajá la cabina a ${hasta} cm, o pasala de ${desde} y el`
+      + ` rincón sale de un panel. Si la medida tiene que quedar así, el rincón va en sándwich:`
+      + ` las dos pilastras con una costilla de ${COSTILLA_MINIMA_CM} cm por detrás de la junta,`
+      + ` que ya sale en el plano, en el despiece y en la cotización.`
+  }
+
   const deFicha = anchosPanelFabrica(modelo ?? '', altoPanelCm)
   const mayor = Math.max(...deFicha)
   if (frente > mayor) {

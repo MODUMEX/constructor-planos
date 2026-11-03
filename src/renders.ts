@@ -230,13 +230,22 @@ function esZocloOPata(pieza: string): boolean {
 /**
  * De qué línea son las fotos del juego.
  *
- * Touchless S3 monta el mismo juego que LEEDER —bisagra, gancho, las tres
- * escuadras y el remate—, así que las fotos son las de LEEDER. Lo único que
- * no lleva es cerrojo, porque la puerta abre sin contacto, y los cerrojos ya
- * no están en ningún juego.
+ * Touchless S3 monta el juego de LEEDER —bisagra, gancho, escuadra U y el
+ * remate—, así que las fotos son las de LEEDER. No lleva cerrojo, porque la
+ * puerta abre sin contacto, y los cerrojos ya no están en ningún juego.
  */
 function lineaDelJuego(linea: Linea): Linea {
   return linea === 'TOUCHLESS' ? 'LEEDER' : linea
+}
+
+/**
+ * Las escuadras F y T no van en Touchless: el juego es el de LEEDER menos
+ * esas dos. Se quitan acá y no del índice de fotos porque en LEEDER sí van,
+ * y el índice lo escribe `importar-herrajes.mjs` de lo que haya en la
+ * carpeta.
+ */
+function sonDeLaLinea(linea: Linea, pieza: string): boolean {
+  return linea !== 'TOUCHLESS' || !/^escuadra [ft]$/i.test(pieza)
 }
 
 export function fotosHerraje(
@@ -246,7 +255,8 @@ export function fotosHerraje(
 ): FotoHerraje[] {
   const suya = lineaDelJuego(linea)
   const juego = FOTOS_HERRAJES.filter(
-    (f) => f.acabado === acabado && (f.linea === undefined || f.linea === suya),
+    (f) =>
+      f.acabado === acabado && (f.linea === undefined || f.linea === suya) && sonDeLaLinea(linea, f.pieza),
   )
   const comunes = juego.filter((f) => !esZocloOPata(f.pieza))
   const propia = juego.find((f) => esDeTerminacion(f.pieza, terminacion))
@@ -299,6 +309,7 @@ export function faltanFotosHerraje(linea: Linea, acabado: HerrajeAcabado): boole
   // una pata prestada no quiere decir que ya llegaron las fotos de esta
   const suya = lineaDelJuego(linea)
   return !FOTOS_HERRAJES.some(
-    (x) => x.acabado === acabado && (x.linea === undefined || x.linea === suya),
+    (x) =>
+      x.acabado === acabado && (x.linea === undefined || x.linea === suya) && sonDeLaLinea(linea, x.pieza),
   )
 }

@@ -102,7 +102,6 @@ function configInicial(): Config {
     // el renglón del riel.
     montaje: 'PISO_HEADRAIL',
     bisagra: 'GRAV',
-    cerrojo: 'IND',
     herrajeAcabado: 'INOX',
     alturaCm: 150,
     profundidadCm: 150,

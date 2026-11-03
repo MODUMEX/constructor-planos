@@ -19,7 +19,7 @@ import type { Area, Config, Proyecto, TipologiaId } from '../src/types'
 function cfg(extra: Partial<Config> = {}): Config {
   return {
     linea: 'LEEDER', modelo: 'REFORZADO', acabado: 'Laminado Compacto', color: 'Alumina',
-    montaje: 'PISO_HEADRAIL', bisagra: '', cerrojo: '', herrajeAcabado: 'INOX',
+    montaje: 'PISO_HEADRAIL', bisagra: '', herrajeAcabado: 'INOX',
     alturaCm: 180, profundidadCm: 150, anchoAccesibleCm: 150, anchoPilastraCm: 24,
     espesorMm: 12, terminacion: 'ZOCLO', kap: false, orinales: 0, mgAlturaCm: 120,
     tipologia: 'RECTA_ENTRE_MUROS' as TipologiaId, ...extra,

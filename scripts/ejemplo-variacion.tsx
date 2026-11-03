@@ -27,7 +27,6 @@ function config(tipologia: TipologiaId): Config {
     color: 'Blanco',
     montaje: 'PISO_HEADRAIL',
     bisagra: '',
-    cerrojo: '',
     herrajeAcabado: 'INOX',
     alturaCm: 180,
     profundidadCm: 135,

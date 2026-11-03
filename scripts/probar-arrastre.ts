@@ -19,7 +19,7 @@ function revisar(que: string, bien: boolean, detalle = '') {
 function cfg(tipologia: TipologiaId, extra: Partial<Config> = {}): Config {
   return {
     linea: 'LEEDER', modelo: 'M1', acabado: 'Laminado Compacto', color: 'Blanco',
-    montaje: 'PISO_HEADRAIL', bisagra: '', cerrojo: '', herrajeAcabado: 'INOX',
+    montaje: 'PISO_HEADRAIL', bisagra: '', herrajeAcabado: 'INOX',
     alturaCm: 180, profundidadCm: 150, anchoAccesibleCm: 150, anchoPilastraCm: 24,
     espesorMm: 12, terminacion: 'ZOCLO', kap: false, orinales: 0, mgAlturaCm: 120,
     tipologia, ...extra,

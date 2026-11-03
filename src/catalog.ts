@@ -340,7 +340,7 @@ export const COLORES: Color[] = [
  */
 export const HERRAJE_ACABADOS: { id: HerrajeAcabado; nombre: string; nota: string }[] = [
   { id: 'INOX', nombre: 'Acero inoxidable', nota: 'El juego de siempre, en inoxidable pulido' },
-  { id: 'NEGRO', nombre: 'Negro', nota: 'Todo el juego en negro: bisagra, cerrojo, escuadras, patas y gancho' },
+  { id: 'NEGRO', nombre: 'Negro', nota: 'Todo el juego en negro: bisagra, abrepuertas, escuadras, patas y gancho' },
 ]
 
 /**
@@ -495,11 +495,6 @@ export const MONTAJES: { id: Montaje; nombre: string; nota: string }[] = [
 export const BISAGRAS = [
   { id: 'GRAV', nombre: 'Bisagra de gravedad', nota: 'Cierra sola, la de catálogo' },
   { id: 'INOX', nombre: 'Bisagra de acero inoxidable', nota: 'Servicio pesado' },
-]
-
-export const CERROJOS = [
-  { id: 'IND', nombre: 'Cerrojo con indicador', nota: 'Muestra libre / ocupado' },
-  { id: 'STD', nombre: 'Cerrojo estándar', nota: 'Pasador de canto' },
 ]
 
 /**

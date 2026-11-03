@@ -5,9 +5,9 @@
  * acero inoxidable de LEEDER lo monta también Touchless S3, y Superior 2.0
  * tiene piezas propias —bisagra de autorretorno y su escuadra U—.
  *
- * Touchless no lleva cerrojo, porque la puerta abre sin contacto. Tampoco lo
- * lleva ningún juego en las fotos: el cerrojo, el cerrojo con indicador y la
- * contra salieron de la tira.
+ * Touchless no lleva cerrojo, porque la puerta abre sin contacto, ni las
+ * escuadras F y T. Tampoco hay cerrojo en ningún juego: el cerrojo, el de
+ * indicador y la contra salieron de la tira de fotos.
  *
  * El KAP —el kit de abrepuertas de pie— en México es solo de Touchless; en
  * Costa Rica, por ahora, cualquier modelo lo puede pedir.
@@ -19,7 +19,7 @@ import { herrajesDe, llevaKap } from '../src/catalog'
 import { generarCSV, CABECERA_CSV } from '../src/exportar/csv'
 import { crearTramos } from '../src/modulacion'
 import { FOTOS_HERRAJES } from '../src/datos/herrajes'
-import type { Config, Linea, Pais, Proyecto } from '../src/types'
+import type { Config, HerrajeAcabado, Linea, Pais, Proyecto } from '../src/types'
 
 let mal = 0
 const ok = (b: boolean, t: string) => { if (!b) mal++; console.log(`${b ? '✓' : '✕'} ${t}`) }
@@ -37,12 +37,21 @@ for (const linea of LINEAS) {
   }
 }
 
-console.log('\n— Touchless monta el juego de LEEDER, pieza por pieza')
+console.log('\n— Touchless monta el juego de LEEDER menos las escuadras F y T')
 {
-  const tl = fotosHerraje('TOUCHLESS', 'INOX').map((f) => f.archivo)
-  const leeder = fotosHerraje('LEEDER', 'INOX').map((f) => f.archivo)
-  ok(tl.join('|') === leeder.join('|'), `las mismas ${tl.length} fotos que LEEDER`)
-  ok(tl.every((a) => a.includes('leeder')), '  y son las de la carpeta de LEEDER')
+  const piezas = (l: Linea, a: HerrajeAcabado = 'INOX') => fotosHerraje(l, a).map((f) => f.pieza)
+  const tl = piezas('TOUCHLESS')
+  const leeder = piezas('LEEDER')
+  const sinFT = leeder.filter((x) => !/^escuadra [ft]$/i.test(x))
+  ok(tl.join('|') === sinFT.join('|'), `las ${tl.length} de LEEDER sin F ni T: ${tl.join(', ')}`)
+  ok(!tl.some((x) => /^escuadra [ft]$/i.test(x)), '  no se coló ninguna de las dos')
+  ok(leeder.includes('Escuadra F') && leeder.includes('Escuadra T'), '  y en LEEDER siguen estando')
+  // el negro sale de la misma tira, así que ahí también se quitan
+  ok(!piezas('TOUCHLESS', 'NEGRO').some((x) => /^escuadra [ft]$/i.test(x)), 'en negro tampoco van')
+  ok(
+    fotosHerraje('TOUCHLESS', 'INOX').every((f) => f.archivo.includes('leeder')),
+    'las fotos salen de la carpeta de LEEDER',
+  )
   // Superior sí tiene las suyas: no se le prestan las de LEEDER
   const sup = fotosHerraje('SUPERIOR', 'INOX').map((f) => f.archivo)
   ok(sup.some((a) => a.includes('superior')), 'Superior 2.0 sigue con las suyas')
@@ -66,10 +75,13 @@ for (const linea of LINEAS) {
   }
 }
 
-console.log('\n— el juego negro es el mismo para todas las líneas')
+console.log('\n— el juego negro: el mismo para todas, salvo las dos de Touchless')
 {
-  const negros = LINEAS.filter((l) => l !== 'SUPERIOR').map((l) => fotosHerraje(l, 'NEGRO').map((f) => f.archivo).join('|'))
-  ok(new Set(negros).size === 1, 'LEEDER y Touchless ven las mismas fotos negras')
+  const negro = (l: Linea) => fotosHerraje(l, 'NEGRO').map((f) => f.archivo)
+  ok(negro('TOUCHLESS').every((a) => negro('LEEDER').includes(a)), 'Touchless no estrena ninguna foto negra')
+  const quitadas = negro('LEEDER').filter((a) => !negro('TOUCHLESS').includes(a))
+  ok(quitadas.length === 2, `le faltan las dos escuadras: ${quitadas.join(', ')}`)
+  ok(quitadas.every((a) => /escuadra-[ft]/.test(a)), '  y son la F y la T')
 }
 
 console.log('\n— el KAP: en México solo Touchless, en Costa Rica cualquiera')
@@ -86,7 +98,7 @@ console.log('\n— y el CSV del CIP no manda un KAP que allá no existe')
     const config = {
       tipologia: 'RECTA_ENTRE_MUROS', linea, modelo: linea === 'TOUCHLESS' ? 'TL_S3' : 'ESTANDAR',
       acabado: 'Laminado Compacto', color: 'BLANCO', montaje: 'PISO_HEADRAIL', bisagra: 'GRAV',
-      cerrojo: 'IND', herrajeAcabado: 'INOX', alturaCm: 210, profundidadCm: 150,
+      herrajeAcabado: 'INOX', alturaCm: 210, profundidadCm: 150,
       anchoAccesibleCm: 150, puertaCm: 60, anchoPilastraCm: 24, espesorMm: 12,
       terminacion: 'ZOCLO', kap: true, orinales: 0, mgAlturaCm: 120, mgAnchoCm: 45, mamparasMG: [],
     } as unknown as Config

@@ -13,7 +13,7 @@ import type { Area, Config, TipologiaId } from '../src/types'
 
 const base: Config = {
   linea: 'LEEDER', modelo: 'ESTANDAR', acabado: 'Laminado Compacto', color: 'BLANCO',
-  montaje: 'PISO_HEADRAIL', bisagra: 'GRAV', cerrojo: 'IND', herrajeAcabado: 'INOX',
+  montaje: 'PISO_HEADRAIL', bisagra: 'GRAV', herrajeAcabado: 'INOX',
   alturaCm: 150, profundidadCm: 150, anchoAccesibleCm: 150, anchoPilastraCm: 16,
   espesorMm: 12, terminacion: 'ZOCLO', kap: false, orinales: 0,
   mgAlturaCm: 120, mgAnchoCm: 60, tipologia: 'ORINALES',

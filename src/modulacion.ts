@@ -881,6 +881,33 @@ function anchosConPilastras(tramo: Tramo, pilastras: number[]): Cabina[] {
 }
 
 /**
+ * Si el rincón de la cabina accesible de esa punta hay que armarlo en
+ * SÁNDWICH: dos pilastras canto con canto con una costilla por detrás de la
+ * junta, que es la que las amarra.
+ *
+ * Pasa cuando el relleno ya no se puede juntar con la lateral —las dos sumadas
+ * se pasan de la pilastra más ancha del modelo— pero todavía entra en la
+ * familia de las pilastras. Pasado ese tope el relleno ya es un PANEL, que sí
+ * apoya contra la lateral y no necesita nada.
+ *
+ * Vale para cualquier ancho de lateral: acá el soporte no lo pide el tamaño de
+ * la pieza sino la junta, así que no se mira el mínimo de los 50 cm.
+ */
+export function rinconEnSandwich(tramo: Tramo, config: Config, k: number): boolean {
+  if (!esVariacionPanel(config.tipologia)) return false
+  const n = tramo.cabinas.length
+  const i = tramo.cabinas.findIndex((c) => c.tipo === 'accesible')
+  if (i < 0) return false
+  // de qué punta es el rincón: la misma que elige `lado` en el dibujo. Con
+  // una sola cabina las dos puntas son la suya, y el rincón es el de arranque
+  if (k !== (i === 0 ? 0 : n)) return false
+  const f = frenteAccesible(tramo.cabinas[i], config)
+  if (f.juntada || f.frente <= 0) return false
+  const tope = Math.max(...anchosPilastra(config.modelo))
+  return f.frente <= tope && f.pilastra + f.frente > tope
+}
+
+/**
  * Qué soporte lleva la pilastra de la frontera `k`, o null si no pide ninguno.
  *
  * Solo las PUNTAS —la de esquina y la que apoya contra muro— y solo pasadas
@@ -891,7 +918,10 @@ export function soporteDe(tramo: Tramo, config: Config, k: number): Soporte | nu
   const n = tramo.cabinas.length
   if (k !== 0 && k !== n) return null
   const { anchoCm } = pilastraDePunta(tramo, config, k)
-  if (!anchoCm || anchoCm < PIEZA_PIDE_COSTILLA_CM) return null
+  // El rincón en sándwich pide costilla aunque la lateral sea chica: lo que
+  // hay que amarrar es la junta entre las dos piezas, no la pieza.
+  if (!anchoCm) return null
+  if (anchoCm < PIEZA_PIDE_COSTILLA_CM && !rinconEnSandwich(tramo, config, k)) return null
   const elegido = tramo.soportes?.[k] ?? 'costilla'
   // El sándwich es panel + pilastra, así que solo existe en el Tipo C. Si un
   // plano viejo lo trae en otra tipología, cae en la costilla.
@@ -1076,13 +1106,16 @@ export function piezasQuePidenCostilla(tramo: Tramo, config: Config): string[] {
   ;(tramo.pilastras ?? []).forEach((_a, k) => {
     if (k !== 0 && k !== n) return
     const { anchoCm: ancho, enFrenteMr } = pilastraDePunta(tramo, config, k)
-    if (!ancho || ancho < PIEZA_PIDE_COSTILLA_CM) return
+    const enSandwich = rinconEnSandwich(tramo, config, k)
+    if (!ancho || (ancho < PIEZA_PIDE_COSTILLA_CM && !enSandwich)) return
     const familia = familiaDelFrente(ancho, config.modelo)
     const contraMuro = k === 0 ? tramo.muroInicio : tramo.muroFin
     const donde = enFrenteMr
       ? 'lateral del frente de la accesible'
       : `${k === 0 ? 'de arranque' : 'de cierre'}${contraMuro ? ' (a muro)' : ' (de esquina)'}`
-    avisos.push(`${familia === 'PN' ? 'El panel' : 'La pilastra'} ${donde}, de ${ancho} cm`)
+    avisos.push(enSandwich
+      ? `El rincón ${donde}, de ${ancho} + ${frenteAccesible(tramo.cabinas[k === 0 ? 0 : n - 1], config).frente} cm en sándwich`
+      : `${familia === 'PN' ? 'El panel' : 'La pilastra'} ${donde}, de ${ancho} cm`)
   })
 
   // y la pieza del frente de la cabina accesible, en las "variación panel"

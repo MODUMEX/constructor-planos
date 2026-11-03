@@ -21,7 +21,6 @@ function config(tipologia: TipologiaId, linea: Config['linea'] = 'LEEDER'): Conf
     color: 'BLANCO',
     montaje: 'PISO_HEADRAIL',
     bisagra: 'GRAV',
-    cerrojo: 'IND',
     herrajeAcabado: 'NEGRO',
     alturaCm: 150,
     profundidadCm: 150,

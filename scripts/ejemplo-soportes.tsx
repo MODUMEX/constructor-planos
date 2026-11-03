@@ -18,7 +18,7 @@ import type { Area, Config, Proyecto, Soporte, Tramo } from '../src/types'
 
 const config: Config = {
   linea: 'LEEDER', modelo: 'REFORZADO', acabado: 'Laminado Compacto', color: 'Blanco',
-  montaje: 'PISO_HEADRAIL', bisagra: '', cerrojo: '', herrajeAcabado: 'INOX',
+  montaje: 'PISO_HEADRAIL', bisagra: '', herrajeAcabado: 'INOX',
   alturaCm: 200, profundidadCm: 150, anchoAccesibleCm: 150, anchoPilastraCm: 24,
   espesorMm: 12, terminacion: 'ZOCLO', kap: false, orinales: 0, mgAlturaCm: 120,
   claroPedidoCm: 370, cabinasPedidas: 3, tipologia: 'RECTA_MURO_IZQ', puertaCm: 60,

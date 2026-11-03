@@ -204,7 +204,6 @@ export interface Config {
   colorCodigo?: string
   montaje: Montaje
   bisagra: string
-  cerrojo: string
   /** acabado del juego completo de herrajes */
   herrajeAcabado: HerrajeAcabado
   alturaCm: number

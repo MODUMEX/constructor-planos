@@ -17,7 +17,6 @@ const cfg: Config = {
   color: 'BLANCO',
   montaje: 'PISO_HEADRAIL',
   bisagra: 'GRAV',
-  cerrojo: 'IND',
   herrajeAcabado: 'NEGRO',
   alturaCm: 150,
   profundidadCm: 150,

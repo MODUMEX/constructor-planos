@@ -6,7 +6,7 @@ import type { Config } from '../src/types'
 const cfg: Config = {
   linea: 'LEEDER', modelo: 'ESTANDAR', acabado: 'Laminado Compacto',
   color: 'Alumina', colorCodigo: '2103-12', montaje: 'PISO_HEADRAIL',
-  bisagra: 'GRAV', cerrojo: 'IND', herrajeAcabado: 'INOX',
+  bisagra: 'GRAV', herrajeAcabado: 'INOX',
   alturaCm: 150, profundidadCm: 150, anchoAccesibleCm: 150, anchoPilastraCm: 16,
   espesorMm: 12, terminacion: 'ZOCLO', kap: false, orinales: 0, mgAlturaCm: 120,
   tipologia: 'RECTA_MURO_IZQ',
