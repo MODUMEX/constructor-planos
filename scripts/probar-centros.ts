@@ -98,15 +98,20 @@ console.log('\n3 · el plano FEDEX: variación panel con la accesible plantada')
 {
   // claro 449, la accesible de 164 al arranque y tres cabinas; las descargas
   // del plano están a 213, 308 y 403 del muro
+  //
+  // El plano es de GUADALAJARA, así que se modula como México: ahí la puerta
+  // de salida es la de 60. Sin decirlo, el caso se armaba con las medidas de
+  // Costa Rica —la de 62— y los divisores caían 5 cm corridos de donde los
+  // dibujó planta.
   const c = cfg('MR_PANEL_U', { puertaAccesibleCm: 90, anchoAccesibleCm: 164 })
-  const t = crearTramos('MR_PANEL_U', 449, 4, c)[0]
+  const t = crearTramos('MR_PANEL_U', 449, 4, c, 'MX')[0]
   t.centrosCm = [null, 213, 308, 403]
 
-  const corrida = corridaDeCentros(t, c)
+  const corrida = corridaDeCentros(t, c, 'MX')
   revisar('la corrida deja afuera a la accesible', !('problema' in corrida) && corrida.banos?.desde === 1,
     'problema' in corrida ? corrida.problema : `${corrida.banos?.desde}..${corrida.banos?.hasta}`)
 
-  const r = tramoDesdeCentros(t, c)
+  const r = tramoDesdeCentros(t, c, 'MX')
   revisar('modula', r != null)
   if (r) {
     const armado: Tramo = { ...t, cabinas: r.cabinas, pilastras: r.pilastras }

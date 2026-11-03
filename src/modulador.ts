@@ -97,6 +97,16 @@ export const INTERNA_PREFERIDA_CM = PILASTRA_MINIMA_CM
 export const AJUSTE_INSTALACION_CM = 1
 
 /**
+ * Cuánto absorbe el herraje de CADA pilastra que se fija a un muro.
+ *
+ * El centímetro de arriba no es un número suelto: son los dos medios que dan
+ * las dos puntas cuando la tira va entre muros, y así los rotula planta en el
+ * plano —"Ajuste de 0,5 cm en obra" en cada extremo—. Con una sola pared el
+ * margen es la mitad, porque hay un solo herraje del que tirar.
+ */
+export const AJUSTE_POR_MURO_CM = 0.5
+
+/**
  * Las medidas que se pueden poner A MANO en esa frontera.
  *
  * Es la misma regla que ya respetaba el buscador automático: una pilastra
@@ -121,9 +131,22 @@ export function anchosPilastraEn(extremo: boolean, modelo?: string, actual?: num
   })
 }
 
-/** la puerta que se prefiere cuando varias combinaciones empatan */
+/**
+ * La puerta que se prefiere cuando varias combinaciones empatan. Es el valor
+ * de fuera de Costa Rica; quien llama manda la del país en el pedido.
+ */
 const PUERTA_PREFERIDA = 60
+const PUERTA_ACCESIBLE_PREFERIDA = 90
 const PENALIZA_PUERTA = 0.05
+/**
+ * Lo que pesa el ajuste de obra DENTRO del margen que lo permite.
+ *
+ * Tiene que ser chico. El ajuste de hasta 1 cm es legal —la regla lo da por
+ * bueno y el plano solo tiene que decirlo—, así que una tira que cierre con
+ * medio centímetro de obra y la puerta del país vale más que una exacta con
+ * la puerta angostada. Sirve nada más para desempatar entre dos que ya caben.
+ */
+const PENALIZA_AJUSTE_OBRA = 0.01
 /** pasarse del claro entre dos muros es mucho peor que quedarse corto */
 const PENALIZA_PASARSE = 100
 
@@ -143,8 +166,8 @@ export interface Modulacion {
   diferencia: number
   ajuste: TipoAjuste
   mensaje: string
-  /** pieza de relleno contra la pared, cuando el hueco es de 5 cm o menos */
-  canaleta: { anchoCm: number; codigo: string } | null
+  /** pieza de relleno contra la pared, cuando el hueco es de 4,5 cm o menos */
+  canaleta: { anchoCm: number } | null
   /** ancho de la puerta de la cabina accesible, si la hay */
   anchoPuertaAccesible: number | null
   /** ancho de cada orinal: 60 cm mas lo que le toque del sobrante */
@@ -175,6 +198,14 @@ export interface OpcionesModulacion {
   muroFin?: boolean
   /** L y E dejan el extremo abierto y toleran hasta 5 cm sin canaleta */
   extremoAbierto?: boolean
+  /**
+   * La medida de puerta que se prefiere al desempatar. Sale del país: Costa
+   * Rica fabrica la de 62 y la de 92 y son las que usa de salida. Sin esto
+   * manda la de 60, que es la del catálogo general.
+   */
+  puertaPreferida?: number
+  /** lo mismo para la puerta de la cabina de movilidad reducida */
+  puertaAccesiblePreferida?: number
   /** si el cliente pide una medida concreta de puerta */
   puertaFija?: number
   /** la medida que se pidió para la puerta de la cabina accesible */
@@ -257,8 +288,11 @@ export function medidaCercana(opciones: number[], cm: number): number {
  * pilastra contra muro se come medio centímetro, y un extremo abierto —el que
  * cierra con panel— tiene 5 cm de juego.
  */
-function holguraHueco(extremoAbierto: boolean | undefined, _murosPilastra: number): number {
-  return extremoAbierto ? 5 : AJUSTE_INSTALACION_CM
+function holguraHueco(extremoAbierto: boolean | undefined, murosPilastra: number): number {
+  if (extremoAbierto) return 5
+  // medio centímetro por cada punta que se atornilla a una pared, y nunca más
+  // del centímetro que da la regla
+  return Math.min(AJUSTE_INSTALACION_CM, murosPilastra * AJUSTE_POR_MURO_CM)
 }
 
 /**
@@ -343,6 +377,12 @@ function modularTiraCon(o: OpcionesModulacion, internasPosibles: number[]): Modu
     : o.sinPilastraInicio ? [0] : (clavada ?? puntas.inicio)
   const opExtremo2 = arranqueOrinal ? [cierreMG ? GRUESO_MG : 0] : (clavada ?? puntas.fin)
   const objetivoAcc = nAcc > 0 ? (o.anchoAccesibleCm ?? 0) : 0
+  const preferida = o.puertaPreferida ?? PUERTA_PREFERIDA
+  const preferidaAcc = o.puertaAccesiblePreferida ?? PUERTA_ACCESIBLE_PREFERIDA
+  // El margen de obra son los medios centímetros de los herrajes contra muro, y
+  // nada más: los 5 cm de juego de un extremo abierto los tapa el panel de
+  // cierre, no el instalador, así que ahí quedarse corto sí cuesta.
+  const margenObra = Math.min(AJUSTE_INSTALACION_CM, o.murosPilastra * AJUSTE_POR_MURO_CM)
 
   type Candidato =
     { ap: number; acc: number; api: number; ae1: number; ae2: number; total: number; score: number; anchoAcc: number }
@@ -359,9 +399,22 @@ function modularTiraCon(o: OpcionesModulacion, internasPosibles: number[]): Modu
             // la accesible va primera: se lleva su pilastra de extremo entera y
             // la mitad de la interna que la separa de la cabina siguiente
             const anchoAcc = nAcc > 0 ? ae1 + acc + (internas > 0 ? api / 2 : ae2) : 0
+            // LO QUE EL HERRAJE ABSORBE NO SE COBRA.
+            //
+            // Quedarse corto hasta el margen de obra es una salida LEGAL: la
+            // regla la da por buena y el plano solo tiene que rotularla. Cuando
+            // ese centímetro pesaba lo mismo que cualquier otro, el buscador
+            // angostaba la puerta cinco centímetros con tal de cerrar exacto y
+            // devolvía tiras con puerta de 55 y pilastras de 35 donde planta
+            // pone puerta de 60 y pilastras de 30. Así que dentro del margen
+            // casi no cuenta, y lo que manda es la puerta del país.
+            const falta = Math.max(0, dif)
+            const deObra = Math.min(falta, margenObra)
             const score =
-              Math.abs(dif) +
-              (nEst > 0 ? Math.abs(ap - PUERTA_PREFERIDA) * PENALIZA_PUERTA : 0) +
+              (falta - deObra) + deObra * PENALIZA_AJUSTE_OBRA +
+              Math.max(0, -dif) +
+              (nEst > 0 ? Math.abs(ap - preferida) * PENALIZA_PUERTA : 0) +
+              (nAcc > 0 ? Math.abs(acc - preferidaAcc) * PENALIZA_PUERTA : 0) +
               (dosMuros && total > objetivo ? (total - objetivo) * PENALIZA_PASARSE : 0) +
               (nAcc > 0 && objetivoAcc > 0 ? Math.max(0, objetivoAcc - anchoAcc) * PENALIZA_ACCESIBLE : 0)
             const cand = { ap, acc, api, ae1, ae2, total, score, anchoAcc }
@@ -381,10 +434,6 @@ function modularTiraCon(o: OpcionesModulacion, internasPosibles: number[]): Modu
   if (!mejor) return null
 
 
-  // Las pilastras no tienen que ser todas iguales. Si la tira ya cierra con
-  // internas parejas se deja así —es como sale el despiece de planta—, pero si
-  // no cierra se mezclan medidas del catálogo antes que dejar una canaleta.
-  const cuerpos = nEst * mejor.ap + nAcc * mejor.acc + fijoMG
   const clavadas: (number | null)[] = Array(internas + 2).fill(null)
   // lo que el cliente ya eligió se copia primero y no se discute
   const yaElegidas = o.pilastrasFijas ?? []
@@ -406,6 +455,33 @@ function modularTiraCon(o: OpcionesModulacion, internasPosibles: number[]): Modu
     clavadas[clavadas.length - 1] = cierreMG ? GRUESO_MG : 0
   }
   if (o.sinPilastraInicio) clavadas[0] = 0
+  // SEGUNDA VUELTA POR LA PUERTA DEL PAÍS.
+  //
+  // El puntaje de arriba compara tiras con todas las internas IGUALES, así que
+  // una puerta que solo cierra MEZCLANDO medidas de pilastra nunca llegaba a
+  // competir: con un claro de 450 y cinco puertas ganaba la de 55 con cuatro
+  // internas de 40 parejas, pudiendo salir la de 60 con 35·35·35·30. Acá se le
+  // da esa oportunidad a la preferida y se queda solo si también cabe.
+  let forzadas: number[] | null = null
+  if (!unaClavada && nEst > 0 && mejor.ap !== preferida && puertas.includes(preferida)) {
+    const cuerposPref = nEst * preferida + nAcc * mejor.acc + fijoMG
+    const mezcla = repartirPilastras(
+      objetivo - cuerposPref, internas, internasPosibles, puntas.inicio, clavadas, puntas.fin,
+    )
+    if (mezcla) {
+      const totalPref = cuerposPref + mezcla.reduce((x, y) => x + y, 0)
+      if (cabe(objetivo - totalPref, o.extremoAbierto, o.murosPilastra)) {
+        mejor = { ...mejor, ap: preferida, total: totalPref }
+        forzadas = mezcla
+      }
+    }
+  }
+
+  // Las pilastras no tienen que ser todas iguales. Si la tira ya cierra con
+  // internas parejas se deja así —es como sale el despiece de planta—, pero si
+  // no cierra se mezclan medidas del catálogo antes que dejar una canaleta.
+  const cuerpos = nEst * mejor.ap + nAcc * mejor.acc + fijoMG
+
   // Con una pilastra clavada a mano el reparto manda: es la única forma de que
   // las otras se acomoden en vez de copiarle la medida.
   //
@@ -414,10 +490,10 @@ function modularTiraCon(o: OpcionesModulacion, internasPosibles: number[]): Modu
   // despieces reales: el reparto lleva los extremos a la medida mínima (10) y
   // planta no hace eso (en CERVECERÍA Hombres usó 24 y 12). La tendencia existe
   // pero es más suave que "las mínimas afuera", así que no se codifica.
-  const uniformeCalza = !unaClavada && cabe(objetivo - mejor.total, o.extremoAbierto, o.murosPilastra)
-  const repartidas = uniformeCalza
+  const uniformeCalza = !forzadas && !unaClavada && cabe(objetivo - mejor.total, o.extremoAbierto, o.murosPilastra)
+  const repartidas = forzadas ?? (uniformeCalza
     ? null
-    : repartirPilastras(objetivo - cuerpos, internas, internasPosibles, puntas.inicio, clavadas, puntas.fin)
+    : repartirPilastras(objetivo - cuerpos, internas, internasPosibles, puntas.inicio, clavadas, puntas.fin))
   const pilastras = repartidas ?? (() => {
     // sin reparto posible al menos se respeta la que ella movió
     const base = [mejor.ae1, ...Array(internas).fill(mejor.api), mejor.ae2]
@@ -455,8 +531,10 @@ function modularTiraCon(o: OpcionesModulacion, internasPosibles: number[]): Modu
   const canaleta =
     ajuste === 'canaleta'
       ? (() => {
-          const ancho = Math.max(1, Math.min(CANALETA_MAX_CM, Math.ceil(abs)))
-          return { anchoCm: ancho, codigo: `CN0${ancho}` }
+          // se corta a la medida del hueco, redondeada al milímetro; el tope es el
+          // que cubre el perfil
+          const ancho = Math.min(CANALETA_MAX_CM, Math.round(abs * 10) / 10)
+          return { anchoCm: ancho }
         })()
       : null
 
@@ -536,7 +614,7 @@ export interface Pilastreo {
   diferencia: number
   ajuste: TipoAjuste
   mensaje: string
-  canaleta: { anchoCm: number; codigo: string } | null
+  canaleta: { anchoCm: number } | null
 }
 
 /**
@@ -637,8 +715,10 @@ function ajustarPilastrasCon(o: OpcionesPilastras, internasPosibles: number[]): 
   const canaleta =
     ajuste === 'canaleta'
       ? (() => {
-          const ancho = Math.max(1, Math.min(CANALETA_MAX_CM, Math.ceil(abs)))
-          return { anchoCm: ancho, codigo: `CN0${ancho}` }
+          // se corta a la medida del hueco, redondeada al milímetro; el tope es el
+          // que cubre el perfil
+          const ancho = Math.min(CANALETA_MAX_CM, Math.round(abs * 10) / 10)
+          return { anchoCm: ancho }
         })()
       : null
 
@@ -703,7 +783,7 @@ export function repartirPilastras(
   // Primero la suma exacta. Si el catálogo no da para clavarla —pasa cuando el
   // vendedor fija una pilastra chica en el medio— se admite quedarse corto lo
   // que rellena una canaleta, antes que devolver nada y dejar un hueco enorme.
-  for (let falta = 0; falta <= CANALETA_MAX_CM; falta++) {
+  for (let falta = 0; falta <= Math.floor(CANALETA_MAX_CM); falta++) {
     const meta = objetivo - falta
     if (meta <= 0) break
     for (let apertura = 1; apertura <= internasOrden.length; apertura++) {

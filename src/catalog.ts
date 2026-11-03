@@ -519,6 +519,25 @@ export function anchosPuerta(pais: Pais = 'CR', modelo?: string): number[] {
   return unirAnchos(todas, especialesDe('PT', modelo))
 }
 
+/**
+ * La puerta que se prefiere cuando varias combinaciones de la tira empatan.
+ *
+ * Costa Rica fabrica sus propias medidas y ahí la cabina normal arranca en 62
+ * y la de movilidad reducida en 92 (Dayanna, 3-nov-2026). Fuera de Costa Rica
+ * esas dos no existen y la preferencia vuelve a las de catálogo general.
+ *
+ * Es una PREFERENCIA, no una regla: si el vendedor pide una medida concreta
+ * manda la suya, y si el claro no cierra con la preferida el buscador usa otra.
+ */
+export function puertaPreferida(pais: Pais = 'CR'): number {
+  return pais === 'CR' ? 62 : 60
+}
+
+/** lo mismo para la puerta de la cabina de movilidad reducida */
+export function puertaAccesiblePreferida(pais: Pais = 'CR'): number {
+  return pais === 'CR' ? 92 : 90
+}
+
 /** anchos de pilastra (familia PI) */
 export const ANCHOS_PILASTRA = [10, 12, 15, 17, 19, 24, 30, 35, 40, 45, 50, 55, 60, 70, 85, 90, 100, 120]
 
@@ -593,11 +612,6 @@ export function anchosPanel(modelo: string, altoPanelCm?: number, pais: Pais = '
 }
 
 /**
- * Canaleta (familia CN): la pieza de relleno contra la pared. Solo entra cuando
- * la suma de las piezas queda CORTA, y como máximo 5 cm. Si el hueco es mayor
- * falta material; si las piezas se pasan, no cabe (la canaleta no recorta).
- */
-/**
  * Mamparas de mingitorio (familia MG). No todas las combinaciones existen —la
  * de 45 solo viene en 120 de alto— y además cambian por línea: la ficha de
  * Superior 2.0 solo trae 45×120 y 60×150, sin la de 60×120.
@@ -659,8 +673,16 @@ export function mamparaDe(
   )
 }
 
-export const ANCHOS_CANALETA = [1, 2, 3, 4, 5]
-export const CANALETA_MAX_CM = 5
+/**
+ * Canaleta (familia CN): la pieza de relleno contra la pared. Solo entra
+ * cuando la suma de las piezas queda CORTA, y cubre hasta 4,5 cm, que es lo
+ * que da el perfil (Módulo 6 de la capacitación). Si el hueco es mayor falta
+ * material; si las piezas se pasan, no cabe: la canaleta rellena, no recorta.
+ *
+ * Antes el tope estaba en 5 y había una lista `ANCHOS_CANALETA` de medidas
+ * enteras que no usaba nadie: la canaleta se corta a la medida del hueco.
+ */
+export const CANALETA_MAX_CM = 4.5
 
 /**
  * Ecuación de la modulación, tal como la usa el Constructor actual: cada muro

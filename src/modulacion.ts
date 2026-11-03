@@ -1,6 +1,7 @@
 import { alturasDeConfig,
   GRUESO_PILASTRA, MIN_ACCESIBLE_CM, MIN_CABINA_CM, SNAP_CM, anchosPuerta, MARGEN_PUERTA_CM,
   COSTILLA_MINIMA_CM, LARGO_SECUNDARIO_CM, PIEZA_PIDE_COSTILLA_CM,
+  puertaPreferida, puertaAccesiblePreferida,
 } from './catalog'
 import type { Cabina, Config, Moneda, Pais, Soporte, Tramo, TipologiaId, RenglonBOM } from './types'
 import {
@@ -257,6 +258,8 @@ export function modularConCatalogo(
     cierreMingitorioInicio: extra?.cierreMingitorioInicio,
     sinPilastraInicio: extra?.sinPilastraInicio,
     catalogoPuertas: anchosPuerta(extra?.pais ?? 'CR', extra?.modelo),
+    puertaPreferida: puertaPreferida(extra?.pais ?? 'CR'),
+    puertaAccesiblePreferida: puertaAccesiblePreferida(extra?.pais ?? 'CR'),
     muroInicio: extra?.muroInicio,
     muroFin: extra?.muroFin,
     anchoAccesibleCm: extra?.anchoAccesibleMinCm,

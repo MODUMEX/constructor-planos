@@ -10,6 +10,7 @@ import {
 } from '../geometria'
 import { alturasDeConfig, MODELO_REGADERA, alturasDe, alzadoDe, mamparaDe, nombreHerraje, tipologia } from '../catalog'
 import { altoPilEntre, anchoDeSoporte, anchoTotal, arrancaElCuartoPmr, esEspacioLibre, ladosDeCabina, lugaresDe, mamparaEn, soportesDe } from '../modulacion'
+import { AJUSTE_POR_MURO_CM } from '../modulador'
 import { COSTILLA_TOLERANCIA_CM } from '../catalog'
 import type { CuartoPmr } from '../geometria'
 import { agrupar, modeloParaCsv, nombreLinea, nombreSistema, piezasDeArea } from './piezas'
@@ -1218,23 +1219,64 @@ function cuadroDePiezas(doc: jsPDF, area: Area, x: number, y: number, w: number)
 }
 
 /**
+ * Cómo se reparte el ajuste de obra entre las puntas que se atornillan a una
+ * pared.
+ *
+ * La regla lo rotula media por media: el herraje de cada pilastra contra muro
+ * se come 0,5 cm y el instalador los toma de a uno, no partidos. Con el
+ * centímetro entero salen los dos extremos a 0,5 —como el plano de la
+ * capacitación—; con medio, uno solo.
+ */
+function ajustePorLado(tramo: Tramo, ajusteCm: number): { donde: string; cm: number }[] {
+  const puntas: { donde: string; cm: number }[] = []
+  if (tramo.muroFin) puntas.push({ donde: 'el muro del final', cm: 0 })
+  if (tramo.muroInicio) puntas.push({ donde: 'el muro de inicio', cm: 0 })
+  let queda = ajusteCm
+  for (const p of puntas) {
+    p.cm = Math.round(Math.min(AJUSTE_POR_MURO_CM, queda) * 10) / 10
+    queda = Math.round((queda - p.cm) * 10) / 10
+  }
+  return puntas.filter((p) => p.cm > 0)
+}
+
+/** la nota del ajuste de ese tramo, ya repartida por lado */
+function notaDeAjuste(tramo: Tramo, ajusteCm: number): string {
+  const lados = ajustePorLado(tramo, ajusteCm)
+  // sin pared de la que tirar, el juego lo absorbe el panel que cierra la tira
+  if (!lados.length) return `Ajuste de ${ajusteCm.toFixed(1)} cm, que absorbe el panel de cierre`
+  if (lados.length === 2 && lados[0].cm === lados[1].cm) {
+    return `Ajuste de ${lados[0].cm.toFixed(1)} cm en obra contra cada muro`
+  }
+  if (lados.length === 1) return `Ajuste de ${lados[0].cm.toFixed(1)} cm en obra contra ${lados[0].donde}`
+  return `Ajuste en obra: ${lados.map((l) => `${l.cm.toFixed(1)} cm contra ${l.donde}`).join(' y ')}`
+}
+
+/**
  * Las NOTAS del plano: lo que el instalador tiene que saber y no se ve en el
  * dibujo.
  *
  * La del ajuste es la que pide la regla de modulación: cuando las piezas
- * quedan hasta 1 cm cortas lo absorbe el herraje, pero el plano tiene que
- * decir CUÁNTO. El Constructor viejo la ponía con otra regla y por eso salía
- * mal.
+ * quedan hasta 1 cm cortas lo absorbe el herraje, y el plano tiene que decir
+ * CUÁNTO y DE QUÉ LADO. El Constructor viejo la ponía con otra regla y por eso
+ * salía mal.
+ *
+ * La de la canaleta antes no existía: cuando la tira cerraba con canaleta el
+ * plano se quedaba callado —ni la nombraba ni la dibujaba— y el hueco aparecía
+ * en obra.
  */
 function notasDeObra(doc: jsPDF, area: Area, x: number, y: number, w: number) {
   const notas: string[] = []
+  const deQuien = (t: Tramo) => (area.tramos.length > 1 ? ` (${t.nombre})` : '')
   for (const t of area.tramos) {
-    const ajuste = (t.canaletaCm ?? 0) > 0 ? 0 : (t.ajusteCm ?? 0)
-    if (ajuste > 0) {
-      notas.push(`Ajuste de ${ajuste.toFixed(1)} cm en la instalación${area.tramos.length > 1 ? ` (${t.nombre})` : ''}.`)
+    const canaleta = t.canaletaCm ?? 0
+    if (canaleta > 0) {
+      notas.push(`Cierra con canaleta de ${canaleta.toFixed(1)} cm contra la pared${deQuien(t)}.`)
+      continue
     }
+    const ajuste = t.ajusteCm ?? 0
+    if (ajuste > 0) notas.push(`${notaDeAjuste(t, ajuste)}${deQuien(t)}.`)
   }
-  notas.push('Dejar 8 cm como mínimo entre la fijación de la pilastra y el final del muro.')
+  notas.push('Dejar 10 cm como mínimo entre la fijación de la pilastra y el final del muro.')
 
   texto(doc, 'NOTAS', x, y, { size: 5.5, bold: true, color: GRIS })
   let fila = y + 4
