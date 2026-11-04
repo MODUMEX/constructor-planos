@@ -10,8 +10,19 @@ export interface Usuario {
   /** IVA del distribuidor; si no trae, se usa el 13 % de Costa Rica */
   ivaPorcentaje: number
   distribuidorId: string | null
-  /** el nombre de su distribuidor: es el que va al cajetín, sin poder elegir otro */
+  /** el nombre de su distribuidor: es el que va al cajetín */
   distribuidorNombre?: string
+  /**
+   * Las empresas que este correo puede usar, en orden.
+   *
+   * Un distribuidor con DOS empresas entra una sola vez y elige con cuál
+   * cotiza cada plano. La primera es la de `distribuidorId` y es la que manda
+   * mientras no elija la otra: de ella salen el descuento y el IVA de arriba.
+   *
+   * Con una sola empresa la lista trae un elemento, y el nombre sigue saliendo
+   * fijo en el cajetín como siempre.
+   */
+  distribuidores?: { id: string; nombre: string; descuento: number; iva: number }[]
   /** true cuando la sesión vino de Supabase y no de una cuenta local */
   deLaNube: boolean
   /** token de la sesión, para leer tarifas y demás tablas */
@@ -114,11 +125,14 @@ interface Perfil {
   nombre: string | null
   rol: string | null
   distribuidor_id: string | null
+  /** la SEGUNDA empresa del mismo correo, si la tiene */
+  distribuidor_id_2?: string | null
   solicitud?: boolean | null
   activo: boolean | null
 }
 
 interface Distribuidor {
+  distribuidor_id?: string | number | null
   nombre: string | null
   descuento: number | null
   iva: number | null
@@ -135,6 +149,47 @@ async function pedir<T>(ruta: string, token: string): Promise<T[]> {
   })
   if (!r.ok) throw new Error(`La consulta a ${ruta.split('?')[0]} falló (${r.status}).`)
   return (await r.json()) as T[]
+}
+
+/**
+ * El perfil, pidiendo también la segunda empresa.
+ *
+ * Si la columna `distribuidor_id_2` todavía no está en la base, PostgREST
+ * rechaza el select entero y nadie podría entrar. Por eso se reintenta sin
+ * ella: así la aplicación se puede publicar antes o después de la migración,
+ * en el orden que sea, y mientras tanto funciona como siempre.
+ */
+async function leerPerfil(id: string, token: string): Promise<Perfil[]> {
+  const campos = 'nombre,rol,distribuidor_id,activo,solicitud'
+  try {
+    return await pedir<Perfil>(`profiles?id=eq.${id}&select=${campos},distribuidor_id_2`, token)
+  } catch {
+    return await pedir<Perfil>(`profiles?id=eq.${id}&select=${campos}`, token)
+  }
+}
+
+/**
+ * Las empresas del correo, en el orden del perfil y con lo suyo de cada una.
+ *
+ * El orden lo da el PERFIL y no la base: la primera es la que manda mientras
+ * el vendedor no elija la otra, y una consulta con `in.()` devuelve las filas
+ * en el orden que le da la gana. Una ficha que no aparezca —borrada, o que la
+ * RLS no deje ver— se salta en vez de dejar un hueco en la lista.
+ */
+export function empresasDeFichas(
+  ids: (string | null | undefined)[],
+  fichas: { distribuidor_id?: string | number | null; nombre: string | null; descuento: number | null; iva: number | null; region: string | null }[],
+): NonNullable<Usuario['distribuidores']> {
+  return ids
+    .filter((x): x is string => Boolean(x))
+    .map((x) => fichas.find((f) => String(f.distribuidor_id) === String(x)))
+    .filter((f): f is (typeof fichas)[number] => Boolean(f))
+    .map((f) => ({
+      id: String(f.distribuidor_id),
+      nombre: f.nombre ?? '',
+      descuento: Number(f.descuento ?? 0),
+      iva: f.iva != null ? Number(f.iva) : ivaDeRegion(f.region),
+    }))
 }
 
 async function entrarPorSupabase(email: string, clave: string): Promise<Usuario> {
@@ -161,10 +216,7 @@ async function entrarPorSupabase(email: string, clave: string): Promise<Usuario>
   const id: string = sesion.user?.id
 
   // el perfil vive en la tabla profiles, igual que en el Constructor actual
-  const perfiles = await pedir<Perfil>(
-    `profiles?id=eq.${id}&select=nombre,rol,distribuidor_id,activo,solicitud`,
-    token,
-  )
+  const perfiles = await leerPerfil(id, token)
   const perfil = perfiles[0]
   if (!perfil) throw new Error('La cuenta existe pero no tiene perfil asignado. Avisale a un administrador.')
   // Quien pidió la cuenta desde la pantalla de entrada no entra hasta que un
@@ -178,22 +230,35 @@ async function entrarPorSupabase(email: string, clave: string): Promise<Usuario>
   let descuento = 0
   let ivaPorcentaje = IVA_CR
   let distribuidorNombre: string | undefined
+  let distribuidores: Usuario['distribuidores']
 
-  // el descuento y el IVA son del distribuidor, no del usuario
-  if (perfil.distribuidor_id) {
+  // Las empresas del correo, en orden: la de siempre y la segunda si la tiene.
+  // Un mismo correo puede llevar dos, y entonces elige con cuál cotiza cada
+  // plano; el descuento y el IVA de acá son los de la PRIMERA, que es la que
+  // manda mientras no cambie.
+  const suyos = [perfil.distribuidor_id, perfil.distribuidor_id_2].filter(
+    (x): x is string => Boolean(x),
+  )
+  if (suyos.length) {
     try {
-      const dist = await pedir<Distribuidor>(
-        `distribuidor?distribuidor_id=eq.${perfil.distribuidor_id}&select=nombre,descuento,iva,region`,
+      const fichas = await pedir<Distribuidor>(
+        `distribuidor?distribuidor_id=in.(${suyos.join(',')})&select=distribuidor_id,nombre,descuento,iva,region`,
         token,
       )
-      if (dist[0]) {
-        distribuidorNombre = dist[0].nombre ?? undefined
-        descuento = Number(dist[0].descuento ?? 0)
-        // El IVA escrito a mano manda, incluso si es 0. En blanco va el de su
-        // región: LATAM factura sin IVA y México con 16, no con el 13 de
-        // Costa Rica que caía por omisión.
-        ivaPorcentaje =
-          dist[0].iva != null ? Number(dist[0].iva) : ivaDeRegion(dist[0].region)
+      // Cada empresa con SU descuento y SU IVA. Van en la sesión porque la
+      // cotización los busca en la lista de distribuidores, y esa lista la
+      // filtra la RLS: si de la segunda empresa no viera la ficha, cotizaría
+      // con el descuento de la primera.
+      //
+      // El IVA escrito a mano manda, incluso si es 0. En blanco va el de su
+      // región: LATAM factura sin IVA y México con 16, no con el 13 de Costa
+      // Rica que caía por omisión.
+      const enOrden = empresasDeFichas(suyos, fichas)
+      if (enOrden.length) {
+        distribuidorNombre = enOrden[0].nombre || undefined
+        descuento = enOrden[0].descuento
+        ivaPorcentaje = enOrden[0].iva
+        distribuidores = enOrden
       }
     } catch {
       /* si la tabla no responde, se cotiza sin descuento y con el IVA de Costa Rica */
@@ -206,6 +271,7 @@ async function entrarPorSupabase(email: string, clave: string): Promise<Usuario>
     nombre: perfil.nombre || sesion.user?.email || email,
     rol,
     distribuidorNombre,
+    distribuidores,
     descuento,
     ivaPorcentaje,
     distribuidorId: perfil.distribuidor_id,

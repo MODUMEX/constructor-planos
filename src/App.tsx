@@ -369,11 +369,40 @@ export default function App() {
     }
   }, [usuario])
 
-  // Un distribuidor no elige: sus planos salen a su nombre, así que se pone solo
+  /**
+   * Los planos de un distribuidor salen a nombre de SU empresa, así que el
+   * cajetín se llena solo.
+   *
+   * Con DOS empresas en el mismo correo sigue llenándose solo —con la primera,
+   * para que el campo no arranque en blanco— pero deja cambiarlo: solo se
+   * pisa lo que haya si no es ninguna de las suyas, que es lo que pasa al
+   * abrir un plano de otro o al empezar uno nuevo.
+   */
+  const misDistribuidores = useMemo(
+    () =>
+      usuario?.distribuidores?.length
+        ? usuario.distribuidores
+        : usuario?.distribuidorNombre
+          ? [{
+              id: usuario.distribuidorId ?? '',
+              nombre: usuario.distribuidorNombre,
+              descuento: usuario.descuento,
+              iva: usuario.ivaPorcentaje,
+            }]
+          : [],
+    [
+      usuario?.distribuidores, usuario?.distribuidorNombre, usuario?.distribuidorId,
+      usuario?.descuento, usuario?.ivaPorcentaje,
+    ],
+  )
   useEffect(() => {
-    if (usuario?.rol !== 'Distribuidor' || !usuario.distribuidorNombre) return
-    setProyecto((p) => (p.distribuidor === usuario.distribuidorNombre ? p : { ...p, distribuidor: usuario.distribuidorNombre! }))
-  }, [usuario?.rol, usuario?.distribuidorNombre])
+    if (usuario?.rol !== 'Distribuidor' || !misDistribuidores.length) return
+    setProyecto((p) =>
+      misDistribuidores.some((d) => d.nombre === p.distribuidor)
+        ? p
+        : { ...p, distribuidor: misDistribuidores[0].nombre },
+    )
+  }, [usuario?.rol, misDistribuidores])
 
   /**
    * Trae la lista de distribuidores de la nube. Se llama al entrar y cada vez
@@ -724,10 +753,15 @@ export default function App() {
     const elegida = revisionAGuardar(revisionGuardada?.revision ?? null, ocupadas, hayCambiosSinGuardar)
     // El proyecto queda a nombre del distribuidor de la cotización, no del
     // usuario que guarda: es el mismo criterio del IVA y del descuento.
-    const dueno = distribuidores.find(
-      (d) => d.nombre.trim().toLowerCase() === proyecto.distribuidor.trim().toLowerCase(),
-    )
-    const g = await guardarProyecto(usuario, proyecto, elegida.revision, dueno?.distribuidorId ?? null)
+    const igual = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
+    const dueno = distribuidores.find((d) => igual(d.nombre, proyecto.distribuidor))
+    // Un distribuidor con dos empresas puede no tener la segunda en esa lista:
+    // la trae la RLS, y si su política todavía deja ver una sola, el dueño
+    // saldría nulo y el plano se guardaría bajo la empresa equivocada. El
+    // correo sí sabe cuáles son suyas, así que de ahí se saca el número.
+    const mio = misDistribuidores.find((d) => igual(d.nombre, proyecto.distribuidor))
+    const duenoId = dueno?.distribuidorId ?? (mio?.id ? Number(mio.id) || null : null)
+    const g = await guardarProyecto(usuario, proyecto, elegida.revision, duenoId)
     if (!g.ok) return fallar(g.mensaje)
     setGuardandoProyecto(false)
     setRevisionGuardada({ revision: elegida.revision, huella, numero })
@@ -1641,10 +1675,21 @@ export default function App() {
    * En blanco manda el de su region (LATAM factura sin IVA). Si el proyecto
    * todavia no tiene distribuidor elegido, va el de la cuenta.
    */
+  // De la lista de fichas si está, y si no de la sesión: un distribuidor con
+  // dos empresas puede no ver la ficha de la segunda, y entonces el respaldo
+  // no puede ser el descuento de la primera.
+  const mioPorNombre = (nombre?: string | null) =>
+    misDistribuidores.find((d) => d.nombre === nombre)
   const descuentoDelDistribuidor = (nombre?: string | null) =>
-    descuentoDeDistribuidor(distribuidores.find((x) => x.nombre === nombre), usuario?.descuento ?? 0)
+    descuentoDeDistribuidor(
+      distribuidores.find((x) => x.nombre === nombre),
+      mioPorNombre(nombre)?.descuento ?? usuario?.descuento ?? 0,
+    )
   const ivaDelDistribuidor = (nombre?: string | null) =>
-    ivaDeDistribuidor(distribuidores.find((x) => x.nombre === nombre), usuario?.ivaPorcentaje ?? IVA_CR)
+    ivaDeDistribuidor(
+      distribuidores.find((x) => x.nombre === nombre),
+      mioPorNombre(nombre)?.iva ?? usuario?.ivaPorcentaje ?? IVA_CR,
+    )
   const ivaPorcentaje = ivaDelDistribuidor(proyecto.distribuidor)
 
   /**
@@ -2472,9 +2517,20 @@ export default function App() {
                     </div>
                     <div className={`campo${avisoDatos && !(proyecto.distribuidor || usuario.distribuidorNombre || '').trim() ? ' falta' : ''}`}>
                       <label>Distribuidor</label>
-                      {usuario.rol === 'Distribuidor' ? (
-                        // un distribuidor no elige: sus planos salen a su nombre
+                      {usuario.rol === 'Distribuidor' && misDistribuidores.length < 2 ? (
+                        // con una sola empresa no hay nada que elegir: sale a su nombre
                         <div className="fijo">{proyecto.distribuidor || usuario.distribuidorNombre || '—'}</div>
+                      ) : usuario.rol === 'Distribuidor' ? (
+                        // con dos, elige con cuál de las suyas cotiza este plano; el
+                        // descuento y el IVA ya salen de la que quede elegida
+                        <select
+                          value={proyecto.distribuidor}
+                          onChange={(e) => setProyecto({ ...proyecto, distribuidor: e.target.value })}
+                        >
+                          {misDistribuidores.map((d) => (
+                            <option key={d.id} value={d.nombre}>{d.nombre}</option>
+                          ))}
+                        </select>
                       ) : (
                       <select value={proyecto.distribuidor} onChange={(e) => setProyecto({ ...proyecto, distribuidor: e.target.value })}>
                         <option value="">—</option>
