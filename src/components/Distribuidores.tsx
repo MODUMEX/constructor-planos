@@ -3,7 +3,7 @@ import {
   crearDistribuidor, guardarDistribuidor, listarDistribuidores, PAISES_DISTRIBUIDOR, REGIONES,
   type DatosDistribuidor, type Distribuidor, type Region,
 } from '../distribuidores'
-import { listarCuentasDistribuidor, type UsuarioInterno } from '../usuarios'
+import { ligarSegundaEmpresa, listarCuentasDistribuidor, type UsuarioInterno } from '../usuarios'
 import { esAdmin, type Usuario } from '../auth'
 import Ojo from './Ojo'
 import CampoNumero from './CampoNumero'
@@ -83,6 +83,26 @@ export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Pr
       a[0] === 'sin asignar' ? 1 : b[0] === 'sin asignar' ? -1 : a[0].localeCompare(b[0], 'es'),
     )
   }, [cuentas, lista, buscaCuenta])
+
+  /** qué cuenta está cambiando de segunda empresa, para no tocarla dos veces */
+  const [ligando, setLigando] = useState<string | null>(null)
+
+  /**
+   * Le liga o le quita la segunda empresa a una cuenta.
+   *
+   * La lista se corrige en el acto y solo si la nube dijo que sí, para que no
+   * quede mostrando una empresa que no se guardó.
+   */
+  async function ligarSegunda(c: UsuarioInterno, valor: string) {
+    const id2 = valor ? Number(valor) : null
+    setLigando(c.id)
+    const r = await ligarSegundaEmpresa(usuario, c.id, id2)
+    setLigando(null)
+    setAviso({ ok: r.ok, mensaje: r.ok ? `${c.nombre || c.email}: ${r.mensaje}` : r.mensaje })
+    if (r.ok) {
+      setCuentas((cs) => cs.map((x) => (x.id === c.id ? { ...x, distribuidorId2: id2 } : x)))
+    }
+  }
 
   const [edita, setEdita] = useState<DatosDistribuidor | null>(null)
   const [guardando, setGuardando] = useState(false)
@@ -393,13 +413,31 @@ export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Pr
                     </h4>
                     <table>
                       <thead>
-                        <tr><th>Nombre</th><th>Correo</th><th>Estado</th></tr>
+                        <tr><th>Nombre</th><th>Correo</th><th>Segunda empresa</th><th>Estado</th></tr>
                       </thead>
                       <tbody>
                         {gente.map((c) => (
                           <tr key={c.id}>
                             <td style={{ fontWeight: 600 }}>{c.nombre || '—'}</td>
                             <td>{c.email || '—'}</td>
+                            {/* un mismo correo puede trabajar con dos empresas: acá se le
+                                liga la segunda, y en el paso 1 elige con cuál cotiza */}
+                            <td>
+                              <select
+                                value={c.distribuidorId2 == null ? '' : String(c.distribuidorId2)}
+                                disabled={ligando === c.id}
+                                onChange={(e) => void ligarSegunda(c, e.target.value)}
+                              >
+                                <option value="">Ninguna</option>
+                                {lista
+                                  .filter((d) => d.activo && d.distribuidorId !== c.distribuidorId)
+                                  .map((d) => (
+                                    <option key={d.distribuidorId} value={String(d.distribuidorId)}>
+                                      {d.nombre}
+                                    </option>
+                                  ))}
+                              </select>
+                            </td>
                             <td>{c.activo ? 'Activo' : 'Inactivo'}</td>
                           </tr>
                         ))}

@@ -121,16 +121,27 @@ export interface FichaNueva {
  */
 export async function aprobarSolicitud(
   usuario: Usuario | null,
-  d: { id: string; rol: Rol; distribuidorId: number | null; ficha?: FichaNueva },
+  d: {
+    id: string
+    rol: Rol
+    distribuidorId: number | null
+    /** la SEGUNDA empresa del mismo correo; casi siempre va en null */
+    distribuidorId2?: number | null
+    ficha?: FichaNueva
+  },
 ): Promise<Resultado<null>> {
   if (d.rol === 'Distribuidor' && !d.distribuidorId && !d.ficha?.nombre.trim()) {
     return { ok: false, mensaje: 'Poné el nombre de la empresa o elegí una ficha que ya exista.' }
+  }
+  if (d.distribuidorId2 && d.distribuidorId2 === d.distribuidorId) {
+    return { ok: false, mensaje: 'Las dos empresas no pueden ser la misma.' }
   }
   const r = await llamar(usuario, {
     accion: 'aprobar_solicitud',
     id: d.id,
     rol: d.rol,
     distribuidor_id: d.distribuidorId,
+    distribuidor_id_2: d.distribuidorId2 ?? null,
     ficha: d.ficha,
   })
   return { ok: r.ok, mensaje: r.mensaje }

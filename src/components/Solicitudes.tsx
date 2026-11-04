@@ -30,6 +30,14 @@ interface Eleccion {
   rol: Rol
   /** ficha existente a la que se lo liga; vacío = crearle una nueva */
   distribuidorId: string
+  /**
+   * Una SEGUNDA empresa para el mismo correo, si trabaja con dos.
+   *
+   * Es opcional y casi siempre va en blanco. La primera es la que manda: es la
+   * que sale por omisión en el cajetín y de la que salen su descuento y su
+   * IVA mientras no elija la otra en el paso 1.
+   */
+  distribuidorId2: string
   ficha: FichaNueva
 }
 
@@ -56,6 +64,7 @@ export default function Solicitudes({ usuario, distribuidores, onCerrar, onResue
       elige[s.id] ?? {
         rol: 'Distribuidor',
         distribuidorId: '',
+        distribuidorId2: '',
         // la empresa la escribió él al registrarse; el contacto es su nombre
         ficha: { nombre: s.nota || s.nombre, region: 'Costa Rica', pais: 'Costa Rica', descuento: 0, iva: null },
       }
@@ -81,6 +90,7 @@ export default function Solicitudes({ usuario, distribuidores, onCerrar, onResue
       id: s.id,
       rol: o.rol,
       distribuidorId: esDistrib && o.distribuidorId ? Number(o.distribuidorId) : null,
+      distribuidorId2: esDistrib && o.distribuidorId2 ? Number(o.distribuidorId2) : null,
       ficha: esDistrib && !o.distribuidorId ? o.ficha : undefined,
     })
     setTrabajando(null)
@@ -161,6 +171,29 @@ export default function Solicitudes({ usuario, distribuidores, onCerrar, onResue
                         ))}
                       </select>
                       <span className="ayuda">Si ya trabajás con esa empresa, ligalo a la ficha que existe</span>
+                    </div>
+                  )}
+
+                  {esDistrib && activos.length > 0 && (
+                    <div className="campo">
+                      <label>Segunda empresa</label>
+                      <select
+                        value={o.distribuidorId2}
+                        onChange={(e) => cambiar(s, { distribuidorId2: e.target.value })}
+                      >
+                        <option value="">Ninguna</option>
+                        {/* la que ya quedó de primera no se ofrece de nuevo */}
+                        {activos
+                          .filter((d) => String(d.distribuidorId) !== o.distribuidorId)
+                          .map((d) => (
+                            <option key={d.distribuidorId} value={String(d.distribuidorId)}>
+                              {d.nombre}
+                            </option>
+                          ))}
+                      </select>
+                      <span className="ayuda">
+                        Solo si el mismo correo trabaja con dos. Elige con cuál cotiza cada plano
+                      </span>
                     </div>
                   )}
 

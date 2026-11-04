@@ -24,6 +24,11 @@ export interface UsuarioInterno {
   activo: boolean
   /** de qué empresa es la cuenta; solo lo llevan las de rol Distribuidor */
   distribuidorId: number | null
+  /**
+   * La SEGUNDA empresa del mismo correo, si trabaja con dos. La primera es la
+   * que manda: es la que sale por omisión en el cajetín del plano.
+   */
+  distribuidorId2: number | null
 }
 
 /** lo que se manda al dar de alta o editar */
@@ -47,6 +52,7 @@ interface Fila {
   rol: string | null
   activo: boolean | null
   distribuidor_id: number | null
+  distribuidor_id_2?: number | null
 }
 
 const COLUMNAS = 'id,nombre,email,rol,activo,distribuidor_id'
@@ -59,6 +65,7 @@ function deFila(f: Fila): UsuarioInterno {
     rol: (f.rol ?? 'Distribuidor') as Rol,
     activo: f.activo !== false,
     distribuidorId: f.distribuidor_id ?? null,
+    distribuidorId2: f.distribuidor_id_2 ?? null,
   }
 }
 
@@ -99,6 +106,33 @@ export async function listarCuentasDistribuidor(
   if (!r.ok) return { ok: false, mensaje: r.mensaje }
   const filas = ((r.dato as unknown as { cuentas?: Fila[] })?.cuentas ?? [])
   return { ok: true, dato: filas.map(deFila), mensaje: `${filas.length} cuenta(s)` }
+}
+
+/**
+ * Le liga —o le quita— la SEGUNDA empresa a una cuenta de distribuidor.
+ *
+ * Al admitir la solicitud se eligen las dos de una, pero las cuentas que ya
+ * existían se arreglan desde acá. En `null` se la quita.
+ *
+ * Va por la Edge Function, como todo lo que escribe `profiles`, y con el mismo
+ * permiso que admitir una solicitud: quien decide con qué empresa entra
+ * alguien es el mismo que decide si entra.
+ */
+export async function ligarSegundaEmpresa(
+  usuario: Usuario | null,
+  id: string,
+  distribuidorId2: number | null,
+): Promise<Resultado<null>> {
+  const r = await llamarGestion(usuario, {
+    accion: 'ligar_segunda_empresa',
+    id,
+    distribuidor_id_2: distribuidorId2,
+  })
+  if (!r.ok) return { ok: false, mensaje: r.mensaje }
+  return {
+    ok: true,
+    mensaje: distribuidorId2 ? 'Le quedaron las dos empresas.' : 'Le quedó una sola empresa.',
+  }
 }
 
 /** los internos: el equipo de Modumex. Los distribuidores van en su propia lista. */
@@ -177,6 +211,7 @@ export async function crearUsuario(usuario: Usuario | null, d: DatosUsuario): Pr
     rol: d.rol ?? 'Vendedor',
     password: d.password,
     distribuidor_id: null,
+    distribuidor_id_2: null,
   })
   if (!r.ok) return { ok: false, mensaje: r.mensaje }
   return {
@@ -189,6 +224,7 @@ export async function crearUsuario(usuario: Usuario | null, d: DatosUsuario): Pr
       activo: d.activo !== false,
       // los que se dan de alta acá son internos: no cuelgan de ninguna empresa
       distribuidorId: null,
+      distribuidorId2: null,
     },
     mensaje: 'Usuario dado de alta con su cuenta de acceso.',
   }
@@ -218,6 +254,7 @@ export async function guardarUsuario(
     dato: {
       id: d.id,
       distribuidorId: d.distribuidorId ?? null,
+      distribuidorId2: d.distribuidorId2 ?? null,
       nombre: (d.nombre ?? '').trim(),
       email: d.email ?? '',
       rol: (d.rol ?? 'Vendedor') as Rol,
