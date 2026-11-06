@@ -1,7 +1,7 @@
 {
   "name": "constructor-de-planos",
   "private": true,
-  "version": "3.6.1",
+  "version": "3.7.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -58,7 +58,8 @@
     "probar-altura-s3": "esbuild scripts/probar-altura-s3.ts --bundle --platform=node --format=esm --outfile=.ps3.mjs --log-level=warning --define:import.meta.env={} && node .ps3.mjs",
     "probar-medidas": "esbuild scripts/probar-medidas.ts --bundle --platform=node --format=esm --outfile=.med.mjs --log-level=warning --define:import.meta.env={} && node .med.mjs",
     "probar-herrajes": "esbuild scripts/probar-herrajes.ts --bundle --platform=node --format=esm --outfile=.pher.mjs --log-level=warning --define:import.meta.env={} && node .pher.mjs",
-    "probar-dos-distribuidores": "esbuild scripts/probar-dos-distribuidores.ts --bundle --platform=node --format=esm --outfile=.dosdist.mjs --log-level=warning --define:import.meta.env={} && node .dosdist.mjs"
+    "probar-dos-distribuidores": "esbuild scripts/probar-dos-distribuidores.ts --bundle --platform=node --format=esm --outfile=.dosdist.mjs --log-level=warning --define:import.meta.env={} && node .dosdist.mjs",
+    "probar-m2": "esbuild scripts/probar-m2.ts --bundle --platform=node --format=esm --outfile=.m2.mjs --log-level=warning --define:import.meta.env={} && node .m2.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",

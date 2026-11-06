@@ -12,7 +12,7 @@ import {
 import {
   ajustarPilastras, anchosPilastraEn, GRUESO_MG_PIEZA, medidaCercana, modularTira, PILASTRA_MINIMA_CM,
 } from './modulador'
-import { precioPieza, type TablaTarifas } from './tarifas'
+import { m2DePieza, precioPieza, type TablaTarifas } from './tarifas'
 
 let seq = 0
 export function nuevoId(prefijo: string): string {
@@ -1724,13 +1724,15 @@ export function bom(
 
   for (const [clave, cantidad] of [...puertas.entries()].sort()) {
     const [ancho, altoPt] = leerClave(clave)
+    const piezaPt = { familia: 'PT' as const, anchoCm: ancho, altoCm: altoPt }
     renglones.push({
       sku: `${codigoLinea}-PT${ancho}`,
       clave: `PT${ancho}x${altoPt}`,
       descripcion: `Puerta ${ancho} × ${altoPt} cm`,
       tipo: 'Puerta',
       cantidad,
-      precioUnit: precioPieza({ familia: 'PT', anchoCm: ancho, altoCm: altoPt }, opciones),
+      precioUnit: precioPieza(piezaPt, opciones),
+      m2Unit: m2DePieza(piezaPt, opciones),
       tarifaReal: tarifaExacta,
     })
   }
@@ -1738,16 +1740,15 @@ export function bom(
   // cubículos de regadera, que van más altos.
   for (const [altoPn, cantidad] of [...panelesPorAlto.entries()].sort((a, b) => a[0] - b[0])) {
     if (cantidad <= 0) continue
+    const piezaDiv = { familia: 'PN' as const, anchoCm: config.profundidadCm, altoCm: altoPn }
     renglones.push({
       sku: `${codigoLinea}-PN${config.profundidadCm}`,
       clave: `PN${config.profundidadCm}x${altoPn}`,
       descripcion: `Panel divisor ${config.profundidadCm} × ${altoPn} cm`,
       tipo: 'Panel',
       cantidad,
-      precioUnit: precioPieza(
-        { familia: 'PN', anchoCm: config.profundidadCm, altoCm: altoPn },
-        opciones,
-      ),
+      precioUnit: precioPieza(piezaDiv, opciones),
+      m2Unit: m2DePieza(piezaDiv, opciones),
       tarifaReal: tarifaExacta,
     })
   }
@@ -1755,38 +1756,44 @@ export function bom(
   // pieza y otro precio por m².
   for (const [clave, cantidad] of [...panelesDeFrentePorAncho.entries()].sort()) {
     const [ancho, altoPn] = leerClave(clave)
+    const piezaPN = { familia: 'PN' as const, anchoCm: ancho, altoCm: altoPn }
     renglones.push({
       sku: `${codigoLinea}-PN${ancho}`,
       clave: `PN${ancho}x${altoPn}`,
       descripcion: `Panel de frente ${ancho} × ${altoPn} cm`,
       tipo: 'Panel',
       cantidad,
-      precioUnit: precioPieza({ familia: 'PN', anchoCm: ancho, altoCm: altoPn }, opciones),
+      precioUnit: precioPieza(piezaPN, opciones),
+      m2Unit: m2DePieza(piezaPN, opciones),
       tarifaReal: tarifaExacta,
     })
   }
   for (const [clave, cantidad] of [...panelesDelCuarto.entries()].sort()) {
     const [ancho, altoPn] = leerClave(clave)
+    const piezaPN = { familia: 'PN' as const, anchoCm: ancho, altoCm: altoPn }
     renglones.push({
       sku: `${codigoLinea}-PN${ancho}`,
       clave: `PN${ancho}x${altoPn}`,
       descripcion: `Panel del cuarto accesible ${ancho} × ${altoPn} cm`,
       tipo: 'Panel',
       cantidad,
-      precioUnit: precioPieza({ familia: 'PN', anchoCm: ancho, altoCm: altoPn }, opciones),
+      precioUnit: precioPieza(piezaPN, opciones),
+      m2Unit: m2DePieza(piezaPN, opciones),
       tarifaReal: tarifaExacta,
     })
   }
   const sufijoPil = config.montaje === 'PISO_TECHO' ? 'PT' : 'STD'
   for (const [clave, cantidad] of [...pilastrasPorAncho.entries()].sort()) {
     const [ancho, altoPl] = leerClave(clave)
+    const piezaPL = { familia: 'PL' as const, anchoCm: ancho, altoCm: altoPl }
     renglones.push({
       sku: `${codigoLinea}-PI${sufijoPil}${ancho}`,
       clave: `PL${ancho}x${altoPl}`,
       descripcion: `Pilastra ${ancho} × ${altoPl} cm`,
       tipo: 'Pilastra',
       cantidad,
-      precioUnit: precioPieza({ familia: 'PL', anchoCm: ancho, altoCm: altoPl }, opciones),
+      precioUnit: precioPieza(piezaPL, opciones),
+      m2Unit: m2DePieza(piezaPL, opciones),
       tarifaReal: tarifaExacta,
     })
   }
@@ -1801,13 +1808,15 @@ export function bom(
   // el pedido las calcula el CIP, ya con el plano y la cotización hechos.
   for (const [clave, cantidad] of [...mamparasPorMedida.entries()].sort()) {
     const [ancho, alto] = clave.split('x').map(Number)
+    const piezaMg = { familia: 'MG' as const, anchoCm: ancho, altoCm: alto }
     renglones.push({
       sku: `${codigoLinea}-MG${ancho}${alto}`,
       clave: `MG${ancho}x${alto}`,
       descripcion: `Mingitorio ${ancho} × ${alto} cm`,
       tipo: 'Mingitorio',
       cantidad,
-      precioUnit: precioPieza({ familia: 'MG', anchoCm: ancho, altoCm: alto }, opciones),
+      precioUnit: precioPieza(piezaMg, opciones),
+      m2Unit: m2DePieza(piezaMg, opciones),
       tarifaReal: tarifaExacta,
     })
   }

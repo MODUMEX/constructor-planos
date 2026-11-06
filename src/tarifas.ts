@@ -163,6 +163,19 @@ export interface OpcionesPrecio {
 }
 
 /** precio de una pieza, ya en la moneda pedida */
+/**
+ * Los m² con los que se COBRA esa pieza, para poder sumarlos en la cotización.
+ *
+ * No son los de la medida pedida sino los de la medida de catálogo con que se
+ * factura: una puerta de 62 se cobra como la de 64 si esa es la que existe, y
+ * los m² del cuadro tienen que decir lo mismo que el precio. Por eso toma las
+ * mismas `OpcionesPrecio` que `precioPieza` y de ahí saca el país, en vez de
+ * repetir esa cuenta afuera y arriesgarse a que un día no coincidan.
+ */
+export function m2DePieza(pieza: Pieza, o: OpcionesPrecio): number {
+  return m2Cobrados(pieza, o.modeloCodigo, o.moneda === 'MXN' ? 'MX' : 'CR')
+}
+
 export function precioPieza(pieza: Pieza, o: OpcionesPrecio): number {
   const tabla = o.tarifas ?? TARIFAS_RESPALDO
   const modelo = tabla[o.modeloCodigo] ?? tabla.ESTANDAR

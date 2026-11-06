@@ -430,6 +430,14 @@ export interface RenglonBOM {
   tipo: string
   cantidad: number
   precioUnit: number
+  /**
+   * Los m² de UNA pieza, los mismos con los que se le saca el precio. Sirven
+   * para sumar el área del pedido en la cotización.
+   *
+   * Las piezas que se cobran por unidad —un herraje, un grabado— no llevan
+   * ninguno, y por eso no suman.
+   */
+  m2Unit?: number
   /** true si el precio salió de la tabla de tarifas por m² */
   tarifaReal?: boolean
   /**

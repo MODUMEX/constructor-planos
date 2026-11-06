@@ -6,7 +6,7 @@ import { generarCSV, nombreArchivoCSV } from './exportar/csv'
 import { generarSyclick, nombreArchivoSyclick } from './exportar/syclick'
 import { generarPDF, nombreArchivoPDF } from './exportar/pdf'
 import {
-  descuentosDelDistribuidor, generarCotizacionPDF, nombreArchivoCotizacion, resumenDePiezas, totalesDe,
+  descuentosDelDistribuidor, generarCotizacionPDF, m2Texto, nombreArchivoCotizacion, resumenDePiezas, totalesDe,
 } from './exportar/cotizacion'
 import { csvABytes, FILTRO_CSV, FILTRO_PDF, FILTRO_XLSX, guardarArchivo, TIPO_XLSX } from './exportar/guardar'
 import { abrirProyecto, armarNumero, numeroTomado, partirNumero, siguienteNumeroPlano } from './proyectos'
@@ -3471,16 +3471,21 @@ export default function App() {
 
                   {/* ---------- cuántas piezas lleva el pedido ---------- */}
                   {piezasDelPedido.length > 0 && (
-                    <div className="tabla-wrap" style={{ marginTop: 18, maxWidth: 360 }}>
+                    <div className="tabla-wrap" style={{ marginTop: 18, maxWidth: 440 }}>
                       <table>
                         <thead>
-                          <tr><th>Piezas del pedido</th><th className="der">Cant.</th></tr>
+                          <tr>
+                            <th>Piezas del pedido</th>
+                            <th className="der">Cant.</th>
+                            <th className="der">m²</th>
+                          </tr>
                         </thead>
                         <tbody>
                           {piezasDelPedido.map((p) => (
                             <tr key={p.tipo}>
                               <td>{p.tipo}</td>
                               <td className="der num">{p.cantidad}</td>
+                              <td className="der num">{m2Texto(p.m2)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -3489,6 +3494,9 @@ export default function App() {
                             <td style={{ fontWeight: 700 }}>Total de piezas</td>
                             <td className="der num" style={{ fontWeight: 700 }}>
                               {piezasDelPedido.reduce((t, p) => t + p.cantidad, 0)}
+                            </td>
+                            <td className="der num" style={{ fontWeight: 700 }}>
+                              {m2Texto(piezasDelPedido.reduce((t, p) => t + p.m2, 0))}
                             </td>
                           </tr>
                         </tfoot>

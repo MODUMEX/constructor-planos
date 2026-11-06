@@ -146,16 +146,37 @@ const ORDEN_PIEZAS = ['Puerta', 'Panel', 'Pilastra', 'Mingitorio', 'Antepecho']
  * Cuántas piezas lleva el pedido, por familia. Es la cuenta que se hace a mano
  * al final de cada cotización para saber qué se va a fabricar.
  */
-export function resumenDePiezas(renglones: RenglonBOM[]): { tipo: string; cantidad: number }[] {
-  const por = new Map<string, number>()
-  for (const r of renglones) por.set(r.tipo, (por.get(r.tipo) ?? 0) + r.cantidad)
+export interface FilaDePiezas {
+  tipo: string
+  cantidad: number
+  /**
+   * Los m² de ese renglón: los de una pieza por las que lleva. Son los m² con
+   * los que se COBRA, no los de la medida pedida, así que cuadran con el
+   * precio. Las piezas que van por unidad —herrajes, grabados— suman 0.
+   */
+  m2: number
+}
+
+export function resumenDePiezas(renglones: RenglonBOM[]): FilaDePiezas[] {
+  const por = new Map<string, FilaDePiezas>()
+  for (const r of renglones) {
+    const ya = por.get(r.tipo) ?? { tipo: r.tipo, cantidad: 0, m2: 0 }
+    ya.cantidad += r.cantidad
+    ya.m2 += (r.m2Unit ?? 0) * r.cantidad
+    por.set(r.tipo, ya)
+  }
   const orden = (t: string) => {
     const i = ORDEN_PIEZAS.indexOf(t)
     return i < 0 ? ORDEN_PIEZAS.length : i
   }
-  return [...por.entries()]
-    .map(([tipo, cantidad]) => ({ tipo, cantidad }))
-    .sort((a, b) => orden(a.tipo) - orden(b.tipo) || a.tipo.localeCompare(b.tipo))
+  return [...por.values()].sort(
+    (a, b) => orden(a.tipo) - orden(b.tipo) || a.tipo.localeCompare(b.tipo),
+  )
+}
+
+/** cómo se escriben los m² en los dos cuadros, el de pantalla y el del PDF */
+export function m2Texto(m2: number): string {
+  return m2 > 0 ? m2.toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'
 }
 
 /**
@@ -432,13 +453,19 @@ export function generarCotizacionPDF(proyecto: Proyecto, d: DatosCotizacion): js
       hojaN += 1
       y = encabezado(doc, proyecto, d, hojaN)
     }
-    const ancho = 74
+    // tres columnas: la pieza, cuántas van y los m² que suman
+    const ancho = 90
+    const xCant = M + ancho - 26
+    const xM2 = M + ancho - 2
     doc.setFillColor(...MARCA)
     doc.rect(M, y - 4, ancho, 7, 'F')
     doc.setTextColor(255)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(7.5)
     doc.text('PIEZAS DEL PEDIDO', M + 2, y + 0.8)
+    doc.text('CANT.', xCant, y + 0.8, { align: 'right' })
+    // el ² sí está en WinAnsi, que es lo que traen las fuentes de jsPDF
+    doc.text('M²', xM2, y + 0.8, { align: 'right' })
     let yp = y + 7
     for (const p of piezas) {
       doc.setFont('helvetica', 'normal')
@@ -446,7 +473,9 @@ export function generarCotizacionPDF(proyecto: Proyecto, d: DatosCotizacion): js
       doc.setTextColor(TINTA)
       doc.text(p.tipo, M + 2, yp)
       doc.setFont('helvetica', 'bold')
-      doc.text(String(p.cantidad), M + ancho - 2, yp, { align: 'right' })
+      doc.text(String(p.cantidad), xCant, yp, { align: 'right' })
+      doc.setFont('helvetica', 'normal')
+      doc.text(m2Texto(p.m2), xM2, yp, { align: 'right' })
       yp += 5
     }
     doc.setDrawColor(210)
@@ -455,7 +484,8 @@ export function generarCotizacionPDF(proyecto: Proyecto, d: DatosCotizacion): js
     doc.setFontSize(8.5)
     doc.setTextColor(...MARCA)
     doc.text('Total de piezas', M + 2, yp)
-    doc.text(String(piezas.reduce((a, p) => a + p.cantidad, 0)), M + ancho - 2, yp, { align: 'right' })
+    doc.text(String(piezas.reduce((a, p) => a + p.cantidad, 0)), xCant, yp, { align: 'right' })
+    doc.text(m2Texto(piezas.reduce((a, p) => a + p.m2, 0)), xM2, yp, { align: 'right' })
     y = yp + 9
   }
 

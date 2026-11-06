@@ -1,5 +1,5 @@
 import { GRABADOS, HERRAJES, type ArticuloSuelto } from './datos/articulos'
-import { precioPieza, type OpcionesPrecio } from './tarifas'
+import { m2DePieza, precioPieza, type OpcionesPrecio } from './tarifas'
 import type { Extra, RenglonBOM } from './types'
 
 /**
@@ -97,7 +97,16 @@ export function renglonesDeExtras(extras: Extra[], o: OpcionesPrecio): RenglonBO
     .filter((x) => (Number(x.cantidad) || 0) > 0)
     .map((x) => {
       const { precio, deLista } = precioDeExtra(x, o)
-      const medidas = esPorM2(x.tipo) && x.anchoCm && x.altoCm ? ` ${x.anchoCm} × ${x.altoCm} cm` : ''
+      const porM2 = esPorM2(x.tipo) && x.anchoCm && x.altoCm
+      const medidas = porM2 ? ` ${x.anchoCm} × ${x.altoCm} cm` : ''
+      // Los m² con los que se cobra, para que el extra sume en el cuadro de
+      // piezas igual que una pieza de la modulación. Un herraje o un grabado
+      // van por unidad y no llevan ninguno.
+      const familia = FAMILIAS_EXTRA.find((f) => f.tipo === x.tipo)?.familia
+      const m2Unit =
+        porM2 && familia
+          ? m2DePieza({ familia, anchoCm: Number(x.anchoCm), altoCm: Number(x.altoCm) }, o)
+          : undefined
       return {
         sku: (x.codigo || '').trim() || `EXTRA-${x.tipo.toUpperCase()}`,
         clave: `EXTRA:${(x.codigo || '').trim() || x.tipo.toUpperCase()}`,
@@ -105,6 +114,7 @@ export function renglonesDeExtras(extras: Extra[], o: OpcionesPrecio): RenglonBO
         tipo: etiquetaExtra(x.tipo),
         cantidad: Number(x.cantidad) || 0,
         precioUnit: precio,
+        m2Unit,
         tarifaReal: deLista,
         // si la pieza trae su propio descuento, se lo lleva al renglón: la
         // cotización lo saca de la cascada general y le aplica este
