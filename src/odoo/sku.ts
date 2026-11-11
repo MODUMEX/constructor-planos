@@ -1,6 +1,6 @@
 import type { Config } from '../types'
 import type { Familia, Pieza } from '../exportar/piezas'
-import { buscarColor } from '../catalog'
+import { buscarColor, COLOR_DE_LINEA, esDeLinea } from '../catalog'
 import { terminacionDe } from '../renders'
 
 /**
@@ -166,7 +166,22 @@ export function skuOdoo(pieza: Pieza, config: Config): Traduccion {
   if (!linea) return { falta: `Odoo no tiene la línea ${config.linea} / ${modelo}` }
 
   const color = colorOdoo(config.color)
-  if (!color) return { falta: `el color "${config.color}" no está en la lista de Odoo` }
+  if (!color) {
+    /**
+     * "De línea" no es un color: es el comodín de cuando todavía no se
+     * eligió. Odoo pide la materia prima, así que acá no hay nada que
+     * traducir — pero decir que "no está en la lista" manda a buscar un
+     * problema de catálogo que no existe. Lo que falta es elegir el color.
+     */
+    if (esDeLinea(config.color)) {
+      return {
+        falta:
+          `todavía no se eligió el color: el área va con "${COLOR_DE_LINEA}". ` +
+          'Elegilo en el paso 3, Acabado, y volvé a intentar.',
+      }
+    }
+    return { falta: `el color "${config.color}" no está en la lista de Odoo` }
+  }
 
   const vars = variantes(pieza, config, linea)
   if (!vars) return { falta: `no se sabe traducir el subtipo ${pieza.subTipo}` }

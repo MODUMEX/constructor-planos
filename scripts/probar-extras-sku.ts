@@ -106,5 +106,24 @@ console.log('\n— qué se pregunta y qué no')
   ok(new Set(sueltas).size === sueltas.length, 'no hay variantes repetidas en la tabla')
 }
 
+console.log("\n— el color sin elegir se avisa como lo que es")
+{
+  const sinColor = { ...config, color: 'De línea' } as unknown as Config
+  const proyecto = {
+    numero: '1000',
+    areas: [{ nombre: 'Área 1', tramos: [], config: sinColor }],
+    extras: [{ tipo: 'mingitorio', cantidad: 1, anchoCm: 45, altoCm: 120 } as Extra],
+  } as unknown as Proyecto
+  const r = lineasParaOdoo(proyecto, precios)
+
+  ok(r.lineas.length === 0, 'con el color sin elegir no se manda nada')
+  ok(r.faltan.some((f) => f.includes('no se eligió el color')),
+    'el aviso dice que falta elegirlo, no que el color no exista')
+  ok(r.faltan.some((f) => f.includes('paso 3')), 'y dice dónde se elige')
+  ok(!r.faltan.some((f) => f.includes('no está en la lista de Odoo')),
+    'ya no manda a buscar un problema de catálogo que no existe')
+  ok(r.faltan.length === 1, 'y lo dice UNA vez, no una por el extra y otra suelta')
+}
+
 console.log(mal === 0 ? '\nTodo cuadra.' : `\n${mal} caso(s) mal.`)
 process.exit(mal === 0 ? 0 : 1)

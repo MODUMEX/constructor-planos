@@ -118,7 +118,13 @@ export function lineasParaOdoo(
           confExtras,
         )
         if (!esSku(traduccion)) {
-          faltan.add(`el extra "${r.descripcion}": ${traduccion.falta}`)
+          /*
+            Sin el nombre del extra adelante: lo que puede fallar acá es la
+            línea o el color, que son del PROYECTO y no de la pieza suelta.
+            Colgárselo al extra decía la misma frase dos veces, una con su
+            nombre y otra sin él, como si fueran dos problemas distintos.
+          */
+          faltan.add(traduccion.falta)
           continue
         }
         codigo = traduccion.sku
