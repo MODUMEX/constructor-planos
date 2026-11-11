@@ -56,6 +56,13 @@ export interface ProyectoEnLista {
   actualizadoEl: string
   /** de qué distribuidor es; null en los viejos que se guardaron sin dueño */
   distribuidorId: number | null
+  /**
+   * Quién dibujó el plano. Es el nombre copiado en la fila, no el uuid: la RLS
+   * de `profiles` solo deja leerla al Super Admin, así que un Vendedor no
+   * podría resolver el uuid a un nombre. Vacío en los que se guardaron antes
+   * de que la columna existiera.
+   */
+  autor: string
 }
 
 export interface Resultado<T> {
@@ -75,6 +82,7 @@ interface FilaLista {
   estado: string | null
   actualizado_el: string
   distribuidor_id: number | null
+  creado_por_nombre?: string | null
 }
 
 function sinNube<T>(): Resultado<T> {
@@ -138,12 +146,18 @@ export async function listarProyectos(usuario: Usuario | null): Promise<Resultad
 
   const campos = 'proyecto_id,codigo,numero_plano,revision,nombre,cliente,ubicacion,estado,actualizado_el,distribuidor_id'
   try {
-    const r = await conSesion(usuario!, (token) =>
-      fetch(
-        `${URL_SUPABASE}/rest/v1/proyecto?select=${campos}&app_json->>app=eq.${MARCA_APP}&order=actualizado_el.desc`,
-        { headers: cabeceras(token) },
-      ),
-    )
+    const pedir = (select: string) =>
+      conSesion(usuario!, (token) =>
+        fetch(
+          `${URL_SUPABASE}/rest/v1/proyecto?select=${select}&app_json->>app=eq.${MARCA_APP}&order=actualizado_el.desc`,
+          { headers: cabeceras(token) },
+        ),
+      )
+    // Se pide también el autor, y si la columna todavía no está en la base se
+    // vuelve a pedir sin ella: así la aplicación se puede publicar antes o
+    // después de la migración y la lista nunca deja de verse.
+    let r = await pedir(`${campos},creado_por_nombre`)
+    if (!r.ok) r = await pedir(campos)
     if (!r.ok) return { ok: false, mensaje: await detalle(r) }
     const filas = (await r.json()) as FilaLista[]
     const lista: ProyectoEnLista[] = filas.map((f) => ({
@@ -157,6 +171,7 @@ export async function listarProyectos(usuario: Usuario | null): Promise<Resultad
       estado: f.estado ?? 'borrador',
       actualizadoEl: f.actualizado_el,
       distribuidorId: f.distribuidor_id ?? null,
+      autor: (f.creado_por_nombre ?? '').trim(),
     }))
     return { ok: true, dato: lista, mensaje: `${lista.length} proyecto(s).` }
   } catch (e) {
@@ -245,6 +260,9 @@ export async function guardarProyecto(
     // lo que se hacía antes.
     distribuidor_id: distribuidorId ?? (u.distribuidorId ? Number(u.distribuidorId) : null),
     creado_por: u.id,
+    // el NOMBRE al lado del uuid: es lo único que la lista puede leer sin ser
+    // Super Admin, y es con lo que se busca por persona
+    creado_por_nombre: u.nombre,
     // las columnas de resumen son para poder mirar la tabla sin abrir el JSON
     linea_codigo: codigoLinea(config.linea),
     modelo_codigo: config.modelo,
@@ -261,16 +279,25 @@ export async function guardarProyecto(
   }
 
   try {
-    const r = await conSesion(u, (token) =>
-      fetch(`${URL_SUPABASE}/rest/v1/proyecto?on_conflict=codigo`, {
-        method: 'POST',
-        headers: cabeceras(token, {
-          // merge-duplicates es lo que convierte el insert en upsert
-          Prefer: 'resolution=merge-duplicates,return=representation',
+    const mandar = (cuerpo: Record<string, unknown>) =>
+      conSesion(u, (token) =>
+        fetch(`${URL_SUPABASE}/rest/v1/proyecto?on_conflict=codigo`, {
+          method: 'POST',
+          headers: cabeceras(token, {
+            // merge-duplicates es lo que convierte el insert en upsert
+            Prefer: 'resolution=merge-duplicates,return=representation',
+          }),
+          body: JSON.stringify([cuerpo]),
         }),
-        body: JSON.stringify([fila]),
-      }),
-    )
+      )
+    // Si la columna del autor todavía no está en la base, se guarda sin ella.
+    // Guardar es lo último que puede fallar por una migración que falta: antes
+    // que perder el trabajo del vendedor, se pierde el nombre.
+    let r = await mandar(fila)
+    if (!r.ok) {
+      const { creado_por_nombre: _, ...sinAutor } = fila
+      r = await mandar(sinAutor)
+    }
     if (!r.ok) return { ok: false, mensaje: await detalle(r) }
     const filas = (await r.json()) as FilaLista[]
     const f = filas[0]
@@ -287,6 +314,7 @@ export async function guardarProyecto(
         estado: f.estado ?? 'borrador',
         actualizadoEl: f.actualizado_el,
         distribuidorId: f.distribuidor_id ?? null,
+        autor: (f.creado_por_nombre ?? u.nombre ?? '').trim(),
       },
       mensaje: `Guardado como ${fila.codigo}.`,
     }

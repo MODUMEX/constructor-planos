@@ -44,6 +44,13 @@ function fecha(iso: string): string {
   return d.toLocaleString('es-CR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
+/**
+ * Lo que vale el filtro cuando se piden los planos que NO tienen autor: los
+ * que se guardaron antes de que el nombre se guardara con el plano. No puede
+ * ser la cadena vacía, que es lo que vale "todos".
+ */
+const SIN_AUTOR = '--sin-autor--'
+
 export default function Proyectos({
   usuario, proyecto, onAbrir, onCambiarNumero, onCerrar, onAutorizar, onRechazar,
   revisionActual, hayCambios, onGuardar,
@@ -61,6 +68,7 @@ export default function Proyectos({
   const [motivo, setMotivo] = useState('')
   const [nombresDist, setNombresDist] = useState<Map<number, string>>(new Map())
   const [filtroDist, setFiltroDist] = useState('')
+  const [filtroAutor, setFiltroAutor] = useState('')
   const autoriza = puedeAutorizar(usuario)
   /**
    * Quién ve de qué distribuidor es cada proyecto. Al distribuidor no se lo
@@ -110,6 +118,28 @@ export default function Proyectos({
     return [...ids].map((id) => ({ id, nombre: nombreDist(id) })).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
   }, [lista, nombreDist])
 
+  /**
+   * Quiénes hicieron los planos que están en la lista, para el filtro.
+   *
+   * Sale de la propia lista y no de la tabla de usuarios: así aparecen solo
+   * los que de verdad tienen planos acá, y no hace falta que el Vendedor pueda
+   * leer `profiles`, que por RLS es del Super Admin.
+   *
+   * Los planos guardados antes de que se guardara el autor no traen ninguno:
+   * van juntos bajo "sin autor" para que se puedan encontrar igual.
+   */
+  const autoresEnLista = useMemo(() => {
+    const nombres = new Set<string>()
+    let hayHuerfanos = false
+    for (const p of lista) {
+      const a = p.autor.trim()
+      if (a) nombres.add(a)
+      else hayHuerfanos = true
+    }
+    const ordenados = [...nombres].sort((a, b) => a.localeCompare(b, 'es'))
+    return { nombres: ordenados, hayHuerfanos }
+  }, [lista])
+
   /** las revisiones que ya existen para el plano que está abierto */
   const revisionesDelPlano = useMemo(() => {
     const n = proyecto.numero.trim()
@@ -120,12 +150,17 @@ export default function Proyectos({
     const q = busqueda.trim().toLowerCase()
     return lista.filter((p) => {
       if (filtroDist && String(p.distribuidorId ?? '') !== filtroDist) return false
+      if (filtroAutor === SIN_AUTOR ? p.autor.trim() !== '' : filtroAutor && p.autor !== filtroAutor) {
+        return false
+      }
       if (!q) return true
-      const campos = [p.numeroPlano, p.revision, p.obra, p.cliente, p.ubicacion]
+      // el autor también entra en la búsqueda escrita, para no tener que ir al
+      // desplegable cuando ya se sabe el nombre
+      const campos = [p.numeroPlano, p.revision, p.obra, p.cliente, p.ubicacion, p.autor]
       if (veDistribuidor) campos.push(nombreDist(p.distribuidorId))
       return campos.join(' ').toLowerCase().includes(q)
     })
-  }, [lista, busqueda, filtroDist, veDistribuidor, nombreDist])
+  }, [lista, busqueda, filtroDist, filtroAutor, veDistribuidor, nombreDist])
 
   async function guardar() {
     setTrabajando(true)
@@ -237,7 +272,7 @@ export default function Proyectos({
                   <input
                     value={busqueda}
                     onChange={(e) => setBusqueda(e.target.value)}
-                    placeholder={veDistribuidor ? 'Plano, obra, cliente, ubicación o distribuidor' : 'Plano, obra, cliente o ubicación'}
+                    placeholder={veDistribuidor ? 'Plano, obra, cliente, ubicación, distribuidor o quién lo hizo' : 'Plano, obra, cliente, ubicación o quién lo hizo'}
                   />
                 </div>
                 {veDistribuidor && (
@@ -248,6 +283,22 @@ export default function Proyectos({
                       {distEnLista.map((d) => (
                         <option key={d.id} value={String(d.id)}>{d.nombre}</option>
                       ))}
+                    </select>
+                  </div>
+                )}
+                {/* mientras ningún plano traiga autor —antes de la migración—
+                    el filtro no tendría nada que ofrecer, así que no sale */}
+                {autoresEnLista.nombres.length > 0 && (
+                  <div className="campo">
+                    <label>Hecho por</label>
+                    <select value={filtroAutor} onChange={(e) => setFiltroAutor(e.target.value)}>
+                      <option value="">Todos</option>
+                      {autoresEnLista.nombres.map((a) => (
+                        <option key={a} value={a}>{a}</option>
+                      ))}
+                      {/* los de antes de que se guardara el autor, para que no
+                          queden escondidos cuando se filtra por alguien */}
+                      {autoresEnLista.hayHuerfanos && <option value={SIN_AUTOR}>Sin autor</option>}
                     </select>
                   </div>
                 )}
@@ -271,6 +322,7 @@ export default function Proyectos({
                         <th>Obra</th>
                         <th>Cliente</th>
                         {veDistribuidor && <th>Distribuidor</th>}
+                        <th>Hecho por</th>
                         <th>Estado</th>
                         <th>Cotización</th>
                         <th>Actualizado</th>
@@ -288,6 +340,7 @@ export default function Proyectos({
                           <td style={{ fontWeight: 600 }}>{p.obra}</td>
                           <td>{p.cliente}</td>
                           {veDistribuidor && <td>{nombreDist(p.distribuidorId)}</td>}
+                          <td>{p.autor || '—'}</td>
                           <td>{p.estado}</td>
                           <td>
                             {cot ? (
