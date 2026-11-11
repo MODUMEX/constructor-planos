@@ -235,7 +235,7 @@ export default function Proyectos({
 
   return (
     <div className="modal-fondo" onClick={onCerrar}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal ancho" onClick={(e) => e.stopPropagation()}>
         <header className="modal-cab">
           <div>
             <h2>Proyectos</h2>
@@ -313,7 +313,7 @@ export default function Proyectos({
                     : 'Ningún proyecto calza con esa búsqueda.'}
                 </p>
               ) : (
-                <div className="tabla-wrap">
+                <div className="tabla-wrap fija-acciones">
                   <table>
                     <thead>
                       <tr>

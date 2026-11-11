@@ -213,7 +213,7 @@ export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Pr
 
   return (
     <div className="modal-fondo" onClick={onCerrar}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal ancho" onClick={(e) => e.stopPropagation()}>
         <header className="modal-cab">
           <div>
             <h2>Distribuidores</h2>
@@ -427,7 +427,7 @@ export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Pr
               </div>
             </>
           ) : (
-            <div className="tabla-wrap">
+            <div className="tabla-wrap fija-acciones">
               <table>
                 <thead>
                   <tr>

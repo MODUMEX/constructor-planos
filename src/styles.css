@@ -572,6 +572,18 @@ button.chip:hover { border-color: var(--accent-line); color: var(--text); }
 
 /* ---------- tablas ---------- */
 .tabla-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
+/* La columna de los botones se queda pegada a la derecha aunque la tabla sea
+   mas ancha que la caja. Sin esto, cuando el contenido crece, Autorizar y
+   Borrar quedan cortados contra el borde, y el unico modo de alcanzarlos es
+   una barra horizontal que vive al final de la lista, a 26 proyectos de ahi. */
+.tabla-wrap.fija-acciones th:last-child,
+.tabla-wrap.fija-acciones td:last-child {
+  position: sticky;
+  right: 0;
+  background: var(--surface);
+  box-shadow: -10px 0 12px -10px rgba(0, 0, 0, .55);
+  white-space: nowrap;
+}
 table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
 th, td { text-align: left; padding: 9px 13px; border-bottom: 1px solid var(--line-soft); }
 thead th {
@@ -646,6 +658,9 @@ tfoot td { border-top: 1px solid var(--line); font-weight: 600; }
   box-shadow: var(--shadow);
   overflow: hidden;
 }
+/* Las pantallas con tabla ancha, como la de Proyectos, necesitan mas que los
+   1080 de un modal de formulario. */
+.modal.ancho { width: min(1420px, 100%); }
 .modal-cab {
   display: flex;
   align-items: flex-start;
