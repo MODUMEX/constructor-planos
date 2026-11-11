@@ -343,6 +343,41 @@ export async function autorizar(
   }
 }
 
+export interface ContactoOdoo {
+  id: number
+  nombre: string
+  cedula: string | null
+  ciudad: string | null
+  esEmpresa: boolean
+}
+
+/**
+ * Busca contactos en Odoo por un pedazo del nombre o de la cédula.
+ *
+ * Hace falta porque los dos lados llaman distinto a la misma empresa: en Odoo
+ * el contacto está con la RAZÓN SOCIAL y en el Constructor el distribuidor
+ * está con el nombre comercial, así que buscarlo por nombre casi nunca calza.
+ * Con esto se elige a mano una vez y lo que queda guardado es el ID, que no
+ * cambia aunque en Odoo le cambien el nombre.
+ *
+ * Solo LEE de Odoo: no crea ni modifica nada.
+ */
+export async function buscarContactosOdoo(
+  usuario: Usuario | null,
+  texto: string,
+): Promise<Resultado<ContactoOdoo[]>> {
+  const r = await llamarFuncion(usuario, { accion: 'buscar_contactos', texto })
+  if (!r.ok) return { ok: false, mensaje: r.mensaje }
+  const contactos = (r.dato?.contactos ?? []) as ContactoOdoo[]
+  return {
+    ok: true,
+    dato: contactos,
+    mensaje: contactos.length
+      ? `${contactos.length} contacto(s).`
+      : 'Odoo no devolvió ningún contacto con eso.',
+  }
+}
+
 export async function rechazar(
   usuario: Usuario | null,
   cotizacionId: number,

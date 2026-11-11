@@ -57,6 +57,15 @@ export interface Distribuidor {
    * no en un bucket: así no hay URL pública que se caiga ni CSP que lo bloquee.
    */
   logo: string | null
+  /**
+   * El contacto que le corresponde en Odoo.
+   *
+   * Va el ID y no el nombre porque los dos lados llaman distinto a la misma
+   * empresa: en Odoo está la RAZÓN SOCIAL y acá el nombre comercial. Sin esto,
+   * autorizar una cotización busca el contacto por nombre y casi nunca calza.
+   * El ID tampoco cambia si en Odoo le cambian el nombre.
+   */
+  odooPartnerId: number | null
   activo: boolean
 }
 
@@ -78,10 +87,11 @@ interface Fila {
   descuento: number | null
   iva: number | null
   logo: string | null
+  odoo_partner_id: number | null
   activo: boolean | null
 }
 
-const COLUMNAS = 'distribuidor_id,nombre,contacto,email,telefono,ubicacion,region,pais,descuento,iva,logo,activo'
+const COLUMNAS = 'distribuidor_id,nombre,contacto,email,telefono,ubicacion,region,pais,descuento,iva,logo,odoo_partner_id,activo'
 
 function deFila(f: Fila): Distribuidor {
   return {
@@ -97,6 +107,7 @@ function deFila(f: Fila): Distribuidor {
     // ojo: 0 es un IVA válido (LATAM), así que solo null es "automático"
     iva: f.iva === null || f.iva === undefined ? null : Number(f.iva),
     logo: f.logo ?? null,
+    odooPartnerId: f.odoo_partner_id ?? null,
     activo: f.activo !== false,
   }
 }
@@ -203,6 +214,7 @@ export async function crearDistribuidor(usuario: Usuario | null, d: DatosDistrib
     descuento: d.descuento ?? 0,
     iva: d.iva ?? null,
     logo: d.logo ?? null,
+    odoo_partner_id: d.odooPartnerId ?? null,
     activo: d.activo !== false,
     password: d.password,
   })
@@ -221,6 +233,7 @@ export async function crearDistribuidor(usuario: Usuario | null, d: DatosDistrib
       descuento: d.descuento ?? 0,
       iva: d.iva ?? null,
       logo: d.logo ?? null,
+      odooPartnerId: d.odooPartnerId ?? null,
       activo: d.activo !== false,
     },
     mensaje: 'Distribuidor dado de alta con su cuenta de acceso.',
@@ -249,6 +262,8 @@ export async function guardarDistribuidor(usuario: Usuario | null, d: DatosDistr
     iva: d.iva ?? null,
     // null borra el logo a propósito; undefined lo deja como estaba
     logo: d.logo === undefined ? undefined : (d.logo || null),
+    // null lo desliga de Odoo a propósito; undefined lo deja como estaba
+    odoo_partner_id: d.odooPartnerId === undefined ? undefined : (d.odooPartnerId || null),
     activo: d.activo !== false,
     ...(d.password ? { password: d.password } : {}),
   })
@@ -267,6 +282,7 @@ export async function guardarDistribuidor(usuario: Usuario | null, d: DatosDistr
       descuento: d.descuento ?? 0,
       iva: d.iva ?? null,
       logo: d.logo ?? null,
+      odooPartnerId: d.odooPartnerId ?? null,
       activo: d.activo !== false,
     },
     mensaje: d.password ? 'Cambios guardados, incluida la contraseña.' : 'Cambios guardados.',

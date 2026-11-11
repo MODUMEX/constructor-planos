@@ -5,6 +5,7 @@ import {
 } from '../distribuidores'
 import { ligarSegundaEmpresa, listarCuentasDistribuidor, type UsuarioInterno } from '../usuarios'
 import { esAdmin, type Usuario } from '../auth'
+import { buscarContactosOdoo, type ContactoOdoo } from '../odoo/enviar'
 import Ojo from './Ojo'
 import CampoNumero from './CampoNumero'
 
@@ -110,6 +111,29 @@ export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Pr
   const [refrescando, setRefrescando] = useState(false)
   const [cambiando, setCambiando] = useState<number | null>(null)
   const [avisoLogo, setAvisoLogo] = useState('')
+
+  /**
+   * El contacto de Odoo de la ficha que se está editando.
+   *
+   * Hace falta elegirlo a mano porque los dos lados llaman distinto a la misma
+   * empresa: en Odoo está la RAZÓN SOCIAL y acá el nombre comercial, así que
+   * autorizar una cotización buscaba el contacto por nombre y casi nunca
+   * calzaba. Se elige UNA vez y lo que queda guardado es el ID, que no cambia
+   * aunque en Odoo le cambien el nombre.
+   */
+  const [buscaOdoo, setBuscaOdoo] = useState('')
+  const [contactosOdoo, setContactosOdoo] = useState<ContactoOdoo[] | null>(null)
+  const [buscandoOdoo, setBuscandoOdoo] = useState(false)
+  const [avisoOdoo, setAvisoOdoo] = useState('')
+
+  async function buscarEnOdoo() {
+    setAvisoOdoo('')
+    setBuscandoOdoo(true)
+    const r = await buscarContactosOdoo(usuario, buscaOdoo)
+    setBuscandoOdoo(false)
+    setContactosOdoo(r.dato ?? [])
+    if (!r.ok) setAvisoOdoo(r.mensaje)
+  }
 
   /**
    * Lee el archivo y lo deja como data URI en la ficha. No se sube a ningún
@@ -315,6 +339,71 @@ export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Pr
                   </span>
                 </div>
                 <div className="campo">
+                  <label>Contacto en Odoo</label>
+                  {edita.odooPartnerId ? (
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <span className="chip on">Odoo #{edita.odooPartnerId}</span>
+                      <button
+                        className="btn chico"
+                        onClick={() => { campo('odooPartnerId', null); setContactosOdoo(null); setAvisoOdoo('') }}
+                      >
+                        Desligar
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <input
+                          value={buscaOdoo}
+                          onChange={(e) => setBuscaOdoo(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') void buscarEnOdoo() }}
+                          placeholder="Razón social o cédula jurídica"
+                        />
+                        <button
+                          className="btn"
+                          style={{ flex: '0 0 auto' }}
+                          disabled={buscandoOdoo || buscaOdoo.trim().length < 2}
+                          onClick={() => void buscarEnOdoo()}
+                        >
+                          {buscandoOdoo ? '…' : 'Buscar'}
+                        </button>
+                      </div>
+                      {contactosOdoo !== null && contactosOdoo.length > 0 && (
+                        <div className="tabla-wrap" style={{ marginTop: 8, maxHeight: 190, overflowY: 'auto' }}>
+                          <table>
+                            <tbody>
+                              {contactosOdoo.map((c) => (
+                                <tr key={c.id}>
+                                  <td style={{ fontWeight: 600 }}>{c.nombre}</td>
+                                  <td>{c.cedula ?? '—'}</td>
+                                  <td>{c.ciudad ?? ''}</td>
+                                  <td className="der">
+                                    <button
+                                      className="btn plano chico"
+                                      onClick={() => {
+                                        campo('odooPartnerId', c.id)
+                                        setContactosOdoo(null)
+                                        setBuscaOdoo('')
+                                        setAvisoOdoo(`Queda ligado a "${c.nombre}". Falta apretar Guardar.`)
+                                      }}
+                                    >
+                                      Es este
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  <span className="ayuda">
+                    {avisoOdoo ||
+                      'En Odoo la empresa está con su razón social y acá con el nombre comercial, así que hay que ligarla una vez. Sin esto, autorizar la cotización falla.'}
+                  </span>
+                </div>
+                <div className="campo">
                   <label>IVA (%)</label>
                   <input
                     type="number" min={0} max={100} step="0.01"
@@ -348,13 +437,14 @@ export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Pr
                     <th>Región</th>
                     <th className="der">Desc.</th>
                     <th className="der">IVA</th>
+                    <th>Odoo</th>
                     <th>Estado</th>
                     <th></th>
                   </tr>
                 </thead>
                 <tbody>
                   {lista.length === 0 && (
-                    <tr><td colSpan={8}>Todavía no hay distribuidores dados de alta.</td></tr>
+                    <tr><td colSpan={9}>Todavía no hay distribuidores dados de alta.</td></tr>
                   )}
                   {lista.map((d) => (
                     <tr key={d.distribuidorId} style={d.activo ? undefined : { opacity: 0.55 }}>
@@ -363,7 +453,15 @@ export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Pr
                       <td>{d.ubicacion || '—'}</td>
                       <td>{d.region ?? '—'}</td>
                       <td className="der">{d.descuento ? d.descuento + '%' : '—'}</td>
-                      <td className="der">{d.iva === null ? 'Auto' : d.iva + '%'}</td>
+                      {/* sin contacto ligado, autorizarle una cotización falla; solo
+                          importa en Costa Rica, que es lo único que va a Odoo */}
+                      <td>
+                        {d.odooPartnerId
+                          ? <span className="chip on">#{d.odooPartnerId}</span>
+                          : d.region === 'Costa Rica'
+                            ? <span className="chip" title="Hay que ligarlo desde Editar: sin esto no se le puede autorizar una cotización">Falta</span>
+                            : '—'}
+                      </td>
                       <td>{d.activo ? 'Activo' : 'Inactivo'}</td>
                       <td className="der">
                         <button className="btn plano chico" onClick={() => { setEdita({ ...d }); setVerClave(false); setAviso(null) }}>Editar</button>
