@@ -3,7 +3,7 @@ import type { Usuario } from '../auth'
 import { tierDeColor } from '../catalog'
 import { precioPieza, type TablaTarifas } from '../tarifas'
 import { agrupar, piezasDeArea } from '../exportar/piezas'
-import { renglonesDeExtras } from '../extras'
+import { esPorM2, FAMILIAS_EXTRA, renglonesDeExtras, subTipoDeExtra } from '../extras'
 import { esSku, skuOdoo } from './sku'
 
 /**
@@ -80,8 +80,51 @@ export function lineasParaOdoo(
    * que cualquier pieza, así que también van a Odoo. Antes se quedaban en la
    * pantalla: el cliente los veía en su cotización y la orden salía sin ellos.
    */
-  for (const r of renglonesDeExtras(proyecto.extras ?? [], opcionesDeExtras(proyecto, precios))) {
-    const codigo = (r.sku || '').trim()
+  /**
+   * Los extras que se cobran por m² —una puerta suelta, un panel, una
+   * pilastra, una mampara de mingitorio— son piezas del mismo catálogo que
+   * las de la modulación, así que su código se arma igual, con el mismo
+   * traductor. Antes no se armaba ninguno y la cotización entera se trababa
+   * con "no tiene código de artículo".
+   *
+   * La línea, el color y el acabado salen del ÁREA 1, igual que el precio:
+   * un extra no vive en ningún área, y el proyecto cotiza con un solo acabado.
+   */
+  const confExtras = proyecto.areas[0]?.config
+  const extras = proyecto.extras ?? []
+  const renglonesExtra = renglonesDeExtras(extras, opcionesDeExtras(proyecto, precios))
+
+  for (let i = 0; i < renglonesExtra.length; i++) {
+    const r = renglonesExtra[i]
+    let codigo = (r.sku || '').trim()
+
+    if ((!codigo || codigo.startsWith('EXTRA-')) && confExtras) {
+      const x = extras.filter((e) => (Number(e.cantidad) || 0) > 0)[i]
+      const fam = FAMILIAS_EXTRA.find((f) => f.tipo === x?.tipo)
+      if (x && fam?.familia && esPorM2(x.tipo)) {
+        const subTipo = subTipoDeExtra(x)
+        if (!subTipo) {
+          faltan.add(`al extra "${r.descripcion}" le falta elegir la variante`)
+          continue
+        }
+        const traduccion = skuOdoo(
+          {
+            familia: fam.familia,
+            anchoCm: Number(x.anchoCm) || 0,
+            altoCm: Number(x.altoCm) || 0,
+            subTipo,
+            area: '',
+          },
+          confExtras,
+        )
+        if (!esSku(traduccion)) {
+          faltan.add(`el extra "${r.descripcion}": ${traduccion.falta}`)
+          continue
+        }
+        codigo = traduccion.sku
+      }
+    }
+
     if (!codigo || codigo.startsWith('EXTRA-')) {
       faltan.add(`el extra "${r.descripcion}" no tiene código de artículo`)
       continue

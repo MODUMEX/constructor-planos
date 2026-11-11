@@ -388,6 +388,18 @@ export interface Extra {
   tipo: 'puerta' | 'panel' | 'pilastra' | 'mingitorio' | 'costilla' | 'herraje' | 'grabado'
   /** código del herraje o del grabado */
   codigo?: string
+  /**
+   * La variante de la pieza, con los mismos nombres que usa la modulación:
+   * PTAIZQ, PNCEN, PLLATMUR y compañía.
+   *
+   * El SKU de Odoo no se arma solo con la familia y la medida: una puerta
+   * lleva la mano y si abre contra el muro, un panel si es central o lateral,
+   * una pilastra su posición. En la modulación eso lo sabe el plano; un extra
+   * se pide suelto, así que hay que preguntarlo. El mingitorio no tiene
+   * variantes en Odoo y la costilla es siempre una pilastra de costilla: esos
+   * dos salen solos y este campo queda en blanco.
+   */
+  subTipo?: string
   descripcion?: string
   cantidad: number
   anchoCm?: number

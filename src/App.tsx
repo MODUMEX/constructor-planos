@@ -52,7 +52,7 @@ import { descuentoDeDistribuidor, ivaDeDistribuidor, listarDistribuidores, type 
 import { alturasDeFabrica, cargarAlturas, usarAlturas, type TablaAlturas } from './alturas'
 import { cargarPiezas, usarPiezas } from './piezas'
 import {
-  articuloDe, catalogoDe, esPorM2, FAMILIAS_EXTRA, renglonesDeExtras,
+  articuloDe, catalogoDe, esPorM2, FAMILIAS_EXTRA, pideVariante, renglonesDeExtras, VARIANTES_EXTRA,
   type TipoExtra,
 } from './extras'
 import Proyectos from './components/Proyectos'
@@ -3351,6 +3351,27 @@ export default function App() {
                                   onChange={(e) => cambiarExtra(i, { altoCm: Number(e.target.value) || 0 })}
                                 />
                               </label>
+                              {/*
+                                Odoo no sabe fabricar "una puerta de 60 x 150" sin saber
+                                de qué mano es, así que acá se elige. El mingitorio y la
+                                costilla no preguntan nada: el primero no tiene variantes
+                                y la segunda es siempre una pilastra de costilla.
+                              */}
+                              {pideVariante(x.tipo) && (
+                                <label className="campo" style={{ width: 210 }}>
+                                  <span>Variante</span>
+                                  <select
+                                    value={x.subTipo ?? ''}
+                                    title="Hace falta para el código de artículo con el que se manda a fabricar"
+                                    onChange={(e) => cambiarExtra(i, { subTipo: e.target.value || undefined })}
+                                  >
+                                    <option value="">— elegir —</option>
+                                    {(VARIANTES_EXTRA[x.tipo] ?? []).map((v) => (
+                                      <option key={v.valor} value={v.valor}>{v.etiqueta}</option>
+                                    ))}
+                                  </select>
+                                </label>
+                              )}
                             </>
                           ) : (
                             <label className="campo" style={{ flex: '1 1 320px' }}>

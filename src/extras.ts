@@ -39,6 +39,57 @@ export const FAMILIAS_EXTRA = [
 
 export type TipoExtra = (typeof FAMILIAS_EXTRA)[number]['tipo']
 
+/**
+ * Las variantes que Odoo le pide a cada familia, con los mismos nombres que
+ * usa la modulación.
+ *
+ * Sin esto el extra no tiene codigo de articulo y la cotizacion no se puede
+ * autorizar: Odoo no sabe fabricar "una puerta de 60 x 150" sin saber de qué
+ * mano es.
+ *
+ * El mingitorio y la costilla no aparecen acá a propósito. El mingitorio no
+ * tiene variantes en Odoo, y la costilla es por definición una pilastra de
+ * costilla: preguntarlo sería hacer elegir algo que ya está decidido.
+ */
+export const VARIANTES_EXTRA: Partial<Record<TipoExtra, { valor: string; etiqueta: string }[]>> = {
+  puerta: [
+    { valor: 'PTAIZQ', etiqueta: 'Izquierda' },
+    { valor: 'PTADER', etiqueta: 'Derecha' },
+    { valor: 'PTAIZQ-AM', etiqueta: 'Izquierda, abre contra el muro' },
+    { valor: 'PTADER-AM', etiqueta: 'Derecha, abre contra el muro' },
+  ],
+  panel: [
+    { valor: 'PNLAT', etiqueta: 'Lateral' },
+    { valor: 'PNCEN', etiqueta: 'Central' },
+  ],
+  pilastra: [
+    { valor: 'PLCEN', etiqueta: 'Central' },
+    { valor: 'PLLAT', etiqueta: 'Lateral' },
+    { valor: 'PLLATMUR', etiqueta: 'Lateral contra muro' },
+    { valor: 'PLCOS', etiqueta: 'De costilla' },
+    { valor: 'PLCOSMUR', etiqueta: 'De costilla contra muro' },
+  ],
+}
+
+/** si a este tipo de extra hay que preguntarle la variante */
+export function pideVariante(tipo: TipoExtra): boolean {
+  return (VARIANTES_EXTRA[tipo]?.length ?? 0) > 0
+}
+
+/**
+ * La variante con la que se arma el SKU. Devuelve null cuando hace falta
+ * elegirla y todavía está en blanco: ahí no se inventa ninguna, porque mandar
+ * a fábrica una puerta de la mano equivocada es peor que no mandarla.
+ */
+export function subTipoDeExtra(extra: Extra): string | null {
+  if (extra.tipo === 'mingitorio') return 'MG150'
+  if (extra.tipo === 'costilla') return 'PLCOS'
+  if (!pideVariante(extra.tipo)) return null
+  const elegida = (extra.subTipo || '').trim()
+  if (!elegida) return null
+  return VARIANTES_EXTRA[extra.tipo]?.some((v) => v.valor === elegida) ? elegida : null
+}
+
 export function esPorM2(tipo: TipoExtra): boolean {
   return FAMILIAS_EXTRA.find((f) => f.tipo === tipo)?.porM2 ?? false
 }
