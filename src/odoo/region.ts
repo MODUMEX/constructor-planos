@@ -29,3 +29,27 @@ export function destinoOdoo(
       'Ponésela en Distribuidores y volvé a intentar.',
   }
 }
+
+/**
+ * Si en la lista de proyectos hay que DIBUJAR el botón de autorizar.
+ *
+ * Antes el botón salía siempre y, al apretarlo, aparecía un aviso explicando
+ * que ese proyecto no podía irse a Odoo. Ofrecer algo y después negarlo es
+ * peor que no ofrecerlo: la fila de México no tiene por qué tener el botón.
+ *
+ * Las fichas llegan de la nube, después de la lista. Mientras no hayan
+ * llegado, o si de ese distribuidor no hay ficha, el botón SE DEJA: esconderlo
+ * por no saber todavía sería esconderlo por un problema de red, y quien
+ * autoriza se quedaría mirando una lista sin botones sin entender por qué. La
+ * regla de verdad corre igual del lado del servidor.
+ */
+export function muestraAutorizar(
+  fichas: Map<number, { nombre?: string; region?: string | null }>,
+  distribuidorId: number | null,
+): boolean {
+  if (fichas.size === 0) return true
+  if (distribuidorId === null) return false
+  const ficha = fichas.get(distribuidorId)
+  if (!ficha) return true
+  return destinoOdoo(ficha).ok
+}

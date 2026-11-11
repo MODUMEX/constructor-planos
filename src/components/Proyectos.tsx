@@ -7,6 +7,7 @@ import {
   siguienteNumero, type ProyectoEnLista, type Revision,
 } from '../proyectos'
 import { estadosDeCotizacion, type EstadoCotizacion } from '../odoo/enviar'
+import { muestraAutorizar } from '../odoo/region'
 
 /**
  * Guardar y abrir proyectos. Cada revisión es su propia fila, así que sacar la
@@ -15,6 +16,12 @@ import { estadosDeCotizacion, type EstadoCotizacion } from '../odoo/enviar'
  * Solo lista los proyectos que guardó el 2.0. Los del Constructor anterior
  * están en la misma tabla pero con otra estructura adentro, y abrirlos fallaría.
  */
+
+/** lo que la lista necesita de cada distribuidor: cómo se llama y a dónde cotiza */
+interface FichaDist {
+  nombre: string
+  region: string | null
+}
 
 interface Props {
   usuario: Usuario
@@ -66,7 +73,7 @@ export default function Proyectos({
   const [confirmarEnvio, setConfirmarEnvio] = useState<number | null>(null)
   const [rechazando, setRechazando] = useState<number | null>(null)
   const [motivo, setMotivo] = useState('')
-  const [nombresDist, setNombresDist] = useState<Map<number, string>>(new Map())
+  const [fichasDist, setFichasDist] = useState<Map<number, FichaDist>>(new Map())
   const [filtroDist, setFiltroDist] = useState('')
   const [filtroAutor, setFiltroAutor] = useState('')
   const autoriza = puedeAutorizar(usuario)
@@ -102,13 +109,21 @@ export default function Proyectos({
     if (!veDistribuidor) return
     void (async () => {
       const r = await listarDistribuidores(usuario)
-      setNombresDist(new Map((r.dato ?? []).map((d) => [d.distribuidorId, d.nombre])))
+      setFichasDist(new Map((r.dato ?? []).map((d) => [
+        d.distribuidorId, { nombre: d.nombre, region: d.region ?? null },
+      ])))
     })()
   }, [usuario, veDistribuidor])
 
+  /** si a esta fila le toca botón de autorizar; la regla vive en odoo/region */
+  const vaAOdoo = useCallback(
+    (id: number | null): boolean => muestraAutorizar(fichasDist, id),
+    [fichasDist],
+  )
+
   const nombreDist = useCallback(
-    (id: number | null): string => (id === null ? '—' : nombresDist.get(id) ?? '#' + id),
-    [nombresDist],
+    (id: number | null): string => (id === null ? '—' : fichasDist.get(id)?.nombre ?? '#' + id),
+    [fichasDist],
   )
 
   /** los distribuidores que de verdad aparecen en la lista, para el filtro */
@@ -399,7 +414,7 @@ export default function Proyectos({
                               </>
                             ) : (
                               <>
-                                {autoriza && !enviada && (
+                                {autoriza && !enviada && vaAOdoo(p.distribuidorId) && (
                                   <button
                                     className="btn chico primario"
                                     onClick={() => setConfirmarEnvio(p.proyectoId)}

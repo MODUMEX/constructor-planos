@@ -12,7 +12,7 @@
  *
  *   npx tsx scripts/probar-odoo-region.ts
  */
-import { destinoOdoo } from '../src/odoo/region'
+import { destinoOdoo, muestraAutorizar } from '../src/odoo/region'
 
 let mal = 0
 const ok = (b: boolean, t: string) => { if (!b) mal++; console.log(`${b ? '✓' : '✕'} ${t}`) }
@@ -70,6 +70,27 @@ console.log('\n— el caso que rompía: el nombre guardado no calza con la ficha
     guardadoLatam.distribuidor,
   )
   ok(r2.ok && r2.moneda === 'USD', 'y el mismo nombre con otro id sale como LATAM, en dólares')
+}
+
+console.log('\n— a qué filas les toca botón de autorizar')
+{
+  const fichas = new Map<number, { nombre?: string; region?: string | null }>([
+    [1, { nombre: 'DICOMA CR', region: 'Costa Rica' }],
+    [2, { nombre: 'DICOMA LATAM', region: 'LATAM' }],
+    [3, { nombre: 'SANIAC', region: 'México' }],
+    [4, { nombre: 'SIN REGION', region: null }],
+  ])
+
+  ok(muestraAutorizar(fichas, 1), 'Costa Rica lleva botón')
+  ok(muestraAutorizar(fichas, 2), 'LATAM lleva botón')
+  ok(!muestraAutorizar(fichas, 3), 'México NO lleva botón: es el caso que mostraba el aviso')
+  ok(!muestraAutorizar(fichas, 4), 'sin región tampoco, que era el otro aviso')
+  ok(!muestraAutorizar(fichas, null), 'un proyecto sin distribuidor tampoco')
+
+  ok(muestraAutorizar(fichas, 99),
+    'de un distribuidor que no está en las fichas se deja el botón, no se adivina')
+  ok(muestraAutorizar(new Map(), 3),
+    'y si las fichas no llegaron, el botón se deja: no se esconde por un problema de red')
 }
 
 console.log(mal === 0 ? '\nTodo cuadra.' : `\n${mal} caso(s) mal.`)
