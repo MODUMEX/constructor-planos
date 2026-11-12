@@ -338,7 +338,12 @@ export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Pr
                     {avisoLogo || 'PNG o JPG, hasta 800 KB. Sale en el PDF de la cotización, al lado del de Modumex.'}
                   </span>
                 </div>
-                <div className="campo">
+                {/*
+                  Ocupa la fila entera de la grilla: en una columna de 240 px la
+                  razón social no se lee. Es gridColumn y no flex porque .campos
+                  es una grilla, y ahí el flex del hijo no hace nada.
+                */}
+                <div className="campo" style={{ gridColumn: '1 / -1' }}>
                   <label>Contacto en Odoo</label>
                   {edita.odooPartnerId ? (
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -368,32 +373,43 @@ export default function Distribuidores({ usuario, lista, onLista, onCerrar }: Pr
                           {buscandoOdoo ? '…' : 'Buscar'}
                         </button>
                       </div>
+                      {/*
+                        Lista y no tabla. Esto vive en una columna angosta de la
+                        ficha: con cuatro columnas, la razón social se comía el
+                        ancho y el botón quedaba fuera, alcanzable solo con una
+                        barra horizontal. Así cada contacto es un renglón que se
+                        acomoda al ancho que haya y el botón nunca se corta.
+                      */}
                       {contactosOdoo !== null && contactosOdoo.length > 0 && (
-                        <div className="tabla-wrap" style={{ marginTop: 8, maxHeight: 190, overflowY: 'auto' }}>
-                          <table>
-                            <tbody>
-                              {contactosOdoo.map((c) => (
-                                <tr key={c.id}>
-                                  <td style={{ fontWeight: 600 }}>{c.nombre}</td>
-                                  <td>{c.cedula ?? '—'}</td>
-                                  <td>{c.ciudad ?? ''}</td>
-                                  <td className="der">
-                                    <button
-                                      className="btn plano chico"
-                                      onClick={() => {
-                                        campo('odooPartnerId', c.id)
-                                        setContactosOdoo(null)
-                                        setBuscaOdoo('')
-                                        setAvisoOdoo(`Queda ligado a "${c.nombre}". Falta apretar Guardar.`)
-                                      }}
-                                    >
-                                      Es este
-                                    </button>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                        <div className="tabla-wrap" style={{ marginTop: 8, maxHeight: 220, overflowY: 'auto' }}>
+                          {contactosOdoo.map((c) => (
+                            <div
+                              key={c.id}
+                              style={{
+                                display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap',
+                                padding: '9px 12px', borderBottom: '1px solid var(--line-soft)',
+                              }}
+                            >
+                              <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+                                <div style={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{c.nombre}</div>
+                                <div className="ayuda">
+                                  {[c.cedula, c.ciudad].filter(Boolean).join(' · ') || 'sin cédula ni ciudad'}
+                                </div>
+                              </div>
+                              <button
+                                className="btn plano chico"
+                                style={{ flex: '0 0 auto' }}
+                                onClick={() => {
+                                  campo('odooPartnerId', c.id)
+                                  setContactosOdoo(null)
+                                  setBuscaOdoo('')
+                                  setAvisoOdoo(`Queda ligado a "${c.nombre}". Falta apretar Guardar.`)
+                                }}
+                              >
+                                Es este
+                              </button>
+                            </div>
+                          ))}
                         </div>
                       )}
                     </>
