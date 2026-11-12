@@ -622,6 +622,20 @@ export default function App() {
   })()
   // las mamparas de orinal también cambian por línea
   const mgDeLaLinea = mgMedidas(config.linea, config.modelo)
+  /**
+   * Las mamparas que se pueden pedir como PIEZA EXTRA.
+   *
+   * Salen del ÁREA 1 y no del área en la que se esté parada, igual que el
+   * precio y el código de Odoo del extra: un extra no vive en ningún área.
+   *
+   * Existe porque el 45 solo se fabrica de 120 de alto y el extra dejaba
+   * escribir 45 × 150: la cotización salía con un precio creíble y se caía
+   * recién al autorizar, diciendo que el producto no está en Odoo.
+   */
+  const mgParaExtras = (() => {
+    const c = proyecto.areas[0]?.config
+    return c ? mgMedidas(c.linea, c.modelo) : mgDeLaLinea
+  })()
 
   /**
    * Tramos que no cerraron contra su claro. El buscador siempre devuelve la
@@ -3335,6 +3349,33 @@ export default function App() {
 
                           {porM2 ? (
                             <>
+                              {/*
+                                La mampara se elige de la lista y no se escribe:
+                                de 45 solo se fabrica la de 120 de alto, y a
+                                mano se podía pedir una 45 × 150 que no existe.
+                                El precio salía igual y recién al autorizar se
+                                caía con "ese producto no está en Odoo".
+                              */}
+                              {x.tipo === 'mingitorio' ? (
+                                <label className="campo" style={{ width: 212 }}>
+                                  <span>Medida (fondo × alto)</span>
+                                  <select
+                                    value={x.anchoCm && x.altoCm ? `${x.anchoCm}x${x.altoCm}` : ''}
+                                    onChange={(e) => {
+                                      const [a, h] = e.target.value.split('x').map(Number)
+                                      cambiarExtra(i, { anchoCm: a || 0, altoCm: h || 0 })
+                                    }}
+                                  >
+                                    <option value="">— elegir —</option>
+                                    {mgParaExtras.map((m) => (
+                                      <option key={`${m.anchoCm}x${m.altoCm}`} value={`${m.anchoCm}x${m.altoCm}`}>
+                                        {m.anchoCm} × {m.altoCm} cm
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                              ) : (
+                              <>
                               <label className="campo" style={{ width: 104 }}>
                                 <span>Ancho (cm)</span>
                                 <input
@@ -3351,6 +3392,8 @@ export default function App() {
                                   onChange={(e) => cambiarExtra(i, { altoCm: Number(e.target.value) || 0 })}
                                 />
                               </label>
+                              </>
+                              )}
                               {/*
                                 Odoo no sabe fabricar "una puerta de 60 x 150" sin saber
                                 de qué mano es, así que acá se elige. El mingitorio y la
