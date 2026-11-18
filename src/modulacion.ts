@@ -1163,6 +1163,33 @@ export function centralesAngostas(tramo: Tramo, config: Config): string[] {
   return avisos
 }
 
+/**
+ * La medida que toma una pieza al arrastrarla, desde donde estaba cuando se
+ * la agarró.
+ *
+ * El `delta` es el recorrido ENTERO del puntero desde que se apretó el botón,
+ * no lo que se movió desde el evento anterior: el navegador manda decenas de
+ * eventos por segundo y todos traen la posición absoluta. Por eso el ancla es
+ * `ancho0`, la medida de arranque, y no la de ahora. Sumarle el recorrido a la
+ * medida actual lo cuenta una vez por evento: la pieza se dispara hasta el tope
+ * del catálogo y ahí parece que se trabó, porque ya no hay medida más grande.
+ *
+ * `factor` es cuánto crece la pieza por centímetro de puntero: 2 en una
+ * pilastra —crece por los dos lados— y 1 en el ancho libre de un orinal.
+ *
+ * Vive acá, y no en el componente, para poder fijarlo en una prueba: el bug
+ * era de la cuenta, no del dibujo.
+ */
+export function anchoTrasArrastre(
+  ancho0: number,
+  deltaCm: number,
+  factor: number,
+  opciones?: number[],
+): number {
+  const deseado = ancho0 + deltaCm * factor
+  return opciones && opciones.length ? medidaCercana(opciones, deseado) : deseado
+}
+
 /** la frontera k lleva mampara de mingitorio en vez de pilastra */
 function esMingitorioEn(tramo: Tramo, k: number): boolean {
   return tramo.cabinas[k - 1]?.tipo === 'orinal' && tramo.cabinas[k]?.tipo === 'orinal'

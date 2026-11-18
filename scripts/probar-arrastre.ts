@@ -7,7 +7,8 @@
  *
  *   npm run probar-arrastre
  */
-import { anchoTotal, compensarPilastra, crearTramos } from '../src/modulacion'
+import { anchoTotal, anchoTrasArrastre, compensarPilastra, crearTramos } from '../src/modulacion'
+import { anchosPilastraEn, medidaCercana } from '../src/modulador'
 import type { Config, TipologiaId } from '../src/types'
 
 let fallos = 0
@@ -107,6 +108,55 @@ console.log('\n4 · lo que no se puede compensar se devuelve a buscar')
     'si ninguna vecina llega, devuelve null',
     compensarPilastra(limpio, c2, 2, limpio.pilastras![2] + 1000) === null,
   )
+}
+
+console.log('\n5 · el arrastre se mide desde donde se AGARRÓ la pieza')
+{
+  /**
+   * El bug que sentía Dayanna el 18-nov-2026: *"al moverlo se desplaza o
+   * demasiado o nada, como si se quedara pegado"*.
+   *
+   * El navegador manda un evento por cada pelo que se mueve el puntero y
+   * todos traen la posición ABSOLUTA, no lo que se corrió desde el anterior.
+   * El arrastre del panel le sumaba ese recorrido a la medida de AHORA en vez
+   * de a la de arranque, así que un solo centímetro de puntero se contaba una
+   * vez por evento: la pieza trepaba sola hasta el tope del catálogo y ahí
+   * parecía trabada, porque ya no había medida más grande a la que saltar.
+   *
+   * Acá se simulan 30 eventos con el puntero QUIETO en la misma posición: la
+   * medida tiene que ser la misma en el primero y en el último.
+   */
+  const config = cfg('RECTA_ENTRE_MUROS', { puertaCm: 60 })
+  const opciones = anchosPilastraEn(false, config.modelo)
+  const ancho0 = 24
+  const recorridoCm = 2.4
+
+  const quieto = Array.from({ length: 30 }, () => anchoTrasArrastre(ancho0, recorridoCm, 2, opciones))
+  revisar('con el puntero quieto la medida no se mueve',
+    new Set(quieto).size === 1, `${quieto[0]} … ${quieto[quieto.length - 1]}`)
+  revisar('y es la que le toca a ese recorrido', quieto[0] === 30, String(quieto[0]))
+
+  // La otra mitad de lo que se sentía: un recorrido CHICO no mueve nada, y eso
+  // está bien —las medidas son de catálogo y hay que cruzar media pieza para
+  // saltar a la siguiente—, pero antes tampoco se quedaba quieto: iba sumando.
+  const apenas = Array.from({ length: 30 }, () => anchoTrasArrastre(ancho0, 1.2, 2, opciones))
+  revisar('un movimiento chico deja la pieza donde estaba, y la deja QUIETA',
+    new Set(apenas).size === 1 && apenas[0] === ancho0, String(apenas[0]))
+
+  // y así era antes: cada evento sumaba sobre lo que ya había cambiado
+  let corrido = ancho0
+  for (let i = 0; i < 30; i++) corrido = medidaCercana(opciones, corrido + recorridoCm * 2)
+  revisar('y el bug viejo sí se disparaba, para que se note la diferencia',
+    corrido > quieto[0] + 20, `${ancho0} → ${corrido} en vez de ${quieto[0]}`)
+
+  // el recorrido sí tiene que mandar: más puntero, más pieza
+  const poco = anchoTrasArrastre(ancho0, 1, 2, opciones)
+  const mucho = anchoTrasArrastre(ancho0, 12, 2, opciones)
+  revisar('mover más agranda más', mucho > poco, `${poco} vs ${mucho}`)
+  revisar('y hacia atrás achica', anchoTrasArrastre(40, -10, 2, opciones) < 40)
+
+  // el orinal va 1 a 1 con el puntero y sin catálogo: su ancho es libre
+  revisar('el orinal sigue al puntero 1 a 1', anchoTrasArrastre(75, 6, 1) === 81)
 }
 
 console.log(fallos ? `\n${fallos} revisiones mal.\n` : '\nTodo cuadra.\n')

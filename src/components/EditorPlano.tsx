@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Cabina, Config, Pais, Soporte, Tramo } from '../types'
 import { alturasDeConfig, anchosPanelFabrica, anchosPilastra, COSTILLA_MINIMA_CM, COSTILLA_TOLERANCIA_CM, esVariacionPanel, familiaDelFrente, ICONO_MR, medidasDeFrente, PIEZA_PIDE_COSTILLA_CM, puertasPosibles, tipologia } from '../catalog'
-import { anchoTotal, arrancaElCuartoPmr, esEspacioLibre, minimoDe, nuevaCabina, pilastrasParaAncho, profundidadAccesible, puertaSugerida, snap, cierraConMingitorio, ladosDeCabina, lugaresDe, mamparaEn } from '../modulacion'
+import { anchoTotal, anchoTrasArrastre, arrancaElCuartoPmr, esEspacioLibre, minimoDe, nuevaCabina, pilastrasParaAncho, profundidadAccesible, puertaSugerida, snap, cierraConMingitorio, ladosDeCabina, lugaresDe, mamparaEn } from '../modulacion'
 import { anchosPilastraEn, medidaCercana, PILASTRA_MINIMA_CM, PUERTA_ACCESIBLE_MIN } from '../modulador'
 import { Grupo, Item, Menu, Raya } from './Menu'
 import {
@@ -170,6 +170,21 @@ export default function EditorPlano({
     ay: number
     cabinas: Cabina[]
     escala: number
+    /**
+     * Cuánto medían la pilastra y el orinal CUANDO SE AGARRÓ la pieza.
+     *
+     * Son el ancla de todo el arrastre y por eso se guardan acá. Leerlos del
+     * tramo en cada movimiento —que es como estaba— hace que el recorrido del
+     * puntero se sume sobre un valor que ya cambió: con mover un pelo la
+     * pilastra salta de 24 a 30, en el siguiente evento el mismo recorrido se
+     * suma sobre 30 y se va a 35, y así hasta el tope del catálogo, donde se
+     * queda clavada porque ya no hay medida más grande. Es exactamente lo que
+     * se siente: *"o se desplaza demasiado o nada, como si se quedara pegado"*
+     * (Dayanna, 18-nov-2026). La pilastra nunca tuvo el problema porque su
+     * arrastre sí guarda `ancho0`.
+     */
+    pilastra0: number
+    orinal0: number
   } | null>(null)
   const arrastrePil = useRef<{
     tramoId: string
@@ -235,6 +250,13 @@ export default function EditorPlano({
     if (!svg) return
     const r = svg.getBoundingClientRect()
     const escala = r.width / caja.w // px por cm
+    // el ancho LIBRE del orinal que tiene a la izquierda, por si lo que se
+    // agarró es un mingitorio: es la misma cuenta que hace el movimiento
+    const nCab = tramo.cabinas.length
+    const pil = (k: number) => tramo.pilastras?.[k] ?? config.anchoPilastraCm
+    const cab = tramo.cabinas[indice]
+    const ladoIzq = indice === 0 ? pil(0) : pil(indice) / 2
+    const ladoDer = indice === nCab - 1 ? pil(nCab) : pil(indice + 1) / 2
     arrastre.current = {
       tramoId: tramo.id,
       indice,
@@ -244,6 +266,8 @@ export default function EditorPlano({
       ay: m.ay,
       cabinas: tramo.cabinas,
       escala,
+      pilastra0: tramo.pilastras?.[indice + 1] ?? config.anchoPilastraCm,
+      orinal0: cab ? cab.anchoCm - ladoIzq - ladoDer : 0,
     }
     arrastroPanel.current = false
     setArrastrando(`${tramo.id}:${indice}`)
@@ -378,7 +402,7 @@ export default function EditorPlano({
       const dx = (e.clientX - p.x0) / p.escala
       const dy = (e.clientY - p.y0) / p.escala
       // arrastrar hacia afuera engorda la pilastra por los dos lados
-      const deseado = p.ancho0 + (dx * p.ax + dy * p.ay) * 2
+      const recorrido = dx * p.ax + dy * p.ay
       // A mano se puede llegar a CUALQUIER pilastra del catálogo en los extremos.
       // El buscador automático sigue prefiriendo las delgadas —que es lo normal
       // contra un muro—, pero hay planos que cierran con una ancha de relleno,
@@ -389,12 +413,12 @@ export default function EditorPlano({
       // entran los PANELES: son el relleno de frente cuando el claro se pasa.
       // Como abajo de 120 las pilastras están mucho más juntas, arrastrar de a
       // poco sigue cayendo en pilastra; solo estirando de verdad llega a panel.
-      if (Math.abs(deseado - p.ancho0) > 0.5) arrastroPil.current = true
+      if (Math.abs(recorrido * 2) > 0.5) arrastroPil.current = true
       const opciones = [
         ...anchosPilastraEn(p.extremo, config.modelo, p.ancho0),
         ...medidasDeFrente(config.modelo, alturasDeConfig(config).panel, pais).filter((m) => m.familia === 'PN').map((m) => m.anchoCm),
       ]
-      onPilastra(p.tramoId, p.indice, medidaCercana(opciones, deseado))
+      onPilastra(p.tramoId, p.indice, anchoTrasArrastre(p.ancho0, recorrido, 2, opciones))
       return
     }
     const a = arrastre.current
@@ -419,18 +443,18 @@ export default function EditorPlano({
     const der = t.cabinas[a.indice + 1]
     const arrastraMingitorio =
       izq?.tipo === 'orinal' && (der?.tipo === 'orinal' || (der === undefined && !t.muroFin))
+    // Siempre contra la medida de ARRANQUE, nunca contra la de ahora: el
+    // recorrido del puntero ya lleva adentro todo lo que se movió desde que se
+    // agarró la pieza. Sumarlo sobre el valor actual lo cuenta dos veces y la
+    // pieza se dispara hasta el tope del catálogo.
     if (arrastraMingitorio) {
-      const nCab = t.cabinas.length
-      const pil = (k: number) => t.pilastras?.[k] ?? config.anchoPilastraCm
-      const ladoIzq = a.indice === 0 ? pil(0) : pil(a.indice) / 2
-      const ladoDer = a.indice === nCab - 1 ? pil(nCab) : pil(a.indice + 1) / 2
-      onOrinal(a.tramoId, a.indice, izq.anchoCm - ladoIzq - ladoDer + deltaCm)
+      onOrinal(a.tramoId, a.indice, anchoTrasArrastre(a.orinal0, deltaCm, 1))
       return
     }
 
     const actual = t.pilastras?.[a.indice + 1] ?? config.anchoPilastraCm
     // el panel mueve la pilastra CENTRAL que tiene a la derecha: mismo mínimo
-    const elegida = medidaCercana(anchosPilastraEn(false, config.modelo, actual), actual + deltaCm * 2)
+    const elegida = anchoTrasArrastre(a.pilastra0, deltaCm, 2, anchosPilastraEn(false, config.modelo, a.pilastra0))
     if (elegida !== actual) onPilastra(a.tramoId, a.indice + 1, elegida)
   }
 
@@ -821,9 +845,31 @@ export default function EditorPlano({
                           >
                             <title>Panel divisor — tocalo para elegir la medida, o arrastralo</title>
                           </rect>
-                          {activo && (
-                            <circle cx={(a.x + b.x) / 2} cy={(a.y + b.y) / 2} r={9} fill="#2e6fd9" opacity={0.28} />
-                          )}
+                          {activo && (() => {
+                            // Mientras se arrastra, la medida que se está
+                            // eligiendo, escrita al lado de la pieza. Las
+                            // medidas son de catálogo y hay que cruzar media
+                            // pieza para saltar a la siguiente: sin el número
+                            // a la vista, ese tramo en el que todavía no saltó
+                            // se siente como que el plano no responde.
+                            const c = pt(m, u1, profDiv * 0.5)
+                            const esMg = esMingitorio(tramo, i + 1)
+                            const medida = esMg
+                              ? anchoDeOrinal(tramo, i, config.anchoPilastraCm)
+                              : (tramo.pilastras?.[i + 1] ?? config.anchoPilastraCm)
+                            return (
+                              <g pointerEvents="none">
+                                <circle cx={(a.x + b.x) / 2} cy={(a.y + b.y) / 2} r={9} fill="#2e6fd9" opacity={0.28} />
+                                <text
+                                  x={c.x} y={c.y - 16} textAnchor="middle" fontSize={15}
+                                  fontWeight={700} fill="#2e6fd9" stroke="#0e1319" strokeWidth={4}
+                                  paintOrder="stroke"
+                                >
+                                  {esMg ? 'orinal ' : ''}{formatear(medida, unidad)}{unidadTxt}
+                                </text>
+                              </g>
+                            )
+                          })()}
                           {/* cota del panel: va en vertical, a lo largo de la pieza */}
                           {verCotas && cuarto?.indice !== i && (() => {
                             const c = pt(m, u1, profDiv * 0.5)
@@ -1012,6 +1058,20 @@ export default function EditorPlano({
                             fill={activa ? '#2e6fd9' : '#3c4e63'} stroke="#5f7590" strokeWidth={0.5}
                             pointerEvents="none"
                           />
+                          {/* la medida que se está eligiendo, a la vista mientras
+                              se arrastra: el tooltip no se ve con el botón apretado */}
+                          {arrastrando === clave && (() => {
+                            const c = pt(m, centro, prof)
+                            return (
+                              <text
+                                x={c.x} y={c.y + 26} textAnchor="middle" fontSize={15}
+                                fontWeight={700} fill="#2e6fd9" stroke="#0e1319" strokeWidth={4}
+                                paintOrder="stroke" pointerEvents="none"
+                              >
+                                {formatear(tramo.pilastras?.[k] ?? ancho, unidad)}{unidadTxt}
+                              </text>
+                            )
+                          })()}
                           <rect
                             x={Math.min(g0.x, g1.x)} y={Math.min(g0.y, g1.y)}
                             width={Math.max(Math.abs(g1.x - g0.x), 8)} height={Math.max(Math.abs(g1.y - g0.y), 8)}
