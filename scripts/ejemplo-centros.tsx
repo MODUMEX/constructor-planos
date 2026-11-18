@@ -14,7 +14,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import EditorPlano from '../src/components/EditorPlano'
 import { generarPDF } from '../src/exportar/pdf'
 import { descargasDe, tramoDesdeCentros } from '../src/descargas'
-import { crearTramos } from '../src/modulacion'
+import { crearTramos, invertirTramo } from '../src/modulacion'
 import type { Area, Config, Proyecto, Tramo } from '../src/types'
 
 const CLARO = 449
@@ -89,6 +89,27 @@ const mixtoAcomodado = (() => {
   return { ...mixto, cabinas: r.cabinas, pilastras: r.pilastras, ajuste: r.ajuste, mensaje: r.mensaje }
 })()
 
+// ---------------------------------------- el campo de orinales AL ARRANQUE
+// Lo mismo pero del otro lado, que es como queda un área invertida. La pilastra
+// que separa el campo de los baños es LATERAL también acá: va entera del lado
+// de los baños. Salía central —media para el último orinal— y la tira terminaba
+// media pilastra antes del muro.
+const INVERTIDO: Config = {
+  ...CON_ORINALES,
+  anchoOrinalCm: 75,
+  mgAnchoCm: 45,
+  claroPedidoCm: 495,
+  cabinasPedidas: 3,
+}
+
+const invertido = (() => {
+  const t = invertirTramo(crearTramos('RECTA_ENTRE_MUROS', 495, 3, INVERTIDO)[0])
+  const con = { ...t, centrosCm: [37.75, 113.75, 190.25, 275.5, 365, 451] }
+  const r = tramoDesdeCentros(con, INVERTIDO)
+  if (!r) throw new Error('el área invertida no moduló')
+  return { ...con, cabinas: r.cabinas, pilastras: r.pilastras, ajuste: r.ajuste, mensaje: r.mensaje }
+})()
+
 const proyecto: Proyecto = {
   numero: '9002',
   paisFabricacion: 'MX',
@@ -101,6 +122,7 @@ const proyecto: Proyecto = {
     area('a-parejo', 'Repartido parejo · las descargas no calzan', parejo),
     area('a-centros', 'Modulado desde los centros de carga', acomodado),
     area('a-orinales', 'Baños + orinales, todo desde los centros', mixtoAcomodado, CON_ORINALES),
+    area('a-invertido', 'El campo de orinales al arranque · área invertida', invertido, INVERTIDO),
   ],
 }
 

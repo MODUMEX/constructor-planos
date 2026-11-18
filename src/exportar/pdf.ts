@@ -759,6 +759,31 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
         uTexto: -SOBRA_MURO_CM - 19,
       })
 
+      /**
+       * El divisor que va a la DERECHA de la cabina i, acotado a lo hondo.
+       *
+       * Está aparte porque lo necesitan los dos caminos del recorrido de abajo:
+       * el orinal corta temprano —no tiene puerta que acotar— y así se quedaba
+       * sin la cota de su mingitorio, que es justamente el único divisor que
+       * puede medir distinto del panel.
+       */
+      const cotaDeDivisor = (i: number, u1: number) => {
+        if (i >= nCab - 1 || cuarto?.indice === i) return
+        const profDiv = profundidadDeDivisor(tramo, i, prof, mamparaEn(tramo, area.config, i)?.anchoCm)
+        if (esMingitorio(tramo, i + 1)) {
+          cotaEnV(doc, e, m, 0, profDiv, u1 + 9, u1, String(profDiv), {
+            size: 5.5,
+            rot,
+            uTexto: u1 + 12,
+          })
+          return
+        }
+        // al LADO de la pieza y hacia la pared, no encima: escrita sobre la
+        // línea del panel el número quedaba tachado por ella
+        const [nx, ny] = aHoja(e, pt(m, u1 + aire(e, 3.5), profDiv * 0.34))
+        texto(doc, String(profDiv), nx, ny, { size: 5.5, align: 'center', angle: rot + 90, color: COTA })
+      }
+
       tramo.cabinas.forEach((cab, i) => {
         if (cuarto?.indice === i) return
         const u0 = acum[i]
@@ -773,6 +798,7 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
             rot,
             vTexto: prof - 22,
           })
+          cotaDeDivisor(i, u1)
           return
         }
         // El ESPACIO LIBRE no tiene puerta que acotar, pero sí tiene medida: el
@@ -790,22 +816,7 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
         // El divisor de la derecha, acotado a lo hondo. El mingitorio entre dos
         // orinales lleva su fondo —el que eligió el cliente, 45 o 60— con cota de
         // verdad, igual que las pilastras: antes salía como un número suelto.
-        if (i < nCab - 1 && cuarto?.indice !== i) {
-          const profDiv = profundidadDeDivisor(tramo, i, prof, mamparaEn(tramo, area.config, i)?.anchoCm)
-          const esMg = esMingitorio(tramo, i + 1)
-          if (esMg) {
-            cotaEnV(doc, e, m, 0, profDiv, u1 + 9, u1, String(profDiv), {
-              size: 5.5,
-              rot,
-              uTexto: u1 + 12,
-            })
-          } else {
-            // al LADO de la pieza y hacia la pared, no encima: escrita sobre la
-            // línea del panel el número quedaba tachado por ella
-            const [nx, ny] = aHoja(e, pt(m, u1 + aire(e, 3.5), profDiv * 0.34))
-            texto(doc, String(profDiv), nx, ny, { size: 5.5, align: 'center', angle: rot + 90, color: COTA })
-          }
-        }
+        cotaDeDivisor(i, u1)
 
         // Los paneles que CIERRAN la tira donde no hay muro. Salían mudos: la
         // cota de fondo la tenían solo los divisores internos, y el de cierre

@@ -1179,8 +1179,9 @@ export function lugaresDe(cabinas: Cabina[]): Lugar[] {
  * otro lado no hay una cabina que las comparta:
  *
  *   · las dos de punta, que apoyan contra el muro;
- *   · la que cierra la tira de baños contra el campo de orinales, porque el
- *     campo empieza DESPUÉS de ella;
+ *   · la que separa la tira de baños del campo de orinales, de cualquiera de
+ *     los dos lados: el campo empieza DESPUÉS de ella o termina ANTES, pero
+ *     nunca se la reparte con un orinal;
  *   · la que sale del CUARTO ACCESIBLE, que cierra con su propio divisor;
  *   · la que toca un ESPACIO LIBRE: ahí no hay cabina que se lleve la mitad,
  *     así que apoya entera del lado de la cabina que sí tiene puerta.
@@ -1199,6 +1200,12 @@ export function ladoDePilastra(
   if (k <= 0) return 'der'
   if (k >= n) return 'izq'
   if (!lugares[k - 1].orinal && lugares[k].orinal) return 'izq'
+  // Y lo mismo con el campo del otro lado, que es como queda un área
+  // invertida: ahí el campo TERMINA antes de la pilastra, así que la pieza
+  // apoya entera del lado de los baños, que ahora es la derecha. Sin esta
+  // línea la pilastra que cierra el campo salía central: media se la comía el
+  // último orinal y la primera cabina de baños quedaba media pilastra corta.
+  if (lugares[k - 1].orinal && !lugares[k].orinal) return 'der'
   // La que separa el cuarto de la tira es LATERAL, y apoya del lado de la
   // TIRA: si el cuarto arranca, hacia la derecha; si el cuarto cierra —área
   // invertida—, hacia la izquierda.

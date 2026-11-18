@@ -11,7 +11,8 @@ import {
   avisosDeDescargas, corridaDeCentros, descargasDe, escalaDeTramo, fronterasDe,
   hayCentros, modularPorCentros, tramoDesdeCentros,
 } from '../src/descargas'
-import { anchoTotal, crearTramos } from '../src/modulacion'
+import { anchoTotal, crearTramos, invertirTramo, ladoDePilastra, lugaresDe } from '../src/modulacion'
+import { anchoDeOrinal } from '../src/geometria'
 import type { Config, Tramo, TipologiaId } from '../src/types'
 
 let fallos = 0
@@ -194,6 +195,46 @@ console.log('\n5b · un área de puros orinales')
     revisar('y el campo sigue midiendo lo mismo',
       Math.abs(anchoTotal(r.cabinas) - anchoTotal(t.cabinas)) < 0.6,
       `${anchoTotal(r.cabinas)} vs ${anchoTotal(t.cabinas)}`)
+  }
+}
+
+console.log('\n5d · el campo de orinales al ARRANQUE, que es como queda un área invertida')
+{
+  // El caso que mandó Dayanna el 18-nov-2026: tres orinales, tres cabinas y la
+  // pilastra que las separa saliendo CENTRAL, o sea repartida entre el último
+  // orinal y la primera cabina. Esa pilastra es LATERAL: va entera del lado de
+  // los baños, igual que cuando el campo va al final.
+  const c = cfg('RECTA_ENTRE_MUROS', { orinales: 3, anchoOrinalCm: 75, mgAnchoCm: 45 })
+  const t = invertirTramo(crearTramos('RECTA_ENTRE_MUROS', 495, 3, c)[0])
+  revisar('el campo quedó al arranque',
+    t.cabinas.slice(0, 3).every((x) => x.tipo === 'orinal'),
+    t.cabinas.map((x) => x.tipo).join(' · '))
+
+  const lug = lugaresDe(t.cabinas)
+  revisar('la pilastra que cierra el campo es lateral y apoya en los baños',
+    ladoDePilastra(lug, 3) === 'der', ladoDePilastra(lug, 3))
+
+  t.centrosCm = [37.75, 113.75, 190.25, 275.5, 365, 451]
+  const r = tramoDesdeCentros(t, c)
+  revisar('modula', r != null)
+  if (r) {
+    const armado: Tramo = { ...t, cabinas: r.cabinas, pilastras: r.pilastras }
+    const fr = fronterasReales(armado)
+    // sin el arreglo la tira se quedaba media pilastra corta y la última
+    // frontera caía unos 10 cm antes del muro
+    revisar('la tira llega hasta el muro', Math.abs(fr[6] - 495) <= 1.5, String(fr[6]))
+    // el último orinal solo cede media mampara del lado del campo; del lado de
+    // los baños no cede nada, así que su libre es su cabina menos esa mitad
+    const ultimoOrinal = anchoDeOrinal(armado, 2, c.anchoPilastraCm)
+    const mediaMampara = r.pilastras[2] / 2
+    revisar('el último orinal NO se come media pilastra',
+      Math.abs(ultimoOrinal - (r.cabinas[2].anchoCm - mediaMampara)) <= 0.6,
+      `${ultimoOrinal} de una cabina de ${r.cabinas[2].anchoCm}`)
+    // y la primera cabina de baños = pilastra entera + puerta + media de la que sigue
+    const esperada = r.pilastras[3] + r.cabinas[3].puerta.anchoCm + r.pilastras[4] / 2
+    revisar('y la primera cabina se lleva la pilastra entera',
+      Math.abs(r.cabinas[3].anchoCm - esperada) <= 0.6,
+      `cabina ${r.cabinas[3].anchoCm}, esperada ${esperada}`)
   }
 }
 

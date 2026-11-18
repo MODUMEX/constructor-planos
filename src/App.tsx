@@ -1329,18 +1329,19 @@ export default function App() {
    * trabaja frontera por frontera sobre la tira tal como se ve, así que no hay
    * forma canónica que armar. Las pilastras que eligió quedan clavadas para que
    * un reparto posterior no las vuelva a emparejar.
+   *
+   * Acá el claro NO manda, al revés que en el resto de la app. La descarga es
+   * un agujero que ya está hecho en el piso: si persiguiéndola las piezas se
+   * pasan del claro, lo que hay que ver es cuánto y dónde, no quedarse con el
+   * plano viejo. Así que se aplica igual y la tira queda marcada en rojo con
+   * los centímetros que se pasa, que es con lo que se decide si se mueve una
+   * descarga, se corrige el claro o se achica una puerta.
    */
   function modularDesdeCentros(tramoId: string) {
     const t = area.tramos.find((x) => x.id === tramoId)
     if (!t) return
     const r = tramoDesdeCentros(t, config, proyecto.paisFabricacion)
     if (!r) return
-    if (r.ajuste === 'falta') {
-      setBloqueo(
-        `Con esas descargas las piezas no caben en el claro de ${t.claroCm} cm. ${r.mensaje}. El plano NO cambió: los avisos de abajo son de cómo está ahora, no de este cambio.`,
-      )
-      return
-    }
     setBloqueo(null)
     // El ancho de cada orinal no es una pieza de la tira sino un dato del área:
     // se guarda acá para que una modulación posterior no se los vuelva a repartir.
@@ -2406,6 +2407,12 @@ export default function App() {
                           como viene en el plano. Las descargas NO se mueven: el sanitario se dibuja
                           ahí y son las piezas las que se acomodan, con el panel —o la mampara del
                           orinal— justo en el medio de cada par.
+                        </p>
+                        <p className="vacio">
+                          Acá el claro no frena el cambio: si persiguiendo las descargas las piezas
+                          se pasan, la modulación se aplica igual y el plano queda marcado en rojo
+                          con cuántos centímetros se pasa, para decidir si se mueve una descarga,
+                          se corrige el claro o se achica una puerta.
                         </p>
                         {t.cabinas.map((c, i) => {
                           if (esEspacioLibre(c)) return null
