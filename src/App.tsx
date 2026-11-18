@@ -4,6 +4,7 @@ import PreviewTipologia from './components/PreviewTipologia'
 import EditorPlano, { formatear } from './components/EditorPlano'
 import { generarCSV, nombreArchivoCSV } from './exportar/csv'
 import { generarSyclick, nombreArchivoSyclick } from './exportar/syclick'
+import { medidasQueNoExisten } from './exportar/piezas'
 import { generarPDF, nombreArchivoPDF } from './exportar/pdf'
 import {
   descuentosDelDistribuidor, generarCotizacionPDF, m2Texto, nombreArchivoCotizacion, resumenDePiezas, totalesDe,
@@ -23,7 +24,7 @@ import { alturasElegibles, alturasDeConfig,
   PAISES, etiquetaTier, nombreHerraje, nombreModelo, tierDeColor, TIPOLOGIAS, tipologia, tipologiaEspejo,
   ANCHOS_PILASTRA, COLOR_DE_LINEA, CUBICULO_MR, esDeLinea, esEspecial, esSoloOrinales, esVariacionPanel, ICONO_MR, PIEZA_PIDE_COSTILLA_CM,
 } from './catalog'
-import { anchosPilastraEn, medidaCercana } from './modulador'
+import { anchosPilastraEn, medidaCercana, PILASTRA_MINIMA_CM } from './modulador'
 import VistaRender from './components/VistaRender'
 import ColoresMexico from './components/ColoresMexico'
 import CampoNumero from './components/CampoNumero'
@@ -33,9 +34,9 @@ import { contarSolicitudes } from './solicitudes'
 import { coloresMxAgrupados, eligeColorMx, slugRenderMx } from './coloresMx'
 import { fotoDe, fotosHerraje, faltanFotosHerraje, SIN_FOTO_PROPIA, terminacionesDe, urlDeFoto } from './renders'
 import {
-  anchoAccesibleDe, anchoTotal, bom, claroDeOrinales, compensarPilastra, crearTramos, esEspacioLibre,
+  anchoAccesibleDe, anchoTotal, bom, centralesAngostas, claroDeOrinales, compensarPilastra, crearTramos, esEspacioLibre,
   frenteAccesible, invertirTramo, modularConCatalogo, nuevoId, pedidoDeModulacion,
-  piezasQuePidenCostilla, profundidadAccesible, reajustarConPuertas, recesoDe, remodularTira,
+  PANEL_MIN_ADENTRO_CM, piezasQuePidenCostilla, profundidadAccesible, reajustarConPuertas, recesoDe, remodularTira,
 } from './modulacion'
 import { anchoDeOrinal } from './geometria'
 import { avisosDeDescargas, centrosDe, corridaDeCentros, tramoDesdeCentros } from './descargas'
@@ -666,6 +667,17 @@ export default function App() {
    * para que el vendedor lo cargue en la cotización si corresponde.
    */
   const piezasSinSoporte = area.tramos.flatMap((t) => piezasQuePidenCostilla(t, config))
+  /**
+   * Las centrales que quedaron por debajo de 24, que es el mínimo de la regla.
+   * Salen cuando el claro no cierra de otra forma, o cuando se eligió a mano.
+   */
+  const centralesChicas = area.tramos.flatMap((t) => centralesAngostas(t, config))
+  /**
+   * Medidas que el plano usa pero que no se fabrican. Se revisa siempre, no
+   * solo al modular: las especiales se dan de alta para un modelo y un plano
+   * viejo puede traer una medida que ya no está en la lista.
+   */
+  const medidasInventadas = medidasQueNoExisten(area, proyecto.paisFabricacion)
   const avisosDeCentros = config.usaCentrosCarga === true
     ? area.tramos.flatMap((t) => avisosDeDescargas(t, config))
     : []
@@ -1211,6 +1223,35 @@ export default function App() {
   }
 
   /**
+   * El mismo cambio de puerta en TODAS las cabinas del área.
+   *
+   * En un baño las puertas casi siempre abren todas para el mismo lado, y
+   * ponerlas una por una desde el menú de cada cabina es el trabajo que nadie
+   * quiere hacer. Esto no reemplaza al menú: ahí se sigue cambiando la que
+   * tenga que ser distinta, después de emparejar todas acá.
+   *
+   * Va directo sobre el tramo tal como se ve —no pasa por `conEspejo`—, porque
+   * "a la izquierda" es a la izquierda de lo que está en pantalla. Y no vuelve
+   * a modular: la mano y la apertura no cambian ninguna medida.
+   */
+  function todasLasPuertas(cambio: Partial<Cabina['puerta']>) {
+    setArea({
+      tramos: area.tramos.map((t) => ({
+        ...t,
+        cabinas: t.cabinas.map((c) =>
+          c.tipo === 'orinal' || c.puerta.tipo !== 'puerta' ? c : { ...c, puerta: { ...c.puerta, ...cambio } },
+        ),
+      })),
+    })
+  }
+
+  /** cuántas puertas de verdad hay en el área, para no ofrecer el cambio si no hay ninguna */
+  const puertasDelArea = area.tramos.reduce(
+    (n, t) => n + t.cabinas.filter((c) => c.tipo !== 'orinal' && c.puerta.tipo === 'puerta').length,
+    0,
+  )
+
+  /**
    * Se arrastró una pilastra: se fija SU medida y el buscador reacomoda el
    * resto de la tira con piezas de catálogo, para que siga cuadrando el claro.
    * Arrastrar una interna cambia todas las internas, que es como se modula.
@@ -1285,13 +1326,8 @@ export default function App() {
       },
     )
     if (!r) return
-    if (r.ajuste === 'falta' && t.ajuste !== 'falta') {
-      setBloqueo(
-        `Con el orinal de ${ancho} cm las piezas no caben en el claro de ${t.claroCm} cm. ${r.mensaje}. ` +
-          'El plano NO cambió: los avisos de abajo son de cómo está ahora, no de este cambio.',
-      )
-      return
-    }
+    // la medida escrita manda, igual que la del cubículo: si la tira se pasa,
+    // se aplica y el plano lo avisa en rojo
     setBloqueo(null)
     setConfig({ anchosOrinalCm: anchos })
     setArea({
@@ -1451,25 +1487,17 @@ export default function App() {
     const r = remodularTira(t, config, llevaAccesible, indice, anchoCm, clavadas, proyecto.paisFabricacion)
     if (!r) return
 
-    // El claro no se mueve: es la medida del sanitario y la modulación se le
-    // adapta. Si con esa pilastra las piezas se pasan, el cambio NO se aplica.
-    // La excepción es una tira que ya venía pasada: ahí hay que dejarla tocar
-    // las piezas para poder arreglarla.
-    if (r.ajuste === 'falta' && t.ajuste !== 'falta') {
-      // Cuántas pilastras hay en la tira: una por frontera más las dos de punta.
-      const posiciones = t.cabinas.length + 1
-      const todasClavadas = elegidas.length >= posiciones
-      setBloqueo(
-        `Con esa medida las piezas no caben en el claro de ${t.claroCm} cm. ${r.mensaje}. ` +
-          'El plano NO cambió: los avisos de abajo son de cómo está ahora, no de este cambio.' +
-          (todasClavadas
-            ? ` Tenés las ${posiciones} pilastras elegidas a mano, así que no queda ninguna libre para acomodar: soltalas con el botón de arriba.`
-            : elegidas.length > 1
-              ? ` Llevás ${elegidas.length} de ${posiciones} pilastras elegidas a mano: soltá alguna para darle juego.`
-              : ''),
-      )
-      return
-    }
+    // La medida escrita MANDA, aunque la tira termine pasándose del claro.
+    //
+    // Antes acá se bloqueaba: el plano no cambiaba y el aviso decía que el
+    // claro mandaba. Pero el claro es un número que se escribe de memoria al
+    // arrancar el área, y la medida del cubículo sale del plano del arquitecto
+    // o de lo que pidió el cliente — esa es la que vale (Dayanna, 18-nov-2026:
+    // *"si escribo 190 de claro y quiero 2 cubículos que pueda modificar la
+    // anchura de los cubículos desde arriba y sí use esa medida aunque al final
+    // se pase de los 190"*). Se aplica y la tira queda marcada en rojo con
+    // cuántos centímetros se pasó, que es el dato con el que se corrige el
+    // claro o se achica una pieza.
     setBloqueo(null)
     setArea({
       tramos: area.tramos.map((x) =>
@@ -2171,6 +2199,40 @@ export default function App() {
               <div className="herramientas">
                 <button className="btn chico" onClick={() => remodular()}>Volver a modular</button>
                 <button className="btn chico" onClick={invertirArea} title="Voltea el área como en un espejo">⇄ Invertir</button>
+                {puertasDelArea > 1 && (
+                  <>
+                    <div className="div" />
+                    <span className="chip">Todas las puertas</span>
+                    <button
+                      className="btn chico"
+                      onClick={() => todasLasPuertas({ mano: 'izq' })}
+                      title={`Pone la bisagra a la izquierda en las ${puertasDelArea} puertas del área`}
+                    >
+                      Bisagra ←
+                    </button>
+                    <button
+                      className="btn chico"
+                      onClick={() => todasLasPuertas({ mano: 'der' })}
+                      title={`Pone la bisagra a la derecha en las ${puertasDelArea} puertas del área`}
+                    >
+                      Bisagra →
+                    </button>
+                    <button
+                      className="btn chico"
+                      onClick={() => todasLasPuertas({ apertura: 'adentro' })}
+                      title={`Todas abren hacia adentro. Ojo: la hoja solo cabe dentro de la cabina con panel de ${PANEL_MIN_ADENTRO_CM} cm o más`}
+                    >
+                      Abren adentro
+                    </button>
+                    <button
+                      className="btn chico"
+                      onClick={() => todasLasPuertas({ apertura: 'afuera' })}
+                      title="Todas abren hacia el pasillo"
+                    >
+                      Abren afuera
+                    </button>
+                  </>
+                )}
                 <div className="div" />
                 <label className="toggle">
                   <input type="checkbox" checked={unidad === 'in'} onChange={(e) => setUnidad(e.target.checked ? 'in' : 'cm')} />
@@ -2199,7 +2261,7 @@ export default function App() {
                 <button className="btn chico" onClick={bajarCSV}>CSV para el CIP</button>
                 <button className="btn chico" onClick={bajarSyclick}>Excel para Syclick</button>
                 <div className="div" />
-                <span className="chip on">Arrastrá los paneles · clic derecho en una pieza</span>
+                <span className="chip on">Tocá cualquier pieza para elegir su medida · o arrastrala</span>
                 {pilastrasElegidas > 0 && (
                   <>
                     <div className="div" />
@@ -2222,7 +2284,7 @@ export default function App() {
                 <div className={`aviso-caja ${tramosConProblema.some((t) => t.ajuste === 'canaleta') && !tramosConProblema.some((t) => t.ajuste !== 'canaleta') ? 'ok' : ''}`} style={{ margin: '0 0 12px' }}>
                   <b>
                     {tramosConProblema.some((t) => t.ajuste === 'falta')
-                      ? 'Las piezas no caben en el claro'
+                      ? 'El claro escrito es menor que el que usa esta modulación'
                       : tramosConProblema.some((t) => t.ajuste === 'sobra')
                         ? 'Queda un hueco que la canaleta no rellena'
                         : 'Cierra con canaleta'}
@@ -2230,10 +2292,21 @@ export default function App() {
                   {tramosConProblema.map((t) => (
                     <span key={t.id}>
                       {t.nombre}: {t.mensaje}
+                      {/* los dos números, que es lo que se compara: lo que se
+                          escribió al abrir el área y lo que miden las piezas */}
+                      {t.ajuste === 'falta' &&
+                        ` · Claro escrito ${formatear(t.claroCm, unidad)}, armado ${formatear(anchoTotal(t.cabinas), unidad)}`}
                       {(t.pilastrasFijas?.length ?? 0) > 0 &&
                         ` · Entre las ${(t.pilastras?.length ?? 0)} pilastras hay que repartir ${sumaPilastras(t).toFixed(1)} cm`}
                     </span>
                   ))}
+                  {tramosConProblema.some((t) => t.ajuste === 'falta') && (
+                    <span>
+                      Las medidas que escribís mandan sobre el claro: el plano queda armado con
+                      ellas y marcado en rojo. Si el claro de verdad es el escrito, achicá una
+                      pieza; si no, corregí el claro en el paso del área.
+                    </span>
+                  )}
                 </div>
               )}
 
@@ -2296,6 +2369,35 @@ export default function App() {
                     El área va con <b>{COLOR_DE_LINEA}</b>, que cotiza con la tarifa de línea.
                     Sirve para mandar la cotización, pero <b>no para fabricar</b>: antes de que el
                     plano se vaya a producción hay que volver al paso de color y elegir cuál es.
+                  </span>
+                </div>
+              )}
+
+              {medidasInventadas.length > 0 && (
+                <div className="aviso-caja" style={{ margin: '0 0 12px' }}>
+                  <b>Hay medidas que no se fabrican</b>
+                  <span>{medidasInventadas.join(' · ')}.</span>
+                  <span>
+                    Esas medidas no están en la ficha de <b>{config.modelo}</b> ni dadas de alta
+                    como pieza especial, así que el plano y la cotización salen con un número que
+                    planta no puede cortar. O se cambia la pieza por una de catálogo, o se da de
+                    alta la especial desde <b>Piezas especiales</b> antes de mandar la cotización.
+                  </span>
+                </div>
+              )}
+
+              {centralesChicas.length > 0 && (
+                <div className="aviso-caja" style={{ margin: '0 0 12px' }}>
+                  <b>Hay pilastras centrales de menos de {PILASTRA_MINIMA_CM} cm</b>
+                  <span>
+                    {centralesChicas.join(' · ')}.
+                  </span>
+                  <span>
+                    La regla pide <b>{PILASTRA_MINIMA_CM} cm como mínimo</b> en una central, porque
+                    carga los paneles de las dos cabinas que tiene a los lados. La app nunca la
+                    propone de arranque: si salió así es porque el claro no cierra de otra forma, o
+                    porque se eligió a mano. Antes de mandar el plano, revisá si caben menos cabinas
+                    o una puerta más angosta.
                   </span>
                 </div>
               )}
@@ -2869,13 +2971,33 @@ export default function App() {
                         }}
                         type="button"
                       >
-                        <span className="lienzo"><PreviewTipologia id={t.id} /></span>
+                        <span className="lienzo"><PreviewTipologia id={t.id} voltear={config.muroAbajo === true} /></span>
                         <span className="pie">
                           <b>{t.nombre}</b>
                           <small>{t.descripcion}</small>
                         </span>
                       </button>
                     ))}
+                  </div>
+                  {/* Voltear vale para TODAS las tipologías, así que va una sola vez
+                      debajo de las tarjetas y no una por tarjeta. */}
+                  <div className="campos" style={{ marginTop: 14 }}>
+                    <div className="campo">
+                      <label className="toggle">
+                        <input
+                          type="checkbox"
+                          checked={config.muroAbajo === true}
+                          onChange={(e) => setConfig({ muroAbajo: e.target.checked })}
+                        />
+                        Voltear: la pared abajo
+                      </label>
+                      <span className="ayuda">
+                        El mismo arreglo dibujado al revés, con la pared de fondo abajo y las cabinas
+                        mirando hacia arriba. Es solo cómo se ve —en la pantalla y en el PDF—: no
+                        cambia ninguna medida ni ninguna pieza. Para mover las cabinas de punta a
+                        punta está <b>⇄ Invertir</b>, en el plano.
+                      </span>
+                    </div>
                   </div>
                 </>
               )}

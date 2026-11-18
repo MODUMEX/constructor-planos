@@ -491,8 +491,14 @@ function murosYPiezas(doc: jsPDF, area: Area, e: Escala, marcos: Marco[]) {
           // el giro se hace a mano sobre el punto donde va apoyado al muro
           const giro = Math.atan2(m.py, m.px) - Math.PI / 2
           const dx = -w / 2
+          // Con el plano VOLTEADO el sanitario sale cabeza abajo —que es lo que
+          // hay que hacer—, pero jsPDF gira la imagen sobre la esquina de abajo
+          // a la izquierda y en sentido antihorario: con 180° la caja termina
+          // UN ALTO Y MEDIO por debajo del punto, o sea fuera de la cabina. Se
+          // le descuentan dos altos para que quede apoyada contra el muro.
+          const dy = m.py < 0 ? -2 * h : 0
           const x = ax + dx * Math.cos(giro)
-          const y = ay + dx * Math.sin(giro)
+          const y = ay + dx * Math.sin(giro) + dy
           doc.addImage(dibujo.src, 'PNG', x, y, w, h, undefined, 'FAST', (-giro * 180) / Math.PI)
         }
       }
@@ -1406,7 +1412,7 @@ export function generarPDF(proyecto: Proyecto, fecha = new Date().toLocaleDateSt
     doc.rect(M / 2, M / 2, HOJA.w - M, HOJA.h - M)
 
     const prof = area.config.profundidadCm
-    const marcos = marcosDe(area.tramos)
+    const marcos = marcosDe(area.tramos, area.config.muroAbajo === true)
     // el cuarto PMR llega más hondo que las cabinas: hay que encuadrarlo también
     const profPmr = area.config.tipologia === 'PMR' ? profundidadDelLugar(area.config) : 0
     // con los centros de carga la hoja lleva una cadena de cotas más por fuera

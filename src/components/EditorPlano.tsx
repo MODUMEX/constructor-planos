@@ -184,7 +184,7 @@ export default function EditorPlano({
   } | null>(null)
 
   const prof = config.profundidadCm
-  const marcos = useMemo(() => marcosDe(tramos), [tramos])
+  const marcos = useMemo(() => marcosDe(tramos, config.muroAbajo === true), [tramos, config.muroAbajo])
   /** en esquina, nicho y U los muros de fondo de cada tramo ya forman el ángulo:
    *  dibujar además los laterales metería una pared en medio del baño */
   const conEsquina = tipologia(config.tipologia).esquinaCompartida
@@ -245,6 +245,7 @@ export default function EditorPlano({
       cabinas: tramo.cabinas,
       escala,
     }
+    arrastroPanel.current = false
     setArrastrando(`${tramo.id}:${indice}`)
     try {
       (e.target as Element).setPointerCapture(e.pointerId)
@@ -261,6 +262,17 @@ export default function EditorPlano({
    * esta bandera el menú se abría también al soltar un arrastre.
    */
   const arrastroPil = useRef(false)
+
+  /**
+   * Lo mismo para el PANEL divisor y el mingitorio.
+   *
+   * El panel solo se podía tocar con clic derecho: con el izquierdo o lo
+   * arrastrabas o no pasaba nada. Era la mitad del "arrastrar es complicado",
+   * porque la pieza mide un centímetro de espesor y acertarle moviendo es
+   * justo lo difícil. Ahora un clic SIN mover abre el menú de medidas, igual
+   * que en la pilastra.
+   */
+  const arrastroPanel = useRef(false)
 
   /**
    * Arrastre de la pilastra del divisor del cuarto PMR.
@@ -393,6 +405,7 @@ export default function EditorPlano({
     const dy = (e.clientY - a.y0) / a.escala
     const deltaCm = dx * a.ax + dy * a.ay
     if (!Number.isFinite(deltaCm)) return
+    if (Math.abs(deltaCm) > 0.5) arrastroPanel.current = true
     // El panel va siempre centrado en su pilastra, así que arrastrarlo es
     // cambiar la MEDIDA de esa pilastra: se elige la de catálogo más cercana y
     // el buscador reacomoda el resto sin tocar las puertas.
@@ -743,7 +756,9 @@ export default function EditorPlano({
                           }}
                         >
                           <path
-                            d={`M ${cerrada.x} ${cerrada.y} A ${hoja} ${hoja} 0 0 1 ${extremo.x} ${extremo.y}`}
+                            // el barrido del arco se da vuelta con el plano: con la pared abajo el
+                            // eje vertical está espejado y con la bandera fija el arco salía al revés
+                            d={`M ${cerrada.x} ${cerrada.y} A ${hoja} ${hoja} 0 0 ${config.muroAbajo === true ? 0 : 1} ${extremo.x} ${extremo.y}`}
                             fill="none"
                             stroke="#8fa3c4"
                             strokeWidth={1.4}
@@ -792,13 +807,20 @@ export default function EditorPlano({
                             fill="transparent"
                             style={{ cursor: horizontal ? 'col-resize' : 'row-resize' }}
                             onPointerDown={(e) => empezarArrastre(e, tramo, i, m)}
+                            onClick={(e) => {
+                              if (arrastroPanel.current) return
+                              e.preventDefault(); e.stopPropagation()
+                              setMenu({ tipo: 'panel', tramoId: tramo.id, indice: i, x: e.clientX, y: e.clientY })
+                            }}
                             onPointerEnter={() => setSobre(clavePanel)}
                             onPointerLeave={() => setSobre((x) => (x === clavePanel ? null : x))}
                             onContextMenu={(e) => {
                               e.preventDefault(); e.stopPropagation()
                               setMenu({ tipo: 'panel', tramoId: tramo.id, indice: i, x: e.clientX, y: e.clientY })
                             }}
-                          />
+                          >
+                            <title>Panel divisor — tocalo para elegir la medida, o arrastralo</title>
+                          </rect>
                           {activo && (
                             <circle cx={(a.x + b.x) / 2} cy={(a.y + b.y) / 2} r={9} fill="#2e6fd9" opacity={0.28} />
                           )}
@@ -1777,10 +1799,9 @@ export default function EditorPlano({
         const boton = (m: { anchoCm: number; familia: 'PL' | 'PN' }) => (
           <button
             key={m.familia + m.anchoCm}
-            className={actual === m.anchoCm ? 'on' : ''}
-            disabled={!cabe(m.anchoCm)}
+            className={[actual === m.anchoCm ? 'on' : '', cabe(m.anchoCm) ? '' : 'pasa'].filter(Boolean).join(' ')}
             title={!cabe(m.anchoCm)
-              ? `${m.anchoCm} cm no entra en el claro: con esa medida las piezas no cierran`
+              ? `${m.anchoCm} cm se pasa del claro. Se puede elegir igual: el plano queda armado con esa medida y marcado en rojo`
               : m.familia === 'PN' ? `Panel de relleno de ${m.anchoCm} cm` : `Pilastra de ${m.anchoCm} cm`}
             onClick={() => { onPilastra(menu.tramoId, k, m.anchoCm); cerrar() }}
             type="button"

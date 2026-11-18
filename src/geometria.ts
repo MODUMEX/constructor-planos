@@ -105,8 +105,15 @@ export interface Marco {
   py: number
 }
 
-export function marcosDe(tramos: Tramo[]): Marco[] {
-  return tramos.map(() => ({ ox: 0, oy: 0, ax: 1, ay: 0, px: 0, py: 1 }))
+/**
+ * `muroAbajo` da vuelta el eje de la profundidad: la pared de fondo queda
+ * ABAJO y las cabinas miran hacia arriba. Como todo el dibujo —pantalla y
+ * PDF— pasa por `pt()`, con eso solo se voltea el plano entero sin tocar una
+ * medida. Los rótulos no se dan vuelta: los textos se posicionan con `pt` pero
+ * se escriben derechos.
+ */
+export function marcosDe(tramos: Tramo[], muroAbajo = false): Marco[] {
+  return tramos.map(() => ({ ox: 0, oy: 0, ax: 1, ay: 0, px: 0, py: muroAbajo ? -1 : 1 }))
 }
 
 export function pt(m: Marco, u: number, v: number): { x: number; y: number } {

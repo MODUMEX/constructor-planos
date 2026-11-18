@@ -334,6 +334,19 @@ export interface Config {
    * alrededor son las piezas.
    */
   usaCentrosCarga?: boolean
+
+  /**
+   * El plano se dibuja con la PARED ABAJO y las cabinas mirando hacia arriba.
+   *
+   * No cambia una sola medida ni una sola pieza: es la misma tira vista desde
+   * el otro lado, como cuando el baño cae del lado de abajo en el plano del
+   * arquitecto y hay que entregarlo en esa orientación para poder calcarlo.
+   * Invertir el área es otra cosa: eso sí mueve las cabinas de punta a punta.
+   *
+   * Lo leen los dos dibujantes —la pantalla y el PDF— a través del marco de
+   * `marcosDe`, así que basta con dar vuelta el eje de la profundidad.
+   */
+  muroAbajo?: boolean
   /** el claro que dio el vendedor para esta área, en cm */
   claroPedidoCm?: number
   /** cuántas cabinas pidió para esta área */

@@ -1,7 +1,7 @@
 {
   "name": "constructor-de-planos",
   "private": true,
-  "version": "3.17.0",
+  "version": "3.18.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -60,7 +60,8 @@
     "probar-medidas": "esbuild scripts/probar-medidas.ts --bundle --platform=node --format=esm --outfile=.med.mjs --log-level=warning --define:import.meta.env={} && node .med.mjs",
     "probar-herrajes": "esbuild scripts/probar-herrajes.ts --bundle --platform=node --format=esm --outfile=.pher.mjs --log-level=warning --define:import.meta.env={} && node .pher.mjs",
     "probar-dos-distribuidores": "esbuild scripts/probar-dos-distribuidores.ts --bundle --platform=node --format=esm --outfile=.dosdist.mjs --log-level=warning --define:import.meta.env={} && node .dosdist.mjs",
-    "probar-m2": "esbuild scripts/probar-m2.ts --bundle --platform=node --format=esm --outfile=.m2.mjs --log-level=warning --define:import.meta.env={} && node .m2.mjs"
+    "probar-m2": "esbuild scripts/probar-m2.ts --bundle --platform=node --format=esm --outfile=.m2.mjs --log-level=warning --define:import.meta.env={} && node .m2.mjs",
+    "ejemplo-voltear": "node scripts/empaquetar-prueba.mjs scripts/ejemplo-voltear.tsx .ejvolt.mjs && node .ejvolt.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",

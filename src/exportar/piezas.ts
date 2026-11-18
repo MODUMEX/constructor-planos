@@ -1,5 +1,5 @@
-import type { Area, Cabina, Config, Tramo } from '../types'
-import { alturasDeConfig, altoEntre, alturasDeCabina, esSoloOrinales, esVariacionPanel, familiaDelFrente, llevaAccesibleSiempre, mamparaDe, nombreModelo, tipologia } from '../catalog'
+import type { Area, Cabina, Config, Pais, Tramo } from '../types'
+import { alturasDeConfig, altoEntre, alturasDeCabina, anchosPanel, anchosPilastra, anchosPuerta, esSoloOrinales, esVariacionPanel, familiaDelFrente, llevaAccesibleSiempre, mamparaDe, mgMedidas, nombreModelo, tipologia } from '../catalog'
 import { arrancaConMingitorio, soportesDe } from '../modulacion'
 import { cierraConMingitorio, fronteraDeOrinal } from '../modulacion'
 import { cuartoPmr } from '../geometria'
@@ -427,6 +427,61 @@ export function piezasDeArea(area: Area): Pieza[] {
     })
   }
   return piezas
+}
+
+/** cómo se nombra cada familia en un aviso, para que se lea como habla planta */
+const NOMBRE_FAMILIA: Record<Familia, string> = {
+  PT: 'puerta',
+  PN: 'panel',
+  PL: 'pilastra',
+  MG: 'mampara de mingitorio',
+}
+
+/**
+ * Las piezas del área cuya medida NO existe.
+ *
+ * Una pieza se fabrica si su ancho está en la ficha del modelo o si alguien la
+ * dio de alta como ESPECIAL. Cualquier otro número es una medida inventada:
+ * el plano se dibuja igual, el CSV sale igual y la cotización le pone precio,
+ * pero en planta no hay con qué cortarla.
+ *
+ * Aparecen por dos caminos. Uno, proyectos viejos: se guardaron con una lista
+ * de medidas que después cambió —el panel de 165 y el de 180 dejaron de venir
+ * a 180 de alto, por ejemplo— y al abrirlos la pieza sigue ahí. Dos, las
+ * especiales: se dan de alta para un modelo y si el área cambia de modelo, o
+ * si la lista se rehace, dejan de existir sin que nadie lo note.
+ *
+ * Por eso esto se corre SIEMPRE y no solo al modular (Dayanna, 18-nov-2026:
+ * *"revisar siempre las medidas, porque hay cotizaciones con medidas
+ * especiales o que no existen"*). Devuelve una línea por medida distinta, no
+ * por pieza: en un baño de ocho cabinas el mismo panel raro saldría ocho veces.
+ */
+export function medidasQueNoExisten(area: Area, pais: Pais = 'CR'): string[] {
+  const { config } = area
+  const altoPanel = alturasDeConfig(config).panel
+  const existe = (p: Pieza): boolean => {
+    if (p.familia === 'PT') return anchosPuerta(pais, config.modelo).includes(p.anchoCm)
+    if (p.familia === 'PL') return anchosPilastra(config.modelo).includes(p.anchoCm)
+    if (p.familia === 'PN') return anchosPanel(config.modelo, altoPanel, pais).includes(p.anchoCm)
+    return mgMedidas(config.linea, config.modelo).some(
+      (m) => m.anchoCm === p.anchoCm && m.altoCm === p.altoCm,
+    )
+  }
+  const vistas = new Map<string, { pieza: Pieza; cuantas: number }>()
+  for (const p of piezasDeArea(area)) {
+    // la canaleta y las piezas de 0 no son material de catálogo
+    if (!p.anchoCm || p.anchoCm <= 0) continue
+    if (existe(p)) continue
+    const clave = `${p.familia}:${p.anchoCm}:${p.familia === 'MG' ? p.altoCm : ''}`
+    const previo = vistas.get(clave)
+    if (previo) previo.cuantas += 1
+    else vistas.set(clave, { pieza: p, cuantas: 1 })
+  }
+  return [...vistas.values()].map(({ pieza, cuantas }) => {
+    const medida = pieza.familia === 'MG' ? `${pieza.anchoCm} × ${pieza.altoCm}` : `${pieza.anchoCm} cm`
+    const veces = cuantas > 1 ? ` (×${cuantas})` : ''
+    return `${NOMBRE_FAMILIA[pieza.familia]} de ${medida}${veces}`
+  })
 }
 
 /**

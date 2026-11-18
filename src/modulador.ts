@@ -77,6 +77,36 @@ const INTERNAS_AUTO = PILASTRAS_INTERNAS.filter(
 )
 
 /**
+ * Lo más angosta que se deja quedar una pilastra CENTRAL, y solo a la fuerza.
+ *
+ * La regla son 24 y sigue siendo 24: es lo primero y lo único que prueba el
+ * buscador mientras haya con qué cerrar. Pero hay claros que con centrales de
+ * 24 no cierran de ninguna manera, y antes de eso es mejor una de 19 avisada
+ * que un plano que no se puede fabricar (Dayanna, 18-nov-2026: *"debemos
+ * permitir las centrales de 19, pero con un mensaje de alarma y nunca que sea
+ * la recomendada al principio"*).
+ *
+ * De 19 para abajo no: una de 17 o de 10 entre dos puertas no carga los dos
+ * paneles, y eso no se negocia.
+ */
+export const PILASTRA_CENTRAL_MINIMA_CM = 19
+
+/** el grupo de la SEGUNDA pasada: el de arriba más las centrales angostas */
+const INTERNAS_ANGOSTAS = PILASTRAS_INTERNAS.filter(
+  (a) => a >= PILASTRA_CENTRAL_MINIMA_CM && a <= PILASTRA_INTERNA_AUTO_MAX,
+)
+
+/** lo que se le agrega al mensaje de la tira cuando hizo falta bajar de 24 */
+export const AVISO_CENTRAL_ANGOSTA =
+  `Hizo falta una pilastra central de menos de ${PILASTRA_MINIMA_CM} cm para cerrar el claro: ` +
+  'revisá si caben menos cabinas o una puerta más angosta'
+
+/** si la tira cerró, sea clavada o con canaleta */
+function cerro(ajuste: TipoAjuste): boolean {
+  return ajuste === 'exacto' || ajuste === 'canaleta'
+}
+
+/**
  * De acá para arriba debería medir una pilastra CENTRAL.
  *
  * Es lo que pide producción: una central de 10 o de 17 no se quiere ver en un
@@ -109,9 +139,10 @@ export const AJUSTE_POR_MURO_CM = 0.5
 /**
  * Las medidas que se pueden poner A MANO en esa frontera.
  *
- * Es la misma regla que ya respetaba el buscador automático: una pilastra
- * CENTRAL no baja de 24 cm, porque más angosta no carga el panel de las dos
- * cabinas que tiene a los lados. En las puntas manda el catálogo completo: hay
+ * Una pilastra CENTRAL llega hasta 19 cm y ni uno menos: de ahí para abajo no
+ * carga los paneles de las dos cabinas que tiene a los lados. Los 24 de la
+ * regla son lo que el buscador elige solo; el 19 está acá para poder forzarlo
+ * a mano, y el plano lo avisa. En las puntas manda el catálogo completo: hay
  * planos que cierran con una ancha de relleno y contra muro no hay mínimo.
  *
  * Vive acá porque la usan los CUATRO caminos manuales —arrastrar la pilastra,
@@ -126,7 +157,7 @@ export function anchosPilastraEn(extremo: boolean, modelo?: string, actual?: num
   return anchosPilastra(modelo).filter((a) => {
     if (a === actual) return true
     if (extremo) return true
-    if (a < PILASTRA_MINIMA_CM) return false
+    if (a < PILASTRA_CENTRAL_MINIMA_CM) return false
     return PILASTRAS_INTERNAS.includes(a) || esEspecial('PL', a, modelo)
   })
 }
@@ -307,10 +338,14 @@ function cabe(diferencia: number, extremoAbierto: boolean | undefined, murosPila
 }
 
 export function modularTira(o: OpcionesModulacion): Modulacion | null {
-  // Una sola pasada: la central de 24 es REGLA, no preferencia, así que no hay
-  // grupo angosto al que caer. Si con eso no cierra, se dice y el vendedor
-  // ajusta el claro, la cantidad de cabinas o la medida de puerta.
-  return modularTiraCon(o, INTERNAS_AUTO)
+  // Primero con las centrales de 24 para arriba, que es la regla: esa pasada
+  // manda siempre y es la única que se corre mientras cierre. Solo si NO hay
+  // forma se vuelve a probar dejando bajar a 19, y entonces el mensaje lo dice.
+  const ancha = modularTiraCon(o, INTERNAS_AUTO)
+  if (!ancha || cerro(ancha.ajuste)) return ancha
+  const angosta = modularTiraCon(o, INTERNAS_ANGOSTAS)
+  if (!angosta || !cerro(angosta.ajuste)) return ancha
+  return { ...angosta, mensaje: `${angosta.mensaje}. ${AVISO_CENTRAL_ANGOSTA}` }
 }
 
 /** de qué grupo sale cada punta de la tira */
@@ -628,8 +663,12 @@ export interface Pilastreo {
  * más escalones, así que por acá casi siempre hay con qué cuadrar.
  */
 export function ajustarPilastras(o: OpcionesPilastras): Pilastreo | null {
-  // igual que al modular: la central de 24 es regla, no hay grupo angosto
-  return ajustarPilastrasCon(o, INTERNAS_AUTO)
+  // mismas dos pasadas que al modular: 24 manda, 19 solo si no hay con qué
+  const ancha = ajustarPilastrasCon(o, INTERNAS_AUTO)
+  if (!ancha || cerro(ancha.ajuste)) return ancha
+  const angosta = ajustarPilastrasCon(o, INTERNAS_ANGOSTAS)
+  if (!angosta || !cerro(angosta.ajuste)) return ancha
+  return { ...angosta, mensaje: `${angosta.mensaje}. ${AVISO_CENTRAL_ANGOSTA}` }
 }
 
 function ajustarPilastrasCon(o: OpcionesPilastras, internasPosibles: number[]): Pilastreo | null {

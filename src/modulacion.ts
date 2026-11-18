@@ -1135,6 +1135,39 @@ export function piezasQuePidenCostilla(tramo: Tramo, config: Config): string[] {
   return avisos
 }
 
+/**
+ * Las pilastras CENTRALES que quedaron por debajo del mínimo de la regla.
+ *
+ * El buscador solo baja de 24 cuando con 24 no hay forma de cerrar el claro, y
+ * a mano se puede forzar desde el menú de medidas. En los dos casos el plano
+ * tiene que decirlo: una central angosta carga los paneles de las dos cabinas
+ * que tiene a los lados y producción quiere verla señalada, no descubrirla.
+ *
+ * Las de punta no entran acá: esas tienen su propia regla —esquina de 24, a
+ * muro sin mínimo— y su propio aviso, el de la costilla.
+ */
+export function centralesAngostas(tramo: Tramo, config: Config): string[] {
+  const n = tramo.cabinas.length
+  const lugares = lugaresDe(tramo.cabinas)
+  const cuarto = ladoDelCuarto(tramo, config)
+  const indiceCuarto = cuarto === 'inicio' ? 0 : cuarto === 'fin' ? n - 1 : -1
+  const avisos: string[] = []
+  ;(tramo.pilastras ?? []).forEach((ancho, k) => {
+    if (k <= 0 || k >= n || !ancho || ancho >= PILASTRA_MINIMA_CM) return
+    // donde va mampara de mingitorio no hay pilastra que juzgar, y la que
+    // cierra la tira contra el campo —o contra el cuarto— es LATERAL, no central
+    if (esMingitorioEn(tramo, k)) return
+    if (ladoDePilastra(lugares, k, indiceCuarto) !== 'mitades') return
+    avisos.push(`entre la cabina ${k} y la ${k + 1}, de ${ancho} cm`)
+  })
+  return avisos
+}
+
+/** la frontera k lleva mampara de mingitorio en vez de pilastra */
+function esMingitorioEn(tramo: Tramo, k: number): boolean {
+  return tramo.cabinas[k - 1]?.tipo === 'orinal' && tramo.cabinas[k]?.tipo === 'orinal'
+}
+
 /** la profundidad del lugar, que nunca puede ser menor que la de la cabina */
 export function profundidadDelLugar(config: Config): number {
   return Math.max(config.profundidadLugarCm ?? config.profundidadCm, config.profundidadCm)

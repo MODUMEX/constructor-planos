@@ -7,17 +7,19 @@
  *   · ESQUINA  → mínimo 24 cm (la punta de la tira que NO topa contra pared)
  *   · A MURO   → sin mínimo; la medida sale de la ficha del modelo
  *
- * Antes la central de 24 era solo una preferencia: si el claro no daba, el
- * buscador bajaba a 19, 17 o 10 y lo avisaba. Ya no. Cuando no da, la tira NO
- * cierra y hay que mover otra cosa —menos cabinas, puerta más angosta o
- * corregir el claro—, que es justo lo que dice la regla.
+ * Los 24 son lo PRIMERO y lo único que prueba el buscador mientras haya con
+ * qué cerrar: nunca propone una angosta de entrada. Si con 24 no cierra de
+ * ninguna manera vuelve a pasar dejando bajar hasta 19 —ni un centímetro
+ * menos— y lo avisa en el mensaje, porque entre un plano que no se puede
+ * fabricar y una central de 19 señalada, Dayanna eligió la segunda
+ * (18-nov-2026). De 19 para abajo sigue sin existir.
  *
  *   npm run probar-pilastra-24
  */
 import { crearTramos, anchoTotal } from '../src/modulacion'
 import { tramoDesdeCentros } from '../src/descargas'
 import { anchoDeOrinal } from '../src/geometria'
-import { PILASTRA_MINIMA_CM } from '../src/modulador'
+import { AVISO_CENTRAL_ANGOSTA, PILASTRA_CENTRAL_MINIMA_CM, PILASTRA_MINIMA_CM } from '../src/modulador'
 import type { Config, TipologiaId, Tramo } from '../src/types'
 
 let mal = 0
@@ -64,11 +66,31 @@ console.log(`— la central nunca baja de ${PILASTRA_MINIMA_CM}`)
 console.log('\n— tampoco en un claro apretado: antes bajaba a 19 o a 10')
 {
   // el de la lamina del Modulo 5 es 300 con 3 cabinas entre muros
-  for (const [claro, cant] of [[300, 3], [323, 4], [269.5, 3], [178, 2]] as [number, number][]) {
+  for (const [claro, cant] of [[300, 3], [269.5, 3], [178, 2]] as [number, number][]) {
     const { internas } = ver(claro, cant, 0, 'apretado')
     ok(internas.every((a) => a >= PILASTRA_MINIMA_CM),
       `claro ${claro}: ninguna central por debajo de ${PILASTRA_MINIMA_CM}`)
   }
+}
+
+console.log(`\n— la central de ${PILASTRA_CENTRAL_MINIMA_CM}: solo cuando no hay otra forma de cerrar`)
+{
+  // El claro 323 del despiece real: con puerta de 60 el objetivo son 327 y
+  // tres internas de 24 más dos extremos de 10 dan 332 como MÍNIMO, o sea que
+  // con la regla al pie la tira se pasa 5 cm y no hay plano. Planta lo cerró
+  // con una interna de 19 y eso es lo que tiene que salir, avisado.
+  const { t, internas } = ver(323, 4, 0, 'no cierra con 24')
+  ok(t.ajuste !== 'falta' && t.ajuste !== 'sobra', `el claro 323 cierra · ${t.ajuste}`)
+  ok(internas.every((a) => a >= PILASTRA_CENTRAL_MINIMA_CM),
+    `ninguna central baja de ${PILASTRA_CENTRAL_MINIMA_CM} · ${internas.join(' · ')}`)
+  ok(internas.some((a) => a < PILASTRA_MINIMA_CM), 'y alguna tuvo que bajar de 24, que es de lo que se avisa')
+  ok((t.mensaje ?? '').includes(AVISO_CENTRAL_ANGOSTA), `el mensaje lo avisa · ${t.mensaje}`)
+
+  // y donde SÍ cierra con 24 no se baja, ni sale el aviso
+  const holgado = ver(420, 4, 0, 'sí cierra con 24')
+  ok(holgado.internas.every((a) => a >= PILASTRA_MINIMA_CM),
+    `el claro 420 sigue cerrando con centrales de ${PILASTRA_MINIMA_CM} o más · ${holgado.internas.join(' · ')}`)
+  ok(!(holgado.t.mensaje ?? '').includes(AVISO_CENTRAL_ANGOSTA), 'y no sale el aviso donde no hace falta')
 }
 
 console.log('\n— la punta CONTRA PARED sí puede ser chica')

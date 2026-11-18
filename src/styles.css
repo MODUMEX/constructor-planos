@@ -567,6 +567,10 @@ button.chip:hover { border-color: var(--accent-line); color: var(--text); }
 .menu .anchos button:hover { border-color: var(--accent); }
 .menu .anchos button.on { background: var(--accent); border-color: var(--accent); color: var(--accent-texto); }
 .menu .anchos button[disabled] { opacity: .3; cursor: not-allowed; text-decoration: line-through; }
+/* la medida SÍ se puede elegir, pero con ella la tira se pasa del claro: se
+   marca en vez de apagarse, porque la medida escrita manda sobre el claro */
+.menu .anchos button.pasa { border-style: dashed; border-color: var(--peligro, #cc2f2f); }
+.menu .anchos button.pasa::after { content: ' !'; font-size: 10px; vertical-align: super; }
 /* la línea que explica qué pieza hay hoy en esa frontera */
 .menu .nota-menu { padding: 0 10px 8px; font-size: 11px; color: var(--text-3); max-width: 250px; }
 

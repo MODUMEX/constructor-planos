@@ -157,7 +157,7 @@ function Tira({
  * como en el Tipo C. Lo que queda entre el fondo de esa cabina y el de las
  * otras es el RECESO, y ahí es donde se mete la tira de baños.
  */
-function VariacionPanel({ muroIzq, muroDer }: { muroIzq: boolean; muroDer: boolean }) {
+function VariacionPanel({ muroIzq, muroDer, voltear = false }: { muroIzq: boolean; muroDer: boolean; voltear?: boolean }) {
   const x0 = 11          // arranque de la cabina accesible
   const xPanel = 57      // el panel que la separa de la tira
   const xFin = 107       // dónde termina la tira
@@ -187,8 +187,8 @@ function VariacionPanel({ muroIzq, muroDer }: { muroIzq: boolean; muroDer: boole
       {/* la tira, metida en el receso. Contra el panel no lleva panel de
           cierre: lleva la pilastra lateral que se le apoya encima */}
       <Tira x0={xPanel} ancho={xFin - xPanel} n={2} muroIzq muroDer={muroDer} />
-      <Claro x1={x0} x2={muroDer ? xFin : xFin - 2} />
-      <Profundidad y1={Y0} y2={yFrente} alto={ALTO.MR_PANEL_U} />
+      <Claro x1={x0} x2={muroDer ? xFin : xFin - 2} voltear={voltear} />
+      <Profundidad y1={Y0} y2={yFrente} alto={ALTO.MR_PANEL_U} voltear={voltear} />
     </g>
   )
 }
@@ -203,7 +203,7 @@ function Accesible({ x, y }: { x: number; y: number }) {
 }
 
 /** la cota del CLARO: horizontal, arriba de todo */
-function Claro({ x1, x2 }: { x1: number; x2: number }) {
+function Claro({ x1, x2, voltear = false }: { x1: number; x2: number; voltear?: boolean }) {
   const y = 9
   return (
     <g stroke={COTA} fill={COTA}>
@@ -211,6 +211,7 @@ function Claro({ x1, x2 }: { x1: number; x2: number }) {
       <line x1={x1} y1={y - 2.6} x2={x1} y2={y + 2.6} strokeWidth={0.7} />
       <line x1={x2} y1={y - 2.6} x2={x2} y2={y + 2.6} strokeWidth={0.7} />
       <text
+        transform={voltear ? `translate(0 ${2 * (y - 2.6)}) scale(1 -1)` : undefined}
         x={(x1 + x2) / 2}
         y={y - 2.6}
         textAnchor="middle"
@@ -230,7 +231,7 @@ function Claro({ x1, x2 }: { x1: number; x2: number }) {
  * palabra va horizontal abajo. Rotada no entra: "PROFUNDIDAD" es más larga que
  * el fondo de una cabina y quedaba cortada.
  */
-function Profundidad({ y1, y2, alto }: { y1: number; y2: number; alto: number }) {
+function Profundidad({ y1, y2, alto, voltear = false }: { y1: number; y2: number; alto: number; voltear?: boolean }) {
   const x = 120
   return (
     <g stroke={COTA} fill={COTA}>
@@ -239,6 +240,7 @@ function Profundidad({ y1, y2, alto }: { y1: number; y2: number; alto: number })
       <line x1={x - 2.6} y1={y2} x2={x + 2.6} y2={y2} strokeWidth={0.7} />
       <line x1={x} y1={y2} x2={x} y2={alto - 8} strokeWidth={0.5} strokeDasharray="1.6 1.6" />
       <text
+        transform={voltear ? `translate(0 ${2 * (alto - 1.6)}) scale(1 -1)` : undefined}
         x={131}
         y={alto - 1.6}
         textAnchor="end"
@@ -253,7 +255,17 @@ function Profundidad({ y1, y2, alto }: { y1: number; y2: number; alto: number })
   )
 }
 
-export default function PreviewTipologia({ id, size = 220 }: { id: TipologiaId; size?: number }) {
+export default function PreviewTipologia({
+  id,
+  size = 220,
+  /**
+   * El esquema dibujado al revés: la pared de fondo abajo y las cabinas
+   * mirando hacia arriba. Es el mismo dibujo espejado sobre el eje vertical;
+   * los dos rótulos se vuelven a espejar sobre sí mismos para que no queden
+   * de cabeza.
+   */
+  voltear = false,
+}: { id: TipologiaId; size?: number; voltear?: boolean }) {
   const H = ALTO[id]
   const cuerpo = () => {
     switch (id) {
@@ -264,8 +276,8 @@ export default function PreviewTipologia({ id, size = 220 }: { id: TipologiaId; 
             <Muro x={6} y={Y0} w={5} h={D} />
             <Muro x={107} y={Y0} w={5} h={D} />
             <Tira x0={11} ancho={96} n={3} muroIzq muroDer />
-            <Claro x1={11} x2={107} />
-            <Profundidad y1={Y0} y2={Y0 + D} alto={H} />
+            <Claro x1={11} x2={107} voltear={voltear} />
+            <Profundidad y1={Y0} y2={Y0 + D} alto={H} voltear={voltear} />
           </>
         )
       case 'RECTA_MURO_IZQ':
@@ -274,8 +286,8 @@ export default function PreviewTipologia({ id, size = 220 }: { id: TipologiaId; 
             <Muro x={6} y={12} w={102} h={5} />
             <Muro x={6} y={Y0} w={5} h={D} />
             <Tira x0={11} ancho={96} n={3} muroIzq muroDer={false} />
-            <Claro x1={11} x2={107} />
-            <Profundidad y1={Y0} y2={Y0 + D} alto={H} />
+            <Claro x1={11} x2={107} voltear={voltear} />
+            <Profundidad y1={Y0} y2={Y0 + D} alto={H} voltear={voltear} />
           </>
         )
       // Cierra contra pared a la DERECHA, así que el panel de cierre va del lado
@@ -286,8 +298,8 @@ export default function PreviewTipologia({ id, size = 220 }: { id: TipologiaId; 
             <Muro x={10} y={12} w={102} h={5} />
             <Muro x={107} y={Y0} w={5} h={D} />
             <Tira x0={11} ancho={96} n={3} muroIzq={false} muroDer />
-            <Claro x1={11} x2={107} />
-            <Profundidad y1={Y0} y2={Y0 + D} alto={H} />
+            <Claro x1={11} x2={107} voltear={voltear} />
+            <Profundidad y1={Y0} y2={Y0 + D} alto={H} voltear={voltear} />
           </>
         )
       case 'ISLA':
@@ -295,8 +307,8 @@ export default function PreviewTipologia({ id, size = 220 }: { id: TipologiaId; 
           <>
             <Muro x={10} y={12} w={98} h={5} />
             <Tira x0={13} ancho={92} n={3} muroIzq={false} muroDer={false} />
-            <Claro x1={13} x2={105} />
-            <Profundidad y1={Y0} y2={Y0 + D} alto={H} />
+            <Claro x1={13} x2={105} voltear={voltear} />
+            <Profundidad y1={Y0} y2={Y0 + D} alto={H} voltear={voltear} />
           </>
         )
       // El cuarto accesible toma TODO el fondo del lugar y se entra por el
@@ -325,17 +337,17 @@ export default function PreviewTipologia({ id, size = 220 }: { id: TipologiaId; 
             <Accesible x={26} y={44} />
             <Muro x={107} y={Y0} w={5} h={D} />
             <Tira x0={xDiv} ancho={51} n={2} muroIzq muroDer />
-            <Claro x1={11} x2={107} />
-            <Profundidad y1={Y0} y2={yFin} alto={H} />
+            <Claro x1={11} x2={107} voltear={voltear} />
+            <Profundidad y1={Y0} y2={yFin} alto={H} voltear={voltear} />
           </>
         )
       }
       case 'MR_PANEL_E':
-        return <VariacionPanel muroIzq={false} muroDer={false} />
+        return <VariacionPanel muroIzq={false} muroDer={false} voltear={voltear} />
       case 'MR_PANEL_L':
-        return <VariacionPanel muroIzq muroDer={false} />
+        return <VariacionPanel muroIzq muroDer={false} voltear={voltear} />
       case 'MR_PANEL_U':
-        return <VariacionPanel muroIzq muroDer />
+        return <VariacionPanel muroIzq muroDer voltear={voltear} />
       case 'ORINALES':
         return (
           <>
@@ -347,8 +359,8 @@ export default function PreviewTipologia({ id, size = 220 }: { id: TipologiaId; 
                 <ellipse cx={11 + i * 24 + 12} cy={22} rx={5} ry={3.4} fill="none" stroke={MURO} strokeWidth={1.1} />
               </g>
             ))}
-            <Claro x1={11} x2={107} />
-            <Profundidad y1={Y0} y2={Y0 + 22} alto={H} />
+            <Claro x1={11} x2={107} voltear={voltear} />
+            <Profundidad y1={Y0} y2={Y0 + 22} alto={H} voltear={voltear} />
           </>
         )
       // igual que la anterior pero con pared al final: el último orinal no
@@ -365,8 +377,8 @@ export default function PreviewTipologia({ id, size = 220 }: { id: TipologiaId; 
                 <ellipse cx={11 + i * 24 + 12} cy={22} rx={5} ry={3.4} fill="none" stroke={MURO} strokeWidth={1.1} />
               </g>
             ))}
-            <Claro x1={11} x2={107} />
-            <Profundidad y1={Y0} y2={Y0 + 22} alto={H} />
+            <Claro x1={11} x2={107} voltear={voltear} />
+            <Profundidad y1={Y0} y2={Y0 + 22} alto={H} voltear={voltear} />
           </>
         )
     }
@@ -387,7 +399,7 @@ export default function PreviewTipologia({ id, size = 220 }: { id: TipologiaId; 
           <line x1={0} y1={0} x2={0} y2={4} stroke={MURO} strokeWidth={1.1} />
         </pattern>
       </defs>
-      {cuerpo()}
+      <g transform={voltear ? `translate(0 ${H}) scale(1 -1)` : undefined}>{cuerpo()}</g>
     </svg>
   )
 }
