@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Cabina, Config, Pais, Soporte, Tramo } from '../types'
-import { alturasDeConfig, anchosPanelFabrica, anchosPilastra, COSTILLA_MINIMA_CM, COSTILLA_TOLERANCIA_CM, esVariacionPanel, familiaDelFrente, ICONO_MR, medidasDeFrente, PIEZA_PIDE_COSTILLA_CM, puertasPosibles, tipologia } from '../catalog'
-import { anchoTotal, anchoTrasArrastre, arrancaElCuartoPmr, esEspacioLibre, minimoDe, nuevaCabina, pilastrasParaAncho, profundidadAccesible, puertaSugerida, snap, cierraConMingitorio, ladosDeCabina, lugaresDe, mamparaEn } from '../modulacion'
-import { anchosPilastraEn, medidaCercana, PILASTRA_MINIMA_CM, PUERTA_ACCESIBLE_MIN } from '../modulador'
+import { alturasDeConfig, anchosPanelFabrica, anchosPilastra, anchosPuerta, COSTILLA_MINIMA_CM, COSTILLA_TOLERANCIA_CM, esVariacionPanel, familiaDelFrente, ICONO_MR, medidasDeFrente, PIEZA_PIDE_COSTILLA_CM, puertasPosibles, tipologia } from '../catalog'
+import { anchoTotal, anchoTrasArrastre, arrancaElCuartoPmr, esEspacioLibre, minimoDe, nuevaCabina, piezasParaAncho, type PlanDeAncho, profundidadAccesible, puertaSugerida, snap, cierraConMingitorio, ladosDeCabina, lugaresDe, mamparaEn } from '../modulacion'
+import { anchosPilastraEn, medidaCercana, PILASTRA_MINIMA_CM, pilastrasDePunta, PUERTA_ACCESIBLE_MIN } from '../modulador'
 import { Grupo, Item, Menu, Raya } from './Menu'
 import {
   anchoDeOrinal, cajaDelPlano, centroPilastra, cuartoPmr, ESPESOR_MURO, esMingitorio, marcosDe, profundidadDeDivisor,
@@ -77,7 +77,6 @@ interface Props {
    * pareja. Mandarlas de a una no sirve: cada una vuelve a modular y deshace
    * la anterior.
    */
-  onPilastras: (tramoId: string, cambios: { indice: number; anchoCm: number }[]) => void
   /**
    * al arrastrar un MINGITORIO: cambia el ancho del orinal que tiene a la
    * izquierda, que es la única medida libre de esa parte de la tira
@@ -93,6 +92,12 @@ interface Props {
   onTipoPuerta: (tramoId: string, indice: number, tipo: 'puerta' | 'ninguna') => void
   /** se le escribió la medida a un ESPACIO LIBRE: queda clavada y modulan las pilastras */
   onAnchoLibre: (tramoId: string, indice: number, anchoCm: number) => void
+  /**
+   * Se le escribió el ancho a una CABINA. Llega resuelto en piezas: qué
+   * pilastras mover y, si hace falta, con qué puerta, más si se pudo dar la
+   * medida exacta.
+   */
+  onAnchoCabina: (tramoId: string, indice: number, plan: PlanDeAncho) => void
   /**
    * al arrastrar la pilastra del divisor del CUARTO PMR, la que cierra contra
    * el muro del fondo: se elige su medida y el PANEL del divisor se estira con
@@ -131,10 +136,10 @@ export default function EditorPlano({
   onSeleccion,
   onCabinas,
   onPilastra,
-  onPilastras,
   onPuerta,
   onTipoPuerta,
   onAnchoLibre,
+  onAnchoCabina,
   onPilastraPmr,
   onLateralMr,
   onSoporte,
@@ -484,9 +489,12 @@ export default function EditorPlano({
 
   /**
    * El vendedor escribió el ancho que quiere para una cabina. El ancho no es
-   * una pieza: es la puerta más lo que le toca de las pilastras de cada lado.
-   * Como la puerta manda, lo que se ajusta es la PILASTRA vecina, y se elige la
-   * de catálogo que deje la cabina lo más cerca de lo pedido.
+   * una pieza: es la puerta más lo que le toca de las pilastras de cada lado,
+   * así que para darle ESE número hay que mover piezas.
+   *
+   * Se mueven las tres que forman la cabina —la pilastra de cada lado, punta
+   * incluida, y la puerta—, siempre con medidas de catálogo y tocando lo menos
+   * posible. El resto de la tira se reacomoda después para cerrar el claro.
    */
   function pedirAncho(tramoId: string, indice: number, texto: string) {
     const t = tramoPorId(tramoId)
@@ -503,13 +511,32 @@ export default function EditorPlano({
     }
 
     const n = t.cabinas.length
-    if (n < 2) return
     const anchoPil = (j: number) => t.pilastras?.[j] ?? config.anchoPilastraCm
     // La cuenta vive en modulación: es la que decide la medida de la cabina y
     // tiene que dar igual acá que en las pruebas.
-    const medidas = anchosPilastraEn(false, config.modelo)
-    const cambios = pilastrasParaAncho(t, indice, pedido, medidas, anchoPil, arrancaElCuartoPmr(t, config))
-    if (cambios.length) onPilastras(tramoId, cambios)
+    const internas = anchosPilastraEn(false, config.modelo)
+    const plan = piezasParaAncho(
+      t,
+      indice,
+      pedido,
+      {
+        // la pilastra de punta sale de su grupo: contra pared no tiene mínimo,
+        // una esquina al aire sí
+        pilastra: (k) =>
+          k === 0 ? pilastrasDePunta(t.muroInicio)
+            : k === n ? pilastrasDePunta(t.muroFin)
+              : internas,
+        // la puerta se mueve de último y solo si no hay otra forma de dar la
+        // medida; en un orinal o en un lugar sin puerta no hay nada que mover
+        puertas:
+          cab.tipo === 'normal' && cab.puerta.tipo === 'puerta'
+            ? anchosPuerta(pais, config.modelo)
+            : [],
+      },
+      anchoPil,
+      arrancaElCuartoPmr(t, config),
+    )
+    if (plan) onAnchoCabina(tramoId, indice, plan)
   }
   function centrarPanel(tramoId: string, indice: number) {
     const t = tramoPorId(tramoId)

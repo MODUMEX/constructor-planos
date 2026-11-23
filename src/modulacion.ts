@@ -10,7 +10,7 @@ import {
   llevaAccesibleSiempre, mamparaDe, tipologia, tierDeColor, type MedidaMG,
 } from './catalog'
 import {
-  ajustarPilastras, anchosPilastraEn, GRUESO_MG_PIEZA, medidaCercana, modularTira, PILASTRA_MINIMA_CM,
+  ajustarPilastras, anchosPilastraEn, estadoDelClaro, GRUESO_MG_PIEZA, medidaCercana, modularTira, PILASTRA_MINIMA_CM,
 } from './modulador'
 import { m2DePieza, precioPieza, type TablaTarifas } from './tarifas'
 
@@ -461,6 +461,16 @@ export function reajustarConPuertas(
   cuartoComeMuro = true,
   /** cuál punta topa contra pared; decide el grupo de cada pilastra de punta */
   muros: { inicio?: boolean; fin?: boolean } = {},
+  /**
+   * Respetar las pilastras clavadas aunque la tira NO tenga espacio libre.
+   *
+   * Sin hueco que absorba la diferencia, clavar una pilastra a la fuerza
+   * DESPUÉS de buscar dejaba la tira descuadrada, y por eso se ignoraban. Con
+   * esto las clavadas entran al buscador: el claro se cierra CON ellas
+   * puestas, moviendo las demás. Es lo que hace falta cuando se escribe el
+   * ancho de una cabina y hay que respetarlo pieza por pieza.
+   */
+  respetarFijas = false,
 ): { cabinas: Cabina[]; pilastras: number[]; canaletaCm: number; ajusteCm: number; ajuste: Tramo['ajuste']; mensaje: string } | null {
   const n = cabinas.length
   if (n === 0) return null
@@ -480,7 +490,7 @@ export function reajustarConPuertas(
       pilastrasActuales ? pilastrasActuales.slice(1) : undefined,
       orinalesPedidos ? orinalesPedidos.slice(1) : undefined,
       // el cuarto arranca la tira: de ese lado ya no hay pared, hay divisor
-      cuartoComeMuro, { inicio: false, fin: muros.fin },
+      cuartoComeMuro, { inicio: false, fin: muros.fin }, respetarFijas,
     )
     if (!resto) return null
     return {
@@ -526,7 +536,7 @@ export function reajustarConPuertas(
       pilastrasActuales ? pilastrasActuales.slice(0, n) : undefined,
       orinalesPedidos ? orinalesPedidos.slice(0, n - 1) : undefined,
       // el cuarto cierra la tira: de ese lado el divisor hace de pared
-      cuartoComeMuro, { inicio: muros.inicio, fin: false },
+      cuartoComeMuro, { inicio: muros.inicio, fin: false }, respetarFijas,
     )
     if (!resto) return null
     return {
@@ -559,6 +569,7 @@ export function reajustarConPuertas(
     murosPilastra,
     extremoAbierto,
     huecoLibre: libres > 0,
+    fijas: respetarFijas ? fijas : undefined,
   })
   if (!r) return null
 
@@ -586,7 +597,7 @@ export function reajustarConPuertas(
 
   // Con un hueco en la tira, la pilastra que el vendedor clavó a mano se
   // respeta tal cual: lo que cambie de largo se lo come el espacio libre.
-  if (libres > 0 && fijas) {
+  if ((libres > 0 || respetarFijas) && fijas) {
     for (let k = 0; k < pilastras.length; k++) {
       const f = fijas[k]
       // una frontera del campo de orinales no es una pilastra que se pueda
@@ -610,6 +621,23 @@ export function reajustarConPuertas(
     const sobra = Math.max(0, snap((r.claroAjustado - piezas) / libres))
     for (let i = 0; i < nuevas.length; i++) {
       if (absorbe(cabinas[i])) nuevas[i] = { ...nuevas[i], anchoCm: snap(nuevas[i].anchoCm + sobra) }
+    }
+  }
+
+  // Con las pilastras clavadas el total es el de las piezas que quedaron, no
+  // el que eligió el buscador: hay que volver a mirar cómo cierra la tira. Sin
+  // esto el plano podía decir "calza exacto" con piezas que se pasan.
+  if (respetarFijas) {
+    const total =
+      cuerpos.reduce((s, x) => s + x, 0) + pilastras.reduce((s, x) => s + x, 0)
+    const estado = estadoDelClaro(r.claroAjustado - total, extremoAbierto, murosPilastra)
+    return {
+      cabinas: nuevas,
+      pilastras,
+      canaletaCm: estado.canaletaCm,
+      ajusteCm: estado.ajusteCm,
+      ajuste: estado.ajuste,
+      mensaje: estado.mensaje,
     }
   }
 
@@ -872,7 +900,7 @@ export function compensarPilastra(
  * La cabina accesible PLANTADA no se recalcula: su ancho no sale de las
  * pilastras de la tira —su frontera vale 0— sino de la medida que se le pidió.
  */
-function anchosConPilastras(tramo: Tramo, pilastras: number[]): Cabina[] {
+export function anchosConPilastras(tramo: Tramo, pilastras: number[]): Cabina[] {
   const lugares = lugaresDe(tramo.cabinas)
   const arranca = tramo.cabinas[0]?.tipo === 'accesible' && (tramo.pilastras?.[0] ?? 0) === 0
   const pil = (k: number) => pilastras[k] ?? 0
@@ -1912,17 +1940,60 @@ export const GRUESO = GRUESO_PILASTRA
  * Vive acá y no en el plano porque es la cuenta que decide la medida de la
  * cabina, y la tienen que dar igual la pantalla y cualquier prueba.
  */
-export function pilastrasParaAncho(
+/**
+ * Lo que hay que mover para que una cabina mida EXACTAMENTE lo que se escribió.
+ *
+ * El ancho de una cabina no es una pieza: es el cuerpo —la puerta— más lo que
+ * le toca de la pilastra de cada lado. Antes esto solo probaba las pilastras
+ * INTERNAS, con la puerta y las puntas intocables, y por eso había medidas que
+ * no se podían pedir: en un claro de 630 con siete cabinas, pedir 92 para la
+ * primera daba 97,5, porque con la puerta clavada en 64 y la pilastra a muro
+ * clavada en 24 la única que podía moverse aportaba de a media pilastra y
+ * ninguna medida de catálogo caía en el número pedido (Dayanna, 23-nov-2026:
+ * *"no me respeta el tamaño que escribo arriba, pongo 92 y me lo cambia a 97.5,
+ * en lugar de adaptar el resto del claro o piezas para que calce"*).
+ *
+ * Ahora entran al reparto las tres piezas de la cabina: la pilastra de cada
+ * lado —la de punta incluida, que contra pared no tiene mínimo— y la PUERTA.
+ * Siguen siendo todas de catálogo, así que lo que sale se puede fabricar.
+ *
+ * El orden en que elige, cuando hay varias combinaciones:
+ *
+ *   1. la que da el número pedido EXACTO;
+ *   2. entre ésas, la que menos mueve la puerta —sigue mandando ella—;
+ *   3. la que toca menos piezas;
+ *   4. la que menos se aleja de las pilastras que ya había.
+ *
+ * Si ninguna combinación llega al número pedido devuelve la más cercana con
+ * `exacto: false`, para que la pantalla lo diga en vez de cambiar el número
+ * por lo bajo.
+ */
+export type PlanDeAncho = {
+  /** las pilastras que hay que mover, por número de frontera */
+  pilastras: { indice: number; anchoCm: number }[]
+  /** la puerta nueva de ESA cabina, o null si no hace falta tocarla */
+  puertaCm: number | null
+  /** lo que se pidió y lo que se consigue con piezas de catálogo */
+  pedidoCm: number
+  logradoCm: number
+  exacto: boolean
+}
+
+export function piezasParaAncho(
   tramo: Tramo,
   indice: number,
   pedidoCm: number,
-  medidas: number[],
+  opciones: {
+    /** qué medidas admite la frontera k; vacío = esa no se mueve */
+    pilastra: (k: number) => number[]
+    /** el catálogo de puertas; vacío = la puerta no se toca */
+    puertas: number[]
+  },
   anchoPilastra: (k: number) => number,
   arrancaElCuarto = false,
-): { indice: number; anchoCm: number }[] {
-  const n = tramo.cabinas.length
+): PlanDeAncho | null {
   const cab = tramo.cabinas[indice]
-  if (!cab || n < 2) return []
+  if (!cab) return null
   const lugares = lugaresDe(tramo.cabinas)
   const cuarto = arrancaElCuarto ? 0 : -1
   /** cuánto de la pilastra de la frontera k entra en ESTA cabina */
@@ -1933,30 +2004,77 @@ export function pilastrasParaAncho(
   }
   const fIzq = parte(indice, true)
   const fDer = parte(indice + 1, false)
-  const cuerpo = cab.tipo === 'orinal' ? cab.anchoCm : cab.puerta.anchoCm
-  const objetivo = pedidoCm - cuerpo
-  const movible = (k: number) => k > 0 && k < n
   const aIzq = anchoPilastra(indice)
   const aDer = anchoPilastra(indice + 1)
-  const revuelto = (izq: number, der: number) =>
-    (fIzq > 0 && izq !== aIzq ? 1 : 0) + (fDer > 0 && der !== aDer ? 1 : 0)
+  const cuerpo0 = cab.tipo === 'orinal' ? cab.anchoCm : cab.puerta.anchoCm
 
-  let mejor: { izq: number; der: number; dif: number } | null = null
-  const opcionesIzq = fIzq > 0 && movible(indice) ? medidas : [aIzq]
-  const opcionesDer = fDer > 0 && movible(indice + 1) ? medidas : [aDer]
-  for (const izq of opcionesIzq) {
-    for (const der of opcionesDer) {
-      const dif = Math.abs(fIzq * izq + fDer * der - objetivo)
-      if (!mejor) { mejor = { izq, der, dif }; continue }
-      if (dif < mejor.dif - 0.001) { mejor = { izq, der, dif }; continue }
-      if (Math.abs(dif - mejor.dif) <= 0.001 && revuelto(izq, der) < revuelto(mejor.izq, mejor.der)) {
-        mejor = { izq, der, dif }
+  /** la medida que la pieza ya tiene siempre es una opción válida */
+  const conActual = (lista: number[], actual: number) =>
+    lista.includes(actual) ? lista : [...lista, actual]
+  const opIzq = fIzq > 0 ? conActual(opciones.pilastra(indice), aIzq) : [aIzq]
+  const opDer = fDer > 0 ? conActual(opciones.pilastra(indice + 1), aDer) : [aDer]
+  const opCuerpo = opciones.puertas.length ? conActual(opciones.puertas, cuerpo0) : [cuerpo0]
+
+  type Candidato = { izq: number; der: number; cuerpo: number; dif: number }
+  /** los cuatro criterios, en orden; gana el que es menor en el primero que difiere */
+  const notas = (c: Candidato) => [
+    Math.round(c.dif * 100) / 100,
+    Math.abs(c.cuerpo - cuerpo0),
+    (c.izq !== aIzq ? 1 : 0) + (c.der !== aDer ? 1 : 0) + (c.cuerpo !== cuerpo0 ? 1 : 0),
+    Math.abs(c.izq - aIzq) + Math.abs(c.der - aDer),
+  ]
+  const gana = (a: Candidato, b: Candidato) => {
+    const na = notas(a)
+    const nb = notas(b)
+    for (let i = 0; i < na.length; i++) {
+      if (na[i] < nb[i] - 0.001) return true
+      if (na[i] > nb[i] + 0.001) return false
+    }
+    return false
+  }
+
+  let mejor: Candidato | null = null
+  for (const cuerpo of opCuerpo) {
+    for (const izq of opIzq) {
+      for (const der of opDer) {
+        const logrado = fIzq * izq + cuerpo + fDer * der
+        const cand = { izq, der, cuerpo, dif: Math.abs(logrado - pedidoCm) }
+        if (!mejor || gana(cand, mejor)) mejor = cand
       }
     }
   }
-  if (!mejor) return []
-  const cambios: { indice: number; anchoCm: number }[] = []
-  if (fIzq > 0 && movible(indice) && mejor.izq !== aIzq) cambios.push({ indice, anchoCm: mejor.izq })
-  if (fDer > 0 && movible(indice + 1) && mejor.der !== aDer) cambios.push({ indice: indice + 1, anchoCm: mejor.der })
-  return cambios
+  if (!mejor) return null
+
+  const pilastras: { indice: number; anchoCm: number }[] = []
+  if (fIzq > 0 && mejor.izq !== aIzq) pilastras.push({ indice, anchoCm: mejor.izq })
+  if (fDer > 0 && mejor.der !== aDer) pilastras.push({ indice: indice + 1, anchoCm: mejor.der })
+  return {
+    pilastras,
+    puertaCm: mejor.cuerpo === cuerpo0 ? null : mejor.cuerpo,
+    pedidoCm,
+    logradoCm: Math.round((fIzq * mejor.izq + mejor.cuerpo + fDer * mejor.der) * 100) / 100,
+    exacto: mejor.dif <= 0.001,
+  }
+}
+
+/** el camino de siempre: solo las pilastras internas, con la puerta intocable */
+export function pilastrasParaAncho(
+  tramo: Tramo,
+  indice: number,
+  pedidoCm: number,
+  medidas: number[],
+  anchoPilastra: (k: number) => number,
+  arrancaElCuarto = false,
+): { indice: number; anchoCm: number }[] {
+  const n = tramo.cabinas.length
+  if (n < 2) return []
+  const plan = piezasParaAncho(
+    tramo,
+    indice,
+    pedidoCm,
+    { pilastra: (k) => (k > 0 && k < n ? medidas : []), puertas: [] },
+    anchoPilastra,
+    arrancaElCuarto,
+  )
+  return plan ? plan.pilastras : []
 }

@@ -337,6 +337,52 @@ function cabe(diferencia: number, extremoAbierto: boolean | undefined, murosPila
   return -diferencia <= (extremoAbierto ? 5 : 0)
 }
 
+/**
+ * Cómo queda la tira contra el claro, una vez que las piezas ya están puestas.
+ *
+ * La cuenta vivía repetida dentro de los dos buscadores, que la sacan del
+ * total que ELLOS eligieron. Cuando las piezas se clavan a mano ese total ya
+ * no sirve —las medidas son las que puso el vendedor— y hay que volver a
+ * mirar: de ahí que sea una función aparte.
+ */
+export function estadoDelClaro(
+  diferencia: number,
+  extremoAbierto: boolean | undefined,
+  murosPilastra: number,
+): { ajuste: TipoAjuste; mensaje: string; canaletaCm: number; ajusteCm: number } {
+  const abs = Math.abs(diferencia)
+  if (cabe(diferencia, extremoAbierto, murosPilastra)) {
+    return {
+      ajuste: 'exacto',
+      mensaje: abs > 0.05 ? `Calza con ajuste de ${abs.toFixed(1)} cm en la instalación` : 'Calza exacto',
+      canaletaCm: 0,
+      ajusteCm: abs > 0.05 ? Math.round(abs * 10) / 10 : 0,
+    }
+  }
+  if (diferencia > 0 && abs <= CANALETA_MAX_CM) {
+    return {
+      ajuste: 'canaleta',
+      mensaje: `Calza con canaleta de ${abs.toFixed(1)} cm (rellena el hueco)`,
+      canaletaCm: Math.min(CANALETA_MAX_CM, Math.round(abs * 10) / 10),
+      ajusteCm: 0,
+    }
+  }
+  if (diferencia > 0) {
+    return {
+      ajuste: 'sobra',
+      mensaje: `Queda un hueco de ${abs.toFixed(1)} cm: más de lo que rellena una canaleta. Si no hay pilastra que lo cierre, poné un PANEL de frente desde el menú del divisor.`,
+      canaletaCm: 0,
+      ajusteCm: 0,
+    }
+  }
+  return {
+    ajuste: 'falta',
+    mensaje: `Las piezas se pasan ${abs.toFixed(1)} cm del claro`,
+    canaletaCm: 0,
+    ajusteCm: 0,
+  }
+}
+
 export function modularTira(o: OpcionesModulacion): Modulacion | null {
   // Primero con las centrales de 24 para arriba, que es la regla: esa pasada
   // manda siempre y es la única que se corre mientras cierre. Solo si NO hay

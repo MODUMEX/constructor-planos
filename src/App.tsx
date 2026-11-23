@@ -34,9 +34,9 @@ import { contarSolicitudes } from './solicitudes'
 import { coloresMxAgrupados, eligeColorMx, slugRenderMx } from './coloresMx'
 import { fotoDe, fotosHerraje, faltanFotosHerraje, SIN_FOTO_PROPIA, terminacionesDe, urlDeFoto } from './renders'
 import {
-  anchoAccesibleDe, anchoTotal, bom, centralesAngostas, claroDeOrinales, compensarPilastra, crearTramos, esEspacioLibre,
+  anchoAccesibleDe, anchosConPilastras, anchoTotal, bom, centralesAngostas, claroDeOrinales, compensarPilastra, crearTramos, esEspacioLibre,
   frenteAccesible, invertirTramo, modularConCatalogo, nuevoId, pedidoDeModulacion,
-  PANEL_MIN_ADENTRO_CM, piezasQuePidenCostilla, profundidadAccesible, reajustarConPuertas, recesoDe, remodularTira,
+  PANEL_MIN_ADENTRO_CM, piezasQuePidenCostilla, type PlanDeAncho, profundidadAccesible, reajustarConPuertas, recesoDe, remodularTira,
 } from './modulacion'
 import { anchoDeOrinal } from './geometria'
 import { avisosDeDescargas, centrosDe, corridaDeCentros, tramoDesdeCentros } from './descargas'
@@ -238,6 +238,7 @@ export default function App() {
   // el aviso del cambio rechazado es de UN área: al pasar a otra no aplica
   useEffect(() => {
     setBloqueo(null)
+    setAnchoSinSalida(null)
   }, [activa])
   useEffect(() => {
     if (!esAdmin(usuario)) { setNSolicitudes(0); return }
@@ -248,6 +249,13 @@ export default function App() {
   const [verDuplicar, setVerDuplicar] = useState(false)
   // por qué se rechazó el último cambio de pilastra, para poder decírselo
   const [bloqueo, setBloqueo] = useState<string | null>(null)
+  /**
+   * El ancho que se escribió para una cabina y que NO se pudo dar con piezas
+   * de catálogo. Antes la app ponía la medida más cercana y se quedaba callada:
+   * se escribía 92, salía 97,5 y no había forma de saber por qué.
+   */
+  const [anchoSinSalida, setAnchoSinSalida] =
+    useState<{ cabina: number; plan: PlanDeAncho } | null>(null)
   /** si ya se le avisó que faltan datos del proyecto; se enciende al querer avanzar */
   const [avisoDatos, setAvisoDatos] = useState(false)
   const [verProyectos, setVerProyectos] = useState(false)
@@ -1216,6 +1224,71 @@ export default function App() {
         (t.pilastrasFijas ?? []).includes(i) ? (t.pilastras?.[i] ?? null) : null,
       ),
     )
+  }
+
+  /**
+   * Se escribió el ancho de una CABINA en la cota de arriba, y ese número manda.
+   *
+   * Llega resuelto en piezas desde el editor —qué pilastra de cada lado y qué
+   * puerta dan justo esa medida—; acá se aplican y se CLAVAN las dos fronteras
+   * de esa cabina, para que al cerrar el claro no se las vuelvan a mover. El
+   * resto de la tira sí se reacomoda: es lo que tiene que adaptarse, no la
+   * medida que se pidió (Dayanna, 23-nov-2026).
+   *
+   * Las puertas de las demás cabinas no se tocan: por eso va por
+   * `reajustarConPuertas` y no por el modulador, que pone una sola medida de
+   * puerta en toda la tira.
+   */
+  function onAnchoCabina(tramoId: string, indice: number, plan: PlanDeAncho) {
+    const t = area.tramos.find((x) => x.id === tramoId)
+    if (!t) return
+    const cabinas =
+      plan.puertaCm == null
+        ? t.cabinas
+        : t.cabinas.map((c, i) =>
+            i === indice ? { ...c, puerta: { ...c.puerta, anchoCm: plan.puertaCm as number } } : c,
+          )
+    const movidas = new Map(plan.pilastras.map((p) => [p.indice, p.anchoCm]))
+    // las dos fronteras de ESTA cabina quedan clavadas aunque no hayan cambiado
+    const elegidas = [...new Set([...(t.pilastrasFijas ?? []), ...movidas.keys(), indice, indice + 1])]
+      .filter((k) => k >= 0 && k <= cabinas.length)
+      .sort((a, b) => a - b)
+    const fijas = Array.from({ length: cabinas.length + 1 }, (_, k) =>
+      movidas.has(k)
+        ? (movidas.get(k) as number)
+        : elegidas.includes(k)
+          ? (t.pilastras?.[k] ?? null)
+          : null,
+    )
+    const p = pedidoDeModulacion(t, config, llevaAccesible)
+    const r = reajustarConPuertas(
+      cabinas, t.claroCm, p.murosPilastra, p.extremoAbierto, p.cuartoCm, fijas,
+      t.pilastras, orinalesPedidosDe(t), p.cuartoComeMuro,
+      { inicio: t.muroInicio, fin: t.muroFin }, true,
+    )
+    setBloqueo(null)
+    setAnchoSinSalida(plan.exacto ? null : { cabina: indice + 1, plan })
+    setArea({
+      tramos: area.tramos.map((x) => {
+        if (x.id !== tramoId) return x
+        if (r) {
+          return {
+            ...x,
+            cabinas: r.cabinas, pilastras: r.pilastras, canaletaCm: r.canaletaCm,
+            ajusteCm: r.ajusteCm, ajuste: r.ajuste, mensaje: r.mensaje, pilastrasFijas: elegidas,
+          }
+        }
+        // sin reparto posible se aplica igual lo que se pidió: la medida escrita
+        // vale más que dejar el plano como estaba
+        const pilastras = fijas.map((f, k) => f ?? x.pilastras?.[k] ?? 0)
+        return {
+          ...x,
+          cabinas: anchosConPilastras({ ...x, cabinas }, pilastras),
+          pilastras,
+          pilastrasFijas: elegidas,
+        }
+      }),
+    })
   }
 
   function onCabinas(tramoId: string, cabinas: Cabina[]) {
@@ -2373,6 +2446,24 @@ export default function App() {
                 </div>
               )}
 
+              {anchoSinSalida && (
+                <div className="aviso-caja" style={{ margin: '0 0 12px' }}>
+                  <b>Esa medida no se puede armar con piezas de catálogo</b>
+                  <span>
+                    Se pidió <b>{formatear(anchoSinSalida.plan.pedidoCm, unidad)}</b> para la
+                    cabina {anchoSinSalida.cabina} y lo más cerca que llega es{' '}
+                    <b>{formatear(anchoSinSalida.plan.logradoCm, unidad)}</b>.
+                  </span>
+                  <span>
+                    El ancho de una cabina es la puerta más lo que le toca de la pilastra de cada
+                    lado, y las tres salen de la ficha de <b>{config.modelo}</b>: no hay
+                    combinación que caiga justo en ese número. O se pide una medida que sí se pueda
+                    armar, o se da de alta la pieza que falta desde <b>Piezas especiales</b> y se
+                    vuelve a escribir.
+                  </span>
+                </div>
+              )}
+
               {medidasInventadas.length > 0 && (
                 <div className="aviso-caja" style={{ margin: '0 0 12px' }}>
                   <b>Hay medidas que no se fabrican</b>
@@ -2429,7 +2520,7 @@ export default function App() {
                     onSeleccion={setSeleccion}
                     onCabinas={onCabinas}
                     onPilastra={onPilastra}
-                    onPilastras={onPilastras}
+                    onAnchoCabina={onAnchoCabina}
                     onOrinal={onOrinal}
                     onPuerta={onPuerta}
                     onTipoPuerta={onTipoPuerta}
